@@ -1,0 +1,3 @@
+# 可选：MCP 对战模式（让 AI 助手一步一步打一局）/ optional: MCP play mode (tools/mcp_server.py)
+-r requirements.txt
+mcp>=1.20,<2

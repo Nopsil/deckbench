@@ -147,6 +147,9 @@ class DecisionLogger:
         row = {"v": 1, "seq": seq, "t_ms": int(time.time() * 1000), **self._meta, **self._ctx(), "screen": screen,
                "options": options, "choice": choice, "choice_i": choice_i, "agent": self._name,
                "reason": getattr(self._inner, "last_reason", None)}
+        for k in ("last_n", "last_source"):
+            if hasattr(self._inner, k):
+                row[k[5:]] = getattr(self._inner, k)
         row.update(extra)
         try:
             object.__setattr__(self._inner, "last_reason", None) if hasattr(self._inner, "last_reason") else None

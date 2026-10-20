@@ -146,7 +146,14 @@ def _one(args):
     signal.alarm(AGENT.get("timeout", 600))
     try:
         hooks = [force_cards_hook(AGENT["force"], AGENT.get("replace", ()))] if AGENT.get("force") or AGENT.get("replace") else []
-        ag = wrap_log(make_agent(AGENT["name"], seed, **AGENT["kw"]), char, asc, seed)
+        ag = make_agent(AGENT["name"], seed, **AGENT["kw"])
+        if AGENT.get("force_pick"):
+            from sts2sim.engine.prefs import ForcePickAgent
+            ag = ForcePickAgent(ag, AGENT["force_pick"], play_first=AGENT.get("force_pick_first", False))
+        if AGENT.get("style") == "lirixuan":
+            from sts2sim.engine.style import apply_lirixuan
+            ag = apply_lirixuan(ag)
+        ag = wrap_log(ag, char, asc, seed)
         r = play_run(char, asc, seed, agent=ag, setup_hooks=hooks)
     except RunTimeout:
         import traceback
@@ -155,6 +162,8 @@ def _one(args):
     finally:
         signal.alarm(0)
     d = r.to_dict()
+    if AGENT.get("force_pick") or AGENT.get("style"):
+        d["forced_picks"] = getattr(ag, "forced", None)
     if getattr(ag, "mstats", None):
         d["mstats"] = ag.mstats
     d["seed"] = seed
@@ -185,6 +194,9 @@ def main():
     ap.add_argument("--no-boss-aware", action="store_true", help="关闭首领感知（选牌/休息）")
     ap.add_argument("--boss-search", action="store_true", help="strong-nosearch 下只在首领战开搜索")
     ap.add_argument("--timeout", type=int, default=0, help="每局秒数上限（默认 heuristic 60，其余 900）")
+    ap.add_argument("--style", default="", choices=["", "lirixuan"], help="风格：lirixuan = 杂耍流铁甲（杂耍必拿、攻击优先、冲精英，见 sts2sim/engine/style.py）")
+    ap.add_argument("--force-pick-first", action="store_true", help="配合 --force-pick：战斗里能打出就先打")
+    ap.add_argument("--force-pick", default="", help="风格规则：卡牌奖励/商店里见到这些牌（ID，逗号分隔）就拿，例 JUGGLING")
     ap.add_argument("--seed", default="", help="指定真游戏种子（逗号分隔，可多个）；给了就只打这些局，忽略 --n/--start")
     ap.add_argument("--log-dir", default="", help="逐步决策日志目录（每局一个 JSONL）")
     a = ap.parse_args()
@@ -206,7 +218,7 @@ def main():
             akw["elite_sims"] = a.elite_sims
     with mp.Pool(a.procs, initializer=_init, initargs=({"name": a.agent, "kw": akw,
                                                                "variant": a.variant, "force": [x for x in a.force.split(",") if x],
-                                                               "replace": [x for x in a.replace.split(",") if x], "log_dir": a.log_dir, "timeout": a.timeout or (60 if a.agent == "heuristic" else 900)},)) as pool:
+                                                               "replace": [x for x in a.replace.split(",") if x], "log_dir": a.log_dir, "force_pick": [x for x in a.force_pick.split(",") if x], "style": a.style, "force_pick_first": a.force_pick_first, "timeout": a.timeout or (60 if a.agent == "heuristic" else 900)},)) as pool:
         res = pool.map(_one, jobs, chunksize=1)
     dt = time.time() - t
     wins = sum(r["victory"] for r in res)
