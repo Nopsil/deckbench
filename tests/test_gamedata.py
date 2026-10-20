@@ -70,3 +70,19 @@ def test_repo_ships_no_generated_game_code():
     gen = os.path.join(root, "sts2sim", "gen")
     assert sorted(f for f in os.listdir(gen) if not f.startswith("__pycache__")) == ["__init__.py"]
     assert not os.path.exists(os.path.join(root, "data", "monster_ai.json"))
+
+
+def test_ensure_regenerates_from_previous_game_dir(env, monkeypatch):
+    """游戏更新后（哈希变了），即使不在默认位置，也用上次 --game-dir 的路径自动重新生成。"""
+    game, dll, cache = env
+    d = _fake_cache(dll, cache)
+    m = json.load(open(os.path.join(d, "manifest.json")))
+    m["game_dir"] = str(game)
+    json.dump(m, open(os.path.join(d, "manifest.json"), "w"))
+    monkeypatch.delenv("DECKBENCH_GAME_DIR")
+    monkeypatch.setattr(gd, "_steam_roots", lambda: [])
+    dll.write_bytes(b"updated")
+    called = {}
+    monkeypatch.setattr(gd, "setup", lambda game_dir=None, keep_src=False: called.setdefault("dir", game_dir))
+    gd.ensure(interactive=False)
+    assert called["dir"] == str(game)

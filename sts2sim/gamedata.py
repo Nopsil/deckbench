@@ -162,11 +162,22 @@ def ensure(interactive=True):
     try:
         return verify()
     except GameDataError:
+        game_dir = None
         if find_dll() is None:
-            raise GameDataError(NOT_FOUND_HELP)
+            game_dir = _previous_game_dir()   # 之前用 --game-dir 指定过的安装（例如游戏更新后自动重新生成）
+            if game_dir is None or find_dll(game_dir) is None:
+                raise GameDataError(NOT_FOUND_HELP)
         if interactive:
             print("首次运行：从你本机的游戏安装生成数据（几分钟）/ first run: generating data from your install ...", flush=True)
-        return setup()
+        return setup(game_dir)
+
+
+def _previous_game_dir():
+    try:
+        d = json.load(open(_current_file(), encoding="utf-8"))["cache_dir"]
+        return json.load(open(os.path.join(d, "manifest.json"), encoding="utf-8")).get("game_dir")
+    except Exception:
+        return None
 
 
 def require():

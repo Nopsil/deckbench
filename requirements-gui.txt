@@ -1,0 +1,6 @@
+# 图形界面需要 / needed for the desktop app (python -m gui.app)
+-r requirements.txt
+fastapi
+uvicorn
+python-multipart
+pywebview      # 可选：独立窗口；装不上也没关系，会改用浏览器打开 / optional: native window, falls back to the browser

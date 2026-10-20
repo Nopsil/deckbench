@@ -5,11 +5,11 @@
 ## 运行（开发模式）
 
 ```bash
-.venv/bin/pip install fastapi uvicorn python-multipart pywebview   # pywebview 可选：没有就用浏览器
+.venv/bin/pip install -r requirements-gui.txt   # Windows: .venv\Scripts\pip ...；pywebview 可选：没有就用浏览器
 .venv/bin/python -m gui.app              # 独立窗口（pywebview）
 .venv/bin/python -m gui.app --browser    # 浏览器
 .venv/bin/python -m gui.app --serve --port 8765   # 只开服务
-cd gui/web && npm install && npm run build         # 改了前端后重新构建（dist/ 不进 git，打包前先构建）
+cd gui/web && npm install && npm run build         # 改了前端后重新构建（dist/ 不进 git，第一次运行前和打包前都要先构建）
 ```
 
 数据（每次测试的参数、日志、结果、上传的 mod）存在 `gui/.data/`（打包版是 exe 旁边的 `data/`），不进 git。
