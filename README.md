@@ -15,7 +15,7 @@
 > - **许可范围**：[LICENSE](LICENSE)（MIT）只覆盖贡献者自己编写的代码，不授予任何游戏代码、数据、美术或商标的许可。
 >   **License scope**: [LICENSE](LICENSE) (MIT) covers only contributors' own code and grants no license to any game code, data, art or trademarks.
 > - Slay the Spire 2 是 Mega Crit 的商标；本项目提及游戏名称仅为说明兼容性。/ Slay the Spire 2 is a trademark of Mega Crit; the name is used only to describe compatibility.
-> - 联系 / Contact: **TODO-CONTACT-EMAIL**（版权方如有任何问题请联系，我们会尽快处理 / rights holders: please reach out and we will respond promptly）
+> - 联系 / Contact: **nopsil@hotmail.com**（版权方如有任何问题请联系，我们会尽快处理 / rights holders: please reach out and we will respond promptly）
 
 给《杀戮尖塔 2》mod 作者用的**非官方**平衡测试工具：不进游戏，让 AI 自动打成百上千局，给出胜率、到达层数、死因、单卡贡献和 A/B 对比。
 An unofficial balance-testing bench for Slay the Spire 2 mod authors: AI plays thousands of runs/fights and reports win rate, floors reached, death causes, per-card impact and A/B comparisons.
