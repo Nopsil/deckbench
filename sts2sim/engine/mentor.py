@@ -339,12 +339,16 @@ def map_action(a, player, acts, alive):
     raise Unsupported(f"unknown action {a}")
 
 
-def make_mentor_agent(seed=0, sims=1000, threads=1, fallback_search=True, mentor_rooms=None, **kw):
+def make_mentor_agent(seed=0, sims=1000, threads=1, fallback_search=True, mentor_rooms=None, noncombat=False, **kw):
     """局外 = learned（StrongAgent）；战斗 = spire-mentor MCTS，不支持时回退到 learned-search（或 learned）。"""
     from .strong import StrongAgent
+    bases = (StrongAgent,)
+    if noncombat:   # 局外决策也交给 spire-mentor 的 PPO 网络（mentor_full.py）
+        from .mentor_full import PpoNonCombat
+        bases = (PpoNonCombat, StrongAgent)
 
-    class MentorAgent(StrongAgent):
-        name = "mentor-mcts"
+    class MentorAgent(*bases):
+        name = "mentor-full" if noncombat else "mentor-mcts"
 
         def __init__(self):
             super().__init__(seed=seed, search=fallback_search, **kw)

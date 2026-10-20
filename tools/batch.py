@@ -2,6 +2,7 @@
 import argparse
 import json
 import multiprocessing as mp
+import os
 import time
 
 
@@ -36,8 +37,8 @@ def make_agent(name, seed, **kw):
         load_learned()
         from sts2sim.engine.imitate import ImitationAgent
         return ImitationAgent(seed=s, **kw)
-    if name in ("mentor-mcts", "mentor-boss"):
-        # 外部 spire-mentor（Rust）MCTS 打战斗；不认识的内容回退 learned-search。需要用户本地构建 sts2_rs（见 reports/fast_engine.md）
+    if name in ("mentor-mcts", "mentor-boss", "mentor-full"):
+        # 外部 spire-mentor（Rust）MCTS 打战斗；不认识的内容回退 learned-search。需要用户本地构建 sts2_rs（见 docs/DEVELOPER.md）
         from sts2sim.engine.weights import load_learned
         load_learned()
         from sts2sim.engine.mentor import make_mentor_agent
@@ -46,6 +47,10 @@ def make_agent(name, seed, **kw):
             kw = dict(kw, mentor_rooms={"Boss"}, fallback_search=False, boss_search=True)
             kw.setdefault("boss_width", 8)
             kw.setdefault("boss_depth", 99)
+        if name == "mentor-full":
+            kw = dict(kw, noncombat=True)
+        if os.name == "nt":      # 回退搜索要 os.fork()，Windows 上没有 → 回退到不搜索的 learned
+            kw.setdefault("fallback_search", False)
         return make_mentor_agent(seed=s, **kw)
     if name == "heuristic":
         return None
@@ -135,7 +140,7 @@ def main():
     ap.add_argument("--start", type=int, default=0)
     ap.add_argument("--procs", type=int, default=mp.cpu_count())
     ap.add_argument("--out", default=None)
-    ap.add_argument("--agent", default="heuristic", choices=["heuristic", "search", "strong", "strong-nosearch", "planner", "planner-search", "learned", "learned-search", "learned-boss", "imitation", "mentor-mcts", "mentor-boss"])
+    ap.add_argument("--agent", default="heuristic", choices=["heuristic", "search", "strong", "strong-nosearch", "planner", "planner-search", "learned", "learned-search", "learned-boss", "imitation", "mentor-mcts", "mentor-boss", "mentor-full"])
     ap.add_argument("--sims", type=int, default=0, help="mentor-*：每个决策的 MCTS 模拟次数（默认 1000）")
     ap.add_argument("--width", type=int, default=6)
     ap.add_argument("--depth", type=int, default=1)
@@ -177,6 +182,13 @@ def main():
         nm, nf = sum(m["mentor"] for m in ms), sum(m["fallback"] for m in ms)
         print(f"  mentor decisions {nm}, fallback {nf} ({nf / max(1, nm + nf):.1%}), "
               f"mcts {sum(m['mcts_sec'] for m in ms) / max(1, nm) * 1000:.0f} ms/decision")
+        pp = collections.defaultdict(lambda: [0, 0])
+        for m in ms:
+            for k, v in (m.get("ppo") or {}).items():
+                pp[k][0] += v[0]; pp[k][1] += v[1]
+        if pp:
+            print("  ppo non-combat (net/fallback):", {k: tuple(v) for k, v in sorted(pp.items())},
+                  "| errors", dict(collections.Counter(k for m in ms for k, n in (m.get("ppo_err") or {}).items() for _ in range(n))))
     for r in errs[:5]:
         ls = r["error"].splitlines()
         print("ERR", r["seed"], ls[0][:200], "|", ls[-2][:200] if len(ls) > 1 else "")
