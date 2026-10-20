@@ -87,7 +87,7 @@ class LocalPythonBackend(SimBackend):
 
     def capabilities(self):
         return {"batch": True, "combat": True, "yaml_mods": True, "dll_mods": False,
-                "engine": "公测版 v0.111.0 转译引擎（整局）+ YAML 战斗模拟器"}
+                "engine": "本机转译引擎（整局，版本取自你的安装）+ YAML 战斗模拟器"}
 
     # ---------------- 目录：角色、AI、变体、卡牌、实验预设、mod
     def _cards(self, refresh=False):

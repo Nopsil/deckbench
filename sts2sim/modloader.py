@@ -52,6 +52,10 @@ class ModSet:
 
     def _load_mod(self, name):
         base = os.path.join(MODS_DIR, name)
+        if not os.path.exists(os.path.join(base, "mod.yaml")):
+            hint = ("\n原版对照组 mods/vanilla 不随仓库分发（属于游戏数据），需要你自己在本机整理，见 README「可选外部依赖」。"
+                    "\nmods/vanilla is not shipped (game data); see README 'Optional external dependencies'.") if name == "vanilla" else ""
+            raise SystemExit(f"找不到 mod / mod not found: {base}{hint}")
         meta = _yaml(os.path.join(base, "mod.yaml"))
         self.meta[name] = meta
         if meta.get("hooks"):
