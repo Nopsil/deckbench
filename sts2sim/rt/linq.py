@@ -18,6 +18,21 @@ class _CInt(int):
 
 
 def _key_cmp(a, b):
+    """LINQ 排序键比较。多键 orderby（转译成元组）逐项比较；IComparable 对象（如 ModelId）用 CompareTo；null 最小。"""
+    if a is None or b is None:
+        return (a is not None) - (b is not None)
+    if isinstance(a, tuple) and isinstance(b, tuple):
+        for x, y in zip(a, b):
+            c = _key_cmp(x, y)
+            if c:
+                return c
+        return len(a) - len(b)
+    if hasattr(a, "CompareTo") and not isinstance(a, (int, float, str)):
+        try:
+            c = a.CompareTo(b)
+            return (c > 0) - (c < 0)
+        except (TypeError, AttributeError):
+            pass
     try:
         return (a > b) - (a < b)
     except TypeError:
