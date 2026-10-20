@@ -1,5 +1,18 @@
 # 更新日志 / Changelog
 
+## 0.1.3 (2026-10)
+
+- 新 AI「通用 AI（推荐，模组角色也能用）」（`modai`）：选牌、休息、商店交给一个只看通用数值、不看卡名的小网络，**模组角色也能用**，速度同学习版，Windows 可用。测试中原版角色平均多走约 1.5–4 层，Claude娘 A0 16.8 → 20.2 层。模型文件只有网络权重。`modai-boss`（加首领战推演）在 Windows 上隐藏。
+  *New "General AI" (`modai`, recommended): a small character-agnostic network for card rewards, rest sites and shops (generic numbers only, no card names), so it works for mod characters; same speed as the learned AI, works on Windows. Weights-only model file. `modai-boss` is hidden on Windows.*
+- 指定游戏种子：「新建测试 → 整局批量」可以填游戏里的种子（自动按游戏规则转大写、O→0、I→1），只打这一局并记录每一步的决策。命令行 `tools/batch.py --seed … --log-dir …`。
+  *Play a real game seed: enter it in New Test (normalized like the game) to play that one run with a per-step decision log. CLI: `--seed`, `--log-dir`.*
+- MCP 对战模式（从源码运行，可选 `requirements-mcp.txt`）：`tools/mcp_server.py` 让支持 MCP 的 AI 助手一步一步打一局，可撤销、恢复、导出操作清单。卡牌中文名运行时从你自己的游戏安装读取，不随项目分发。见 `docs/MCP.md`。
+  *MCP play mode (from source, optional `requirements-mcp.txt`): `tools/mcp_server.py` lets MCP clients play a seeded run step by step with undo/restore/export. Card names are read from your own install at runtime and never shipped.*
+- 可选的 spire-mentor AI：新增 `mentor-full-ev`（普通事件和锻造/删牌/变形/附魔选牌也交给它的 PPO，首领/精英战 4000 次模拟）；`--boss-sims` / `--elite-sims`。A10（每角色 60 局）：`mentor-full` 0/300 → `mentor-full-ev` 5/300。事件的英文文本运行时从你的游戏安装读取。
+  *Optional spire-mentor agent `mentor-full-ev` (PPO also for regular events and out-of-combat card picks; 4000 sims in boss/elite fights) and `--boss-sims` / `--elite-sims`. A10 over 300 runs: 0 → 5 wins. Event text is read from your install at runtime.*
+- 新模块 `sts2sim/gameloc.py`：从你的游戏 `.pck` 里读官方英文/中文本地化，只在内存里用（可用 `DECKBENCH_GAME_PCK`、`DECKBENCH_GAME_LOC_ENG` / `_ZHS` 覆盖）。
+  *New `sts2sim/gameloc.py`: reads official English/Chinese localization from your own `.pck` at runtime, in memory only.*
+
 ## 0.1.2 (2026-10)
 
 - 新 AI `mentor-full`（可选，需要自己构建外部的 spire-mentor）：战斗用它的 MCTS，选牌/路线/商店/休息/Neow 用它的 PPO 网络；Rust 端出错（panic）时回退到我们的 AI，不中断运行。只支持原版 5 个角色，模组角色回退学习版 AI。`tools/batch.py --agent mentor-full` 会打印局外决策统计。

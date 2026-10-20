@@ -98,6 +98,28 @@ $env:DECKBENCH_GAME_DIR = "D:\SteamLibrary\steamapps\common\Slay the Spire 2"
 
 *Install the game, Python 3.11+ (tick "Add to PATH"), .NET 9 SDK, Node.js LTS and ilspycmd; download the ZIP; run the four commands above in PowerShell inside the folder. The first launch generates data from your game in about 1–2 minutes. If your game is in a non-default Steam library, pass `--game-dir` as shown or set `DECKBENCH_GAME_DIR`. Linux/macOS: see [docs/DEVELOPER.md](docs/DEVELOPER.md).*
 
+## 选哪个 AI / Which AI to pick
+
+- **「通用 AI（推荐，模组角色也能用）」**：大多数情况推荐用它。选牌、休息、商店交给一个小网络，它只看通用数值（费用、伤害、格挡、稀有度……），不认具体卡名，所以**你自己做的模组角色也能用**。速度和学习版一样（每局 1–2 秒），Windows 可用。我们的测试里它比学习版平均多走 1–4 层。
+- **「学习版 AI」**：上一版的推荐，速度一样，可以拿来对照。
+- **「spire-mentor 整局 AI」两项**：最强，但要你自己另外构建第三方的 spire-mentor，只支持 5 个原版角色，详见 [docs/DEVELOPER.md](docs/DEVELOPER.md)。
+
+*"通用 AI" (modai, recommended) uses a small network that only looks at generic numbers (cost, damage, block, rarity…), not card names, so it works for your own mod characters too; same speed as the learned AI, works on Windows. The spire-mentor agents are stronger but need the external spire-mentor and support vanilla characters only.*
+
+## 用游戏里的种子 / Play a real game seed
+
+在「新建测试 → 整局批量」里填 **「指定游戏种子」**（游戏里显示的那串，例如 `7F3K9Q2ZB8MA`），AI 就只打这一局，并记录每一步怎么选的，在结果页可以看。
+小写、字母 O 和 I 会按游戏规则自动换成大写、数字 0 和 1。命令行：`python tools/batch.py --char Silent --seed 7F3K9Q2ZB8MA --log-dir steps`。
+
+*Type a seed from the game into "指定游戏种子" in New Test → full runs: the AI plays just that run and records every decision. Lowercase, O and I are normalized like the game does. CLI: `--seed` and `--log-dir`.*
+
+## 让 AI 助手一步一步打（MCP） / Let an AI assistant play (MCP)
+
+如果你用 Claude、Cursor 之类支持 MCP 的 AI 助手，可以让它在模拟器里亲自打一局：它能看局面、选选项、写理由、撤销重来，最后导出一份操作清单，你可以拿同一个种子在真游戏里照着打。
+目前只能从源码运行：`pip install -r requirements-mcp.txt`，然后 `python tools/mcp_server.py`。卡牌的中文名会在运行时从你自己的游戏安装里读取。详见 [docs/MCP.md](docs/MCP.md)。
+
+*MCP clients (Claude, Cursor, …) can play a seeded run step by step: read the state, choose with a reason, undo, and export a replay list for the real game. From source only: `pip install -r requirements-mcp.txt`, then `python tools/mcp_server.py`. Card names are read from your own install at runtime. See docs/MCP.md.*
+
 ## 怎么看结果 / Reading results
 
 - **胜率**：打赢最终首领的局数占比。
@@ -121,8 +143,8 @@ $env:DECKBENCH_GAME_DIR = "D:\SteamLibrary\steamapps\common\Slay the Spire 2"
 *Data is bound to your game files; after an update the app regenerates it on next launch, or run the command above.*
 
 **为什么 Windows 上没有「强 AI（带搜索）」「学习版 AI（带搜索）」？**
-带搜索的 AI 需要系统的 fork 功能，Windows 没有，所以界面里会自动隐藏。Windows 上推荐用 **「学习版 AI（推荐）」**，它不需要搜索。
-*Search-based AIs need `fork()`, which Windows lacks; use "learned" (recommended) on Windows.*
+带搜索的 AI 需要系统的 fork 功能，Windows 没有，所以界面里会自动隐藏。Windows 上推荐用 **「通用 AI（推荐，模组角色也能用）」**，它不需要搜索。
+*Search-based AIs need `fork()`, which Windows lacks; use "通用 AI" (modai, recommended) on Windows.*
 
 **为什么必须有自己的游戏？**
 我们不能也不会分发游戏的任何内容。DeckBench 只在你电脑上读取你自己的游戏来模拟它的规则，所以没有正版游戏就没法用。

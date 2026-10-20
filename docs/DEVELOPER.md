@@ -84,8 +84,12 @@ PYTHONPATH=. .venv/bin/python tools/batch.py --char Claude --asc 10 --n 100 --ag
 | `--n` / `--start` | `20` / `0` | 跑多少局 / 从第几号种子开始（种子 `R<start>`…） |
 | `--procs` | CPU 核数 | 并行进程数 |
 | `--out` | 无 | 每局结果写成 JSONL |
-| `--agent` | `heuristic` | `heuristic`（快）、`learned`（推荐）、`learned-search`、`learned-boss`、`strong`、`strong-nosearch`、`planner`、`planner-search`、`search`、`imitation`、`mentor-mcts`、`mentor-boss`、`mentor-full`（需外部 spire-mentor） |
+| `--agent` | `heuristic` | `heuristic`（快）、`modai`（推荐，通用 AI，模组角色也能用）、`modai-boss`（+ 首领战推演，仅 Linux/macOS）、`learned`、`learned-search`、`learned-boss`、`strong`、`strong-nosearch`、`planner`、`planner-search`、`search`、`imitation`、`mentor-mcts`、`mentor-boss`、`mentor-full`、`mentor-full-ev`（需外部 spire-mentor） |
 | `--sims` | 1000 | `mentor-*` 每个决策的 MCTS 模拟次数 |
+| `--boss-sims` / `--elite-sims` | 同 `--sims`（`mentor-full-ev` 为 4000） | `mentor-*` 首领 / 精英战每步的模拟次数 |
+| `--seed` | 空 | 真游戏种子（逗号分隔可多个；按游戏规则转大写、O→0、I→1）；给了就忽略 `--n/--start` |
+| `--log-dir` | 空 | 每局一个逐步决策日志 JSONL（`<角色>_A<进阶>_<种子>.jsonl`） |
+| `--style` / `--force-pick` / `--force-pick-first` | 空 | 风格规则：`lirixuan`（杂耍流铁甲）；见到这些牌就拿；战斗里先打 |
 | `--width` / `--depth` | `6` / `1` | `search` AI 的搜索宽度/深度 |
 | `--variant` | 无 | Claude娘简化变体（`mods/claude_v35/cards_v35.py` 的 `VARIANTS` 键） |
 | `--force` | 空 | 强制加入起始牌组的牌，逗号分隔，`ID+` 为升级版（单卡 A/B 用） |
@@ -94,7 +98,7 @@ PYTHONPATH=. .venv/bin/python tools/batch.py --char Claude --asc 10 --n 100 --ag
 | `--boss-search` | 关 | `strong-nosearch` 下只在首领战开搜索 |
 | `--timeout` | heuristic 60，其余 900 | 每局秒数上限 |
 
-带搜索的 AI（`strong`、`search`、`learned-search`、`learned-boss`、`planner-search`）用 `os.fork()` 给游戏状态拍快照，只能在 Linux/macOS 上用。
+带搜索的 AI（`strong`、`search`、`learned-search`、`learned-boss`、`planner-search`、`modai-boss`）用 `os.fork()` 给游戏状态拍快照，只能在 Linux/macOS 上用。
 
 其他工具：`tools/ab_card.py`（同种子单卡 A/B：`--force`、`--replace`、`--variant`、`--base-variant`…）、`tools/boss_bench.py`（首领战基准）、
 `tools/tune_cma.py`（CMA-ES 自我对局调参 → `data/ai_weights.json`）、`tools/imitate.py`（模仿学习 → `data/imitation_model.json`）、
@@ -106,19 +110,24 @@ PYTHONPATH=. .venv/bin/python tools/batch.py --char Claude --asc 10 --n 100 --ag
 需要的话请自己克隆并按它的说明用 maturin 构建 Python 绑定 `sts2_rs`。
 *spire-mentor is an external, third-party dependency. Its repository contains game text/data, so DeckBench ships nothing from it (no code, networks or data). Clone and build it yourself.*
 
-三个 AI（`tools/batch.py --agent …`）：
+四个 AI（`tools/batch.py --agent …`）：
 
 | AI | 战斗 | 局外（选牌、路线、商店、休息、Neow/先古之民） |
 |---|---|---|
 | `mentor-mcts` | spire-mentor MCTS（`--sims`，默认 1000） | 我们的 learned |
 | `mentor-boss` | 只有首领战用 MCTS | 我们的 learned |
 | `mentor-full` | spire-mentor MCTS | spire-mentor 的 PPO 网络（每角色一个 ONNX）；其他事件、宝箱、锻造选牌仍用 learned |
+| `mentor-full-ev` | spire-mentor MCTS，首领/精英 4000 模拟 | 同上，另外普通事件、锻造/删牌/变形/附魔选牌也用 PPO；宝箱和局外药水仍用 learned |
 
 - 统计会打印 MCTS 决策数与回退比例；`mentor-full` 还会打印每类局外决策“网络/回退”的次数。
 - 遇到 spire-mentor 不认识的牌/遗物/怪物、调用出错，或者 Rust 端 panic（例如找不到 PPO 网络），都会**回退到我们自己的 AI**，不会中断批量运行。
 - **只支持原版 5 个角色。** 模组角色（如 Claude娘）的局外决策和不认识的战斗都会回退到 learned AI。
   *Only the 5 vanilla characters are supported; mod characters (e.g. Claude) fall back to the learned AI.*
-- 参考：A0 每角色 60 局，`mentor-full` 胜率 23–63%，约 25–55 秒/局（单进程）；A10 目前没有胜局。
+- 参考（每角色 60 局，种子 R0–R59）：A0 `mentor-full` 胜率 23–63%，约 25–55 秒/局（单进程）。
+  A10：`mentor-full` 0/300；`mentor-full-ev` 5/300（Ironclad 2、Defect 3，其余 0），平均层数每个角色都更高，约 50–130 秒/局。
+- `mentor-full-ev` 的普通事件需要英文选项文本：运行时从**你本机的游戏安装**（游戏目录里的 `.pck`）读取，只在内存里用，不写盘、不分发（`sts2sim/gameloc.py`）。
+  读不到时这些事件回退到 learned。可选覆盖：`DECKBENCH_GAME_PCK=<.pck 路径>`，或 `DECKBENCH_GAME_LOC_ENG` / `DECKBENCH_GAME_LOC_ZHS` 指向含 `events.json` 等表的目录。
+  *`mentor-full-ev` reads the English event option text from your own install's `.pck` at runtime (memory only, never written or shipped); without it those events fall back to the learned AI.*
 
 **配置 / Setup**：设置两个环境变量指向你自己构建的 spire-mentor：
 
@@ -149,6 +158,18 @@ spire-mentor 已经实现了这些牌，但 `state_from_dict` 查牌 id 时只�
 我们有一个很小的本地补丁 [`docs/patches/spire-mentor-v0111-cards.patch`](patches/spire-mentor-v0111-cards.patch)（只改 spire-mentor 自己的代码，两处加 `.chain(CardId::V0111_ONLY.iter())`，不含游戏文本或数据）。
 在你的 spire-mentor 克隆里 `cd sts2-rs && git apply <补丁>`，再重新构建 `sts2_rs`；打补丁后回退降到约 0.2–0.3%。
 *spire-mentor implements these cards, but `state_from_dict` only searches `CardId::all()` (the v0.107.1 set) and misses `CardId::V0111_ONLY`, so decks with them fall back to our AI. A tiny code-only patch (no game text/data) is in `docs/patches/spire-mentor-v0111-cards.patch`: apply it in your spire-mentor checkout (`cd sts2-rs && git apply …`) and rebuild.*
+
+## 通用 AI（modai）/ General AI
+
+`--agent modai`：选牌（含跳过）、休息点、商店由一个与角色无关的小网络决定（`sts2sim/engine/modai.py`，纯 Python 推理，Windows 可用）；路线和出牌用 learned。
+网络只看通用数值（费用、伤害、格挡、抽牌、能量、状态、关键词、稀有度、牌组统计、生命、金币…），**不看牌/遗物 ID**，所以模组角色也能用。
+它是用 spire-mentor 的 PPO 当老师、在原版 5 个角色的本机对局上蒸馏出来的；`data/modai_model.json` 只有网络权重和特征归一化参数（约 200 KB），不含任何游戏数据。
+`DECKBENCH_MODAI_MODEL=<json>` 换模型。参考（R0–R59，每格 60 局）：原版五角色平均层数 A0 19.5 → 23.8（0 → 4 胜）、A10 13.1 → 14.5；Claude娘 A0 16.8 → 20.2、A10 13.0 → 14.2。
+*`modai`: a character-agnostic network for card rewards, rest sites and shops (generic numeric features only, no card/relic IDs), distilled from spire-mentor's PPO on vanilla characters; the model file holds weights only.*
+
+## MCP 对战模式 / MCP play mode
+
+见 [docs/MCP.md](MCP.md)：`tools/mcp_server.py`（stdio 或 streamable-HTTP），每局一个子进程，可撤销/恢复/导出。需要 `pip install -r requirements-mcp.txt`。
 
 ## 旧版 YAML 战斗模拟器 / Legacy YAML combat simulator
 
@@ -234,9 +255,9 @@ tests/               单元测试
 dotnet tool install -g ilspycmd --version 9.1.0.7988
 dotnet publish gui\packaging\decompiler\ilspycmd-host.csproj -c Release -r win-x64 --self-contained -o <decompiler 目录> -p:IlspyToolDir=<ilspycmd 工具目录 tools\net8.0\any>
 # 2) 打包（Python 3.12 venv 里装 requirements-gui.txt + pyinstaller；需要 Node.js）
-powershell -ExecutionPolicy Bypass -File gui\packaging\build.ps1 -Work <工作目录> -Py <venv>\Scripts\python.exe -Decompiler <decompiler 目录> -Version 0.1.2
+powershell -ExecutionPolicy Bypass -File gui\packaging\build.ps1 -Work <工作目录> -Py <venv>\Scripts\python.exe -Decompiler <decompiler 目录> -Version 0.1.3
 # 3) 审计：确认包里没有任何游戏文件/数据/生成代码（可选：与游戏安装、本机缓存逐文件比对哈希）
-powershell -ExecutionPolicy Bypass -File gui\packaging\audit.ps1 -Path <工作目录>\DeckBench-0.1.2-win64.zip -GameDir "<游戏目录>" -Cache "$env:LOCALAPPDATA\deckbench"
+powershell -ExecutionPolicy Bypass -File gui\packaging\audit.ps1 -Path <工作目录>\DeckBench-0.1.3-win64.zip -GameDir "<游戏目录>" -Cache "$env:LOCALAPPDATA\deckbench"
 ```
 
 - `build.ps1` 只打包 **git 跟踪的文件**（`git ls-files`），所以本机生成的 `game.py`、缓存等不可能混进去；临时文件/缓存都放在 `-Work` 目录。
