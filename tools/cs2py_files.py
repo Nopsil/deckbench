@@ -1140,25 +1140,26 @@ def prim_params(ti):
 
 
 def run(core_dir, out_path, rels, exclude=(), report_path=None):
+    core_dir = core_dir.replace(os.sep, "/")   # 统一用 / ：Windows 上输出与 Linux 逐字节一致
     files = []
     for r in rels:
-        full = os.path.join(core_dir, r)
+        full = core_dir + "/" + r
         if full.endswith(".cs"):
             files.append(full)
             continue
         for dp, dn, fn in os.walk(full):
             for f in sorted(fn):
                 if f.endswith(".cs"):
-                    files.append(os.path.join(dp, f))
+                    files.append(os.path.join(dp, f).replace(os.sep, "/"))
     files = sorted(set(files))
     # pass 1
     for f in files:
         src = open(f, encoding="utf-8-sig").read()
-        src = apply_patches(os.path.relpath(f, core_dir), src)
+        src = apply_patches(os.path.relpath(f, core_dir).replace(os.sep, "/"), src)
         toks = lex(src)
         p = P2(toks, Ctx(set(), set()))
         try:
-            scan_types(p, None, os.path.relpath(f, core_dir))
+            scan_types(p, None, os.path.relpath(f, core_dir).replace(os.sep, "/"))
         except Exception as e:  # noqa
             print("SCAN FAIL", f, type(e).__name__, e)
     excl = set(exclude)
@@ -1255,10 +1256,10 @@ def run(core_dir, out_path, rels, exclude=(), report_path=None):
             _txt = re.sub(r"(Relic[\w.]*\([^()]*_g=\()" + dn + r"(,\))", r"\g<1>" + dpy + r"\2", _txt)
     # 委托 .Target（闭包所属对象）：Python lambda 无此概念，静态检查恒为 False
     _txt = re.sub(r"_isinst\((\w+)\.Target, AbstractModel\)", "False", _txt)
-    open(out_path, "w").write(_txt)
+    open(out_path, "w", encoding="utf-8", newline="\n").write(_txt)
     if report_path:
-        json.dump(report, open(report_path, "w"), ensure_ascii=False, indent=1)
-        with open(report_path.replace(".json", "_skipped.tsv"), "w") as f:
+        json.dump(report, open(report_path, "w", encoding="utf-8", newline="\n"), ensure_ascii=False, indent=1)
+        with open(report_path.replace(".json", "_skipped.tsv"), "w", encoding="utf-8", newline="\n") as f:
             for row in SKIPPED:
                 f.write("\t".join(row) + "\n")
     nerr = sum(1 for v in report.values() if v["errors"])

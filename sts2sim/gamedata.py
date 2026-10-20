@@ -47,8 +47,10 @@ NOT_FOUND_HELP = (
     "本工具不包含任何游戏文件，需要你自己已购买并安装的游戏（Steam 正式版或公开测试分支均可）。\n"
     "This tool ships no game files; it needs your own installed copy of the game (stable or public beta).\n"
     "  1) 安装游戏 / install the game via Steam\n"
-    "  2) python -m sts2sim.gamedata setup --game-dir \"<...>/steamapps/common/" + GAME_FOLDER + "\"\n"
-    "     或设置环境变量 / or set DECKBENCH_GAME_DIR")
+    + ("  2) DeckBench.exe --game-dir \"D:\\SteamLibrary\\steamapps\\common\\" + GAME_FOLDER + "\"\n"
+       "     或设置环境变量 / or set DECKBENCH_GAME_DIR" if getattr(sys, "frozen", False) else
+       "  2) python -m sts2sim.gamedata setup --game-dir \"<...>/steamapps/common/" + GAME_FOLDER + "\"\n"
+       "     或设置环境变量 / or set DECKBENCH_GAME_DIR"))
 
 
 # ---------------------------------------------------------------- 路径
@@ -277,8 +279,9 @@ def setup(game_dir=None, keep_src=False):
     print("游戏 / game:", dll, flush=True)
     digest = sha256(dll)
     rel = {}
-    ri = os.path.join(bin_dir, "release_info.json")
-    if os.path.exists(ri):
+    ri = next((os.path.join(d, "release_info.json") for d in (bin_dir, os.path.dirname(bin_dir), os.path.dirname(os.path.dirname(bin_dir)))
+               if os.path.exists(os.path.join(d, "release_info.json"))), "")
+    if ri:
         try:
             rel = json.load(open(ri, encoding="utf-8"))
         except Exception:

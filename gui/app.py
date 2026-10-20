@@ -166,6 +166,8 @@ def main():
                 pass
             os._exit(1)
         return
+    if "--game-dir" in argv:   # DeckBench.exe --game-dir "<游戏目录>"：指定非默认位置的安装（之后会记住）
+        os.environ["DECKBENCH_GAME_DIR"] = argv[argv.index("--game-dir") + 1]
     _ensure_game_or_exit()
     port = free_port()
     if "--port" in argv:

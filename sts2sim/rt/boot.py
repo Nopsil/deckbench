@@ -125,7 +125,7 @@ game.DateTimeOffset = DateTimeOffset
 import os as _os  # noqa: E402
 _und = _os.path.join(_os.path.dirname(game.__file__), "undefined.txt")
 if _os.path.exists(_und):
-    for _n in open(_und).read().split():
+    for _n in open(_und, encoding="utf-8").read().split():
         if _n in g:
             continue
         if _n in ("List", "IEnumerable", "IList", "IReadOnlyList"):
