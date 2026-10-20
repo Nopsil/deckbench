@@ -91,7 +91,7 @@ def _please_wait():
     msg = ("正在从你本机的游戏安装生成数据，大约 1–2 分钟，请稍候……\n完成后界面会自动打开。\n\n"
            "Generating data from your own game install (about 1–2 minutes)...\nThe app will open automatically when done.")
     print(msg, flush=True)
-    if os.name != "nt":
+    if os.name != "nt" or os.environ.get("DECKBENCH_NO_DIALOG"):
         return lambda: None
     import ctypes
     u32 = ctypes.windll.user32
@@ -131,7 +131,7 @@ def _ensure_game_or_exit():
         msg = str(e) if isinstance(e, gamedata.GameDataError) else (
             f"生成数据失败 / failed to generate data: {e!r}\n请把 data\\app.log 发给作者 / please send data\\app.log to the author.")
         print(msg, file=sys.stderr, flush=True)
-        if os.name == "nt":
+        if os.name == "nt" and not os.environ.get("DECKBENCH_NO_DIALOG"):   # DECKBENCH_NO_DIALOG=1：自动化测试不弹窗
             try:
                 import ctypes
                 ctypes.windll.user32.MessageBoxW(None, msg, "DeckBench", 0x10)
