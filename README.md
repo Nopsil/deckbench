@@ -40,8 +40,18 @@
 
 ## 开始使用（Windows） / Getting started (Windows)
 
-> 打包好的 .exe（下载即用）**计划中**，以后会放在 Releases 页面；现在需要按下面的步骤装一次环境。
-> *A ready-to-run .exe is planned for the Releases page; for now, set it up once with the steps below.*
+### 最简单：下载打包版 / Easiest: the packaged app
+
+1. 在 Steam 里装好《杀戮尖塔 2》（正式版或 beta 都行）。
+2. 到 [Releases 页面](https://github.com/Nopsil/deckbench/releases) 下载 `DeckBench-<版本>-win64.zip`，**整个解压**到一个文件夹（例如 `D:\DeckBench`）。
+3. 双击 `DeckBench.exe`。第一次启动会弹出「请稍候」提示，从你的游戏生成数据，大约 1–2 分钟，之后界面自动打开。
+   **不需要安装 Python 或 .NET**（反编译器已经打包在 `decompiler` 文件夹里）。
+4. 游戏装在非默认位置时，在该文件夹里打开 PowerShell 运行一次：
+   `.\DeckBench.exe --game-dir "D:\SteamLibrary\steamapps\common\Slay the Spire 2"`，以后直接双击即可。
+
+*Download the zip from the [Releases page](https://github.com/Nopsil/deckbench/releases), unzip the whole folder, and double-click `DeckBench.exe`. The first launch generates data from your own install (about 1–2 minutes). No Python or .NET install needed. If the game is in a non-default library, run once: `.\DeckBench.exe --game-dir "<your game folder>"`.*
+
+### 从源码运行 / Run from source
 
 **一次性准备 / One-time setup**
 

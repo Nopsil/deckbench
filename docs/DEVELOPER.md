@@ -13,6 +13,7 @@
 - [目录结构](#目录结构--layout)
 - [测试](#测试--tests)
 - [Claude娘专用工具](#claude娘示例-mod专用工具--claude-mod-tools)
+- [Windows 打包版](#windows-打包版--building-the-windows-package)
 - [已知限制](#已知限制--known-limitations)
 
 ## 安装（命令行） / Setup (command line)
@@ -193,9 +194,28 @@ tests/               单元测试
   全部写在 `mods/claude_v34/hooks.py`，对应测试在 `tests/test_claude.py`。
 
 
+## Windows 打包版 / Building the Windows package
+
+```powershell
+# 1) 自包含反编译器（只需一次；需要 .NET 9 SDK，可以在任何系统上交叉发布 win-x64）
+dotnet tool install -g ilspycmd --version 9.1.0.7988
+dotnet publish gui\packaging\decompiler\ilspycmd-host.csproj -c Release -r win-x64 --self-contained -o <decompiler 目录> -p:IlspyToolDir=<ilspycmd 工具目录 tools\net8.0\any>
+# 2) 打包（Python 3.12 venv 里装 requirements-gui.txt + pyinstaller；需要 Node.js）
+powershell -ExecutionPolicy Bypass -File gui\packaging\build.ps1 -Work <工作目录> -Py <venv>\Scripts\python.exe -Decompiler <decompiler 目录> -Version 0.1.0
+# 3) 审计：确认包里没有任何游戏文件/数据/生成代码（可选：与游戏安装、本机缓存逐文件比对哈希）
+powershell -ExecutionPolicy Bypass -File gui\packaging\audit.ps1 -Path <工作目录>\DeckBench-0.1.0-win64.zip -GameDir "<游戏目录>" -Cache "$env:LOCALAPPDATA\deckbench"
+```
+
+- `build.ps1` 只打包 **git 跟踪的文件**（`git ls-files`），所以本机生成的 `game.py`、缓存等不可能混进去；临时文件/缓存都放在 `-Work` 目录。
+- 自带的反编译器是**未修改的** ilspycmd 9.1.0.7988（MIT）加一个很小的启动器（`gui/packaging/decompiler/`），连同 .NET 9 运行时自包含发布，
+  玩家不需要安装 .NET SDK。`sts2sim/gamedata.py` 查找顺序：`DECKBENCH_ILSPY` → exe 旁的 `decompiler\` → 系统里的 `ilspycmd`。
+  它生成的 `game.py` 与 SDK 版 ilspycmd 生成的逐字节一致。
+- 第三方声明：`gui/packaging/THIRD-PARTY-NOTICES.txt` + `gui/packaging/notices/`，打包时一起放进 zip。
+- 打包版参数：`DeckBench.exe --game-dir <游戏目录>`（之后会记住）、`--browser`、`--serve --port N`；环境变量 `DECKBENCH_NO_DIALOG=1` 关闭弹窗（自动化测试用）。
+
 ## 已知限制 / Known limitations
 
 - 模拟结果只适合在同一套假设下横向比较，不是真实胜率。
 - 首次生成需要 .NET 9 SDK + ilspycmd；转译器针对 v0.111 系列验证过，游戏大版本更新后可能需要更新转译器/补丁（`tools/cs2py_*.py`、`tools/cs_patches.py`、`sts2sim/rt/patches.py`）。
 - Windows 上没有 fork，带搜索的 AI 不可用；`tools/batch.py` 命令行只支持 Linux/macOS。
-- 图形界面第一次生成数据时（1–2 分钟）还没有进度窗口。
+- 图形界面第一次生成数据时（1–2 分钟）只有一个「请稍候」提示框，没有进度条。
