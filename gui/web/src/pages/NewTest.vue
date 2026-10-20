@@ -8,11 +8,11 @@
         <div class="modes">
           <button class="mode" :class="{ on: kind === 'batch' }" @click="kind = 'batch'">
             <n-icon :component="Route" size="22" />
-            <div><div class="mt">整局批量</div><div class="ms">从第 1 层打到通关，统计层数、首领到达率、胜率（tools/batch.py）</div></div>
+            <div><div class="mt">整局批量</div><div class="ms">从第 1 层打到通关，统计层数、首领到达率、胜率</div></div>
           </button>
           <button class="mode" :class="{ on: kind === 'combat' }" @click="kind = 'combat'">
             <n-icon :component="Swords" size="22" />
-            <div><div class="mt">战斗实验</div><div class="ms">固定卡组打普通/精英/首领，统计单场胜率与掉血（python -m sts2sim）</div></div>
+            <div><div class="mt">战斗实验</div><div class="ms">固定卡组打普通/精英/首领，统计单场胜率与掉血</div></div>
           </button>
         </div>
 
@@ -206,7 +206,7 @@ const title = ref('')
 const starting = ref(false)
 const uploading = ref(false)
 const saved = JSON.parse(localStorage.getItem('nt.form') || '{}')
-const b = reactive({ char: 'Claude', asc: 10, n: 100, start: 0, procs: 4, agent: 'heuristic', variants: [], force: [], replace: [], ...(saved.b || {}) })
+const b = reactive({ char: 'Ironclad', asc: 0, n: 100, start: 0, procs: 4, agent: 'heuristic', variants: [], force: [], replace: [], ...(saved.b || {}) })
 const c = reactive({ source: 'preset', preset: 'quick', mods: ['vanilla'], decks: [], rooms: ['普通', '精英', '首领'], max_turns: 30, fights: 20, seed: 1, agent: 'heuristic', procs: 4, ...(saved.c || {}) })
 watch([b, c, kind], () => {
   localStorage.setItem('nt.form', JSON.stringify({ b, c }))

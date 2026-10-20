@@ -308,9 +308,24 @@ def ping():
     return {"ok": True}
 
 
+def _sim_version():
+    """sts2sim.__version__（直接读源文件，不导入模拟器）。"""
+    try:
+        with open(os.path.join(paths.SIM_ROOT, "sts2sim", "__init__.py"), encoding="utf-8") as f:
+            m = re.search(r'^__version__\s*=\s*["\']([^"\']+)["\']', f.read(), re.M)
+        return m.group(1) if m else "?"
+    except OSError:
+        return "?"
+
+
+@app.get("/api/version")
+def version():
+    return {"name": "DeckBench", "version": _sim_version()}
+
+
 @app.get("/api/health")
 def health():
-    return {"ok": True, "sim_root": paths.SIM_ROOT, "data_dir": paths.DATA_DIR, "frozen": paths.FROZEN}
+    return {"ok": True, "version": _sim_version(), "sim_root": paths.SIM_ROOT, "data_dir": paths.DATA_DIR, "frozen": paths.FROZEN}
 
 
 if os.path.isdir(paths.WEB_DIST):

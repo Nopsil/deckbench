@@ -30,6 +30,7 @@
               </div>
               <div v-else-if="store.catalogError" class="eng err">后端出错：{{ store.catalogError }}</div>
               <div v-else class="eng"><n-spin size="small" /> <span class="es">正在载入模拟器数据…</span></div>
+              <div v-if="appVersion" class="ver">DeckBench v{{ appVersion }}</div>
             </div>
           </aside>
           <main class="main">
@@ -53,7 +54,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { NConfigProvider, NMessageProvider, NDialogProvider, NIcon, NSpin, darkTheme, zhCN, dateZhCN } from 'naive-ui'
 import { CirclePlus, PlayerPlay, ChartBar, Scale, History } from '@vicons/tabler'
@@ -71,7 +72,9 @@ const nav = [
 const isOn = (it) => route.path === it.to || route.path.startsWith(it.to + '/')
 const runningCount = computed(() => store.runs.filter((r) => r.status === 'running').length)
 let timer
+const appVersion = ref('')
 onMounted(() => {
+  fetch('/api/version').then((r) => r.json()).then((d) => { appVersion.value = d.version || '' }).catch(() => {})
   store.loadCatalog()
   store.loadRuns()
   timer = setInterval(() => store.loadRuns().catch(() => {}), 3000)
@@ -97,6 +100,7 @@ nav { display: flex; flex-direction: column; gap: 3px; }
 .badge { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: #D97757; color: #1B1B1E; font-size: 12px; font-weight: 700; display: grid; place-items: center; }
 .foot { margin-top: auto; }
 .eng { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: 12px; background: #1E1E22; border: 1px solid #2A2A2F; }
+.ver { margin-top: 10px; padding: 0 4px; font-size: 11px; color: #77736C; letter-spacing: .02em; }
 .eng.err { color: #E06C6C; font-size: 12px; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: #8FBF8F; margin-top: 6px; box-shadow: 0 0 0 3px rgba(143,191,143,.15); flex: none; }
 .et { font-size: 12.5px; font-weight: 600; }
