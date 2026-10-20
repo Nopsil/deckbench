@@ -29,3 +29,5 @@ cd gui/web && npm install && npm run build         # 改了前端后重新构建
 
 - 整局批量只支持内置 Claude娘 v3.5（cards_v35 变体）和原版 5 角色；上传的 YAML mod 只用于战斗实验。
 - Windows 上没有 fork，「强 AI（带搜索）」「束搜索」两种整局 AI 不可用（界面自动隐藏）。
+- 「spire-mentor 整局 AI（外部）」（`mentor-full`）只有在启动前设置了 `DECKBENCH_MENTOR_SITE` / `DECKBENCH_MENTOR_PY`（指向自己构建的 spire-mentor）时才能选，否则显示为灰色并带提示；只支持原版 5 个角色，模组角色（如 Claude娘）回退到学习版 AI。见 [docs/DEVELOPER.md](../docs/DEVELOPER.md)。
+  *The external `mentor-full` agent is selectable only when spire-mentor is configured (greyed out with a hint otherwise); vanilla characters only, mod characters fall back to the learned AI.*

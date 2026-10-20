@@ -53,8 +53,10 @@
           <div class="panel">
             <h3>AI</h3>
             <div class="agents">
-              <button v-for="a in cat.agents_batch" :key="a.id" class="agent" :class="{ on: b.agent === a.id }" @click="b.agent = a.id">
+              <button v-for="a in cat.agents_batch" :key="a.id" class="agent" :class="{ on: b.agent === a.id, off: a.available === false }"
+                      :disabled="a.available === false" :title="a.hint || ''" @click="b.agent = a.id">
                 <div class="an">{{ a.name }}</div><div class="ad">{{ a.desc }}</div>
+                <div v-if="a.hint" class="ah">{{ a.hint }}</div>
               </button>
             </div>
           </div>
@@ -316,6 +318,9 @@ async function delMod(id) {
 .agents { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .agent { all: unset; cursor: pointer; padding: 12px 14px; border-radius: 11px; border: 1px solid #2E2E34; background: #1A1A1E; transition: all .16s; }
 .agent:hover { border-color: #3C3C43; }
+.agent.off { opacity: .45; cursor: not-allowed; }
+.agent.off:hover { border-color: #2E2E34; }
+.ah { font-size: 11px; color: #B88A5A; margin-top: 6px; line-height: 1.4; }
 .agent.on { border-color: #D97757; background: rgba(217,119,87,.1); }
 .an { font-weight: 650; font-size: 13.5px; }
 .ad { font-size: 12px; color: #8A857E; margin-top: 4px; line-height: 1.45; }

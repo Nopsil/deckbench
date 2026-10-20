@@ -25,6 +25,23 @@ AGENTS_BATCH = [
 if os.name == "nt":
     # 「搜索」类 AI 用 os.fork() 给游戏状态拍快照，Windows 没有 fork，只能用不搜索的两种
     AGENTS_BATCH = [a for a in AGENTS_BATCH if a["id"] in ("heuristic", "learned", "strong-nosearch")]
+MENTOR_HINT = "需要自己构建外部的 spire-mentor，并设置 DECKBENCH_MENTOR_SITE / DECKBENCH_MENTOR_PY 后重启（见 docs/DEVELOPER.md）"
+
+
+def mentor_configured():
+    """外部 spire-mentor 是否已配置（只看目录，不在界面进程里导入它）。"""
+    site, py = os.environ.get("DECKBENCH_MENTOR_SITE", ""), os.environ.get("DECKBENCH_MENTOR_PY", "")
+    return bool(site and py and os.path.isdir(os.path.join(site, "sts2_rs")) and os.path.isdir(os.path.join(py, "sts2_hint")))
+
+
+def agents_batch():
+    ok = mentor_configured()
+    return AGENTS_BATCH + [{
+        "id": "mentor-full", "name": "spire-mentor 整局 AI（外部）",
+        "desc": "战斗用 spire-mentor 的 MCTS，选牌/路线/商店/休息用它的 PPO 网络；只支持 5 个原版角色（模组角色回退学习版 AI）；约 30–50 秒/局",
+        "available": ok, "hint": "" if ok else MENTOR_HINT}]
+
+
 AGENTS_COMBAT = [
     {"id": "heuristic", "name": "启发式（快）", "desc": "贪心，不规划下回合"},
     {"id": "beam", "name": "束搜索", "desc": "宽 4 深 4，能找到需要铺引擎的组合，慢"},
@@ -158,7 +175,7 @@ class LocalPythonBackend(SimBackend):
         c = self._cards(refresh)
         chars = [{"id": k, "name": CHAR_ZH.get(k, k)} for k in c.get("characters", [])]
         return {"backend": {"id": self.id, "name": self.name, **self.capabilities()},
-                "characters": chars, "agents_batch": AGENTS_BATCH, "agents_combat": AGENTS_COMBAT,
+                "characters": chars, "agents_batch": agents_batch(), "agents_combat": AGENTS_COMBAT,
                 "variants": c["variants"], "cards": c["cards"], "starters": c["starters"], "rooms": ROOMS,
                 "experiments": self.experiments(), "mods": self.mods(), "cpu": os.cpu_count() or 1,
                 "encounters": self.encounter_names()}

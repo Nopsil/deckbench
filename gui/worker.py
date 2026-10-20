@@ -237,7 +237,7 @@ def main(argv=None):
     b.add_argument("--start", type=int, default=0)
     b.add_argument("--procs", type=int, default=mp.cpu_count())
     b.add_argument("--out", required=True)
-    b.add_argument("--agent", default="heuristic", choices=["heuristic", "search", "strong", "strong-nosearch", "learned", "learned-search", "learned-boss"])
+    b.add_argument("--agent", default="heuristic", choices=["heuristic", "search", "strong", "strong-nosearch", "learned", "learned-search", "learned-boss", "mentor-full"])
     b.add_argument("--width", type=int, default=6)
     b.add_argument("--depth", type=int, default=1)
     b.add_argument("--variant", default="")
