@@ -15,7 +15,9 @@ from . import metrics, paths
 
 AGENTS_BATCH = [
     {"id": "heuristic", "name": "启发式（快）", "desc": "贪心逐动作模拟，最快；整局默认"},
-    {"id": "learned", "name": "学习版 AI（推荐）", "desc": "强 AI + 自我对局学到的参数（CMA-ES），不搜索、速度同强 AI，Windows 可用"},
+    {"id": "modai", "name": "通用 AI（推荐，模组角色也能用）", "desc": "选牌/休息/商店用一个只看通用数值（费用、伤害、格挡…）的小网络，出牌同学习版；任何角色都能用，速度同学习版，Windows 可用"},
+    {"id": "modai-boss", "name": "通用 AI（首领战搜索）", "desc": "通用 AI + 首领战整场推演；慢 20–40 倍，仅 Linux/macOS"},
+    {"id": "learned", "name": "学习版 AI", "desc": "强 AI + 自我对局学到的参数（CMA-ES），不搜索、速度同强 AI，Windows 可用"},
     {"id": "learned-search", "name": "学习版 AI（带搜索）", "desc": "学习版参数 + 精英/首领前瞻搜索；最强也最慢，仅 Linux/macOS"},
     {"id": "learned-boss", "name": "学习版 AI（只在首领战搜索）", "desc": "学习版参数，首领战用整场推演搜索；比全程搜索快，仅 Linux/macOS"},
     {"id": "strong-nosearch", "name": "强 AI（不搜索）", "desc": "首领感知的选牌/休息，单卡 A/B 常用（旧基线）"},
@@ -24,7 +26,7 @@ AGENTS_BATCH = [
 ]
 if os.name == "nt":
     # 「搜索」类 AI 用 os.fork() 给游戏状态拍快照，Windows 没有 fork，只能用不搜索的两种
-    AGENTS_BATCH = [a for a in AGENTS_BATCH if a["id"] in ("heuristic", "learned", "strong-nosearch")]
+    AGENTS_BATCH = [a for a in AGENTS_BATCH if a["id"] in ("heuristic", "modai", "learned", "strong-nosearch")]
 MENTOR_HINT = "需要自己构建外部的 spire-mentor，并设置 DECKBENCH_MENTOR_SITE / DECKBENCH_MENTOR_PY 后重启（见 docs/DEVELOPER.md）"
 
 

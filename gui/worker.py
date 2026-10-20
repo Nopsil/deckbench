@@ -64,7 +64,7 @@ def cmd_batch(a):
     else:
         jobs = [(a.char, a.asc, f"R{i}") for i in range(a.start, a.start + a.n)]
     akw = {"width": a.width, "depth": a.depth} if a.agent == "search" else {}
-    if a.agent.startswith(("strong", "learned")):
+    if a.agent.startswith(("strong", "learned", "modai")):
         akw.update(boss_aware=True, boss_search=False)
     cfg = {"name": a.agent, "kw": akw, "variant": a.variant or None,
            "force": [x for x in a.force.split(",") if x], "replace": [x for x in a.replace.split(",") if x],
@@ -242,7 +242,7 @@ def main(argv=None):
     b.add_argument("--start", type=int, default=0)
     b.add_argument("--procs", type=int, default=mp.cpu_count())
     b.add_argument("--out", required=True)
-    b.add_argument("--agent", default="heuristic", choices=["heuristic", "search", "strong", "strong-nosearch", "learned", "learned-search", "learned-boss", "mentor-full", "mentor-full-ev"])
+    b.add_argument("--agent", default="heuristic", choices=["heuristic", "search", "strong", "strong-nosearch", "learned", "learned-search", "learned-boss", "mentor-full", "mentor-full-ev", "modai", "modai-boss"])
     b.add_argument("--width", type=int, default=6)
     b.add_argument("--depth", type=int, default=1)
     b.add_argument("--variant", default="")

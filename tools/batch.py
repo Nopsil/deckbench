@@ -58,6 +58,16 @@ def make_agent(name, seed, **kw):
         if os.name == "nt":      # 回退搜索要 os.fork()，Windows 上没有 → 回退到不搜索的 learned
             kw.setdefault("fallback_search", False)
         return make_mentor_agent(seed=s, **kw)
+    if name.startswith("modai"):
+        # 与角色无关的蒸馏局外 AI（sts2sim/engine/modai.py）：modai = 学生网络局外 + learned 出牌（模组角色也能用）；
+        # modai-boss = 再加首领战整场推演（fork，仅 Linux/macOS）；modai-teacher = 老师 PPO 局外（需 spire-mentor，仅原版角色）
+        from sts2sim.engine.modai import make_modai_agent
+        mode = {"modai": "student", "modai-boss": "student", "modai-teacher": "teacher", "modai-dagger": "dagger"}[name]
+        kw = dict(kw)
+        bs = kw.pop("boss_search", False) or name == "modai-boss"
+        if os.name == "nt":   # 首领推演要 os.fork()，Windows 没有
+            bs = False
+        return make_modai_agent(seed=s, mode=mode, boss_search=bs, **kw)
     if name == "heuristic":
         return None
     raise ValueError(name)
@@ -182,7 +192,7 @@ def main():
     ap.add_argument("--start", type=int, default=0)
     ap.add_argument("--procs", type=int, default=mp.cpu_count())
     ap.add_argument("--out", default=None)
-    ap.add_argument("--agent", default="heuristic", choices=["heuristic", "search", "strong", "strong-nosearch", "planner", "planner-search", "learned", "learned-search", "learned-boss", "imitation", "mentor-mcts", "mentor-boss", "mentor-full", "mentor-full-ev"])
+    ap.add_argument("--agent", default="heuristic", choices=["heuristic", "search", "strong", "strong-nosearch", "planner", "planner-search", "learned", "learned-search", "learned-boss", "imitation", "mentor-mcts", "mentor-boss", "mentor-full", "mentor-full-ev", "modai", "modai-boss", "modai-teacher", "modai-dagger"])
     ap.add_argument("--sims", type=int, default=0, help="mentor-*：每个决策的 MCTS 模拟次数（默认 1000）")
     ap.add_argument("--boss-sims", type=int, default=0, help="mentor-*：首领战每步模拟次数（mentor-full-ev 默认 4000）")
     ap.add_argument("--elite-sims", type=int, default=0, help="mentor-*：精英战每步模拟次数（mentor-full-ev 默认 4000）")
@@ -206,7 +216,7 @@ def main():
         jobs = [(a.char, a.asc, f"R{i}") for i in range(a.start, a.start + a.n)]
     t = time.time()
     akw = {"width": a.width, "depth": a.depth} if a.agent == "search" else {}
-    if a.agent.startswith(("strong", "planner", "learned", "imitation")):
+    if a.agent.startswith(("strong", "planner", "learned", "imitation", "modai")):
         akw.update(boss_aware=not a.no_boss_aware, boss_search=a.boss_search)
     if a.agent.startswith("mentor"):
         akw.update(boss_aware=not a.no_boss_aware)

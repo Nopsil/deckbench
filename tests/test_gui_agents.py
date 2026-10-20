@@ -24,3 +24,17 @@ def test_mentor_full_ev_listed(monkeypatch):
     monkeypatch.delenv("DECKBENCH_MENTOR_SITE", raising=False)
     a = {x["id"]: x for x in backend.agents_batch()}["mentor-full-ev"]
     assert a["available"] is False
+
+
+def test_modai_listed_and_windows_hides_fork_agents(monkeypatch):
+    ids = [x["id"] for x in backend.agents_batch()]
+    assert "modai" in ids
+    import importlib
+    monkeypatch.setattr(os, "name", "nt")
+    b2 = importlib.reload(backend)
+    try:
+        ids = [x["id"] for x in b2.agents_batch()]
+        assert "modai" in ids and "modai-boss" not in ids and "learned-search" not in ids
+    finally:
+        monkeypatch.undo()
+        importlib.reload(backend)
