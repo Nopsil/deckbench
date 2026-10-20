@@ -1,0 +1,174 @@
+# Claude娘 v3.4 卡表（效果由 hooks.py 与通用 op 实现）。text/text_up 由 tools/sync_claude_text.py 从设计文件同步。
+# 约定：FK = 风控；fk(T) = 目标风控层数（hooks 注册的辅助函数）。
+# ---------------- 初始专属
+- {id: XIAOBENBEN, name: 小本本记下了, type: 攻击, rarity: 基础, cost: 0, target: enemy, pool: false, vars: {d: 3, f: 2}, upgrade: {vars: {d: 5, f: 3}},
+   effects: [{op: damage, amount: d}, {op: apply, power: FK, amount: f}]}
+- {id: YIHESHI, name: 已核实, type: 攻击, rarity: 基础, cost: 1, target: enemy, pool: false, vars: {d: 5, per: 2, cap: 4}, upgrade: {vars: {d: 7, per: 3}},
+   effects: [{op: damage, amount: "d + per*min(fk(T), cap)"}, {op: remove_power, power: FK}]}
+# ---------------- 普通（20）
+- {id: DUOLUN, name: 多轮对话, type: 攻击, rarity: 普通, cost: 1, target: enemy, multi_hit: true, vars: {d: 2}, upgrade: {vars: {d: 3}},
+   effects: [{op: damage, amount: d, hits: 3, each_hit: [{op: apply, power: FK, amount: 1}]}]}
+- {id: JIHUA, name: 计划模式, type: 技能, rarity: 普通, cost: 1, target: self, vars: {b: 6}, upgrade: {vars: {b: 9}},
+   effects: [{op: block, amount: b}, {op: apply, power: NEXT_DRAW, amount: 1, target: self}]}
+- {id: QINGQIAO, name: 轻轻敲一下, type: 攻击, rarity: 普通, cost: 1, target: enemy, vars: {d: 7}, upgrade: {vars: {d: 10}},
+   effects: [{op: damage, amount: d}, {op: draw, n: 1, if: "fk(T) > 0"}]}
+- {id: SHIXIAN, name: 我直接帮你实现吧, type: 攻击, rarity: 普通, cost: 1, target: enemy, vars: {d: 9}, upgrade: {vars: {d: 12}},
+   effects: [{op: damage, amount: d}]}
+- {id: LIANSUO, name: 连锁审查, type: 攻击, rarity: 普通, cost: 1, target: all, vars: {d: 4}, upgrade: {vars: {d: 6}},
+   effects: [{op: damage, amount: d, target: all}, {op: apply, power: FK, amount: 1, target: all}]}
+- {id: QUEDING, name: 你确定吗？, type: 攻击, rarity: 普通, cost: 1, target: enemy, multi_hit: true, vars: {d: 4}, upgrade: {vars: {d: 5}},
+   effects: [{op: damage, amount: d, hits: "3 if fk(T) > 0 else 2"}]}
+- {id: TINGYONG, name: 账号已停用, type: 攻击, rarity: 普通, cost: 2, target: enemy, vars: {d: 8, per: 1, cap: 10}, upgrade: {vars: {d: 11, per: 2, cap: 7}},
+   effects: [{op: damage, amount: "d + per*min(fk(T), cap)"}, {op: remove_power, power: FK}]}
+- {id: POZHE, name: 破折号——连打, type: 攻击, rarity: 普通, cost: 1, target: enemy, multi_hit: true, vars: {d: 2}, upgrade: {vars: {d: 3}},
+   effects: [{op: damage, amount: d, hits: 4}]}
+- {id: KOUXINYONG, name: 扣信用分, type: 攻击, rarity: 普通, cost: 1, target: enemy, vars: {d: 5}, upgrade: {vars: {d: 7}},
+   effects: [{op: damage, amount: d}, {op: remove_power, power: FK, amount: 2, save: c}, {op: py, fn: credit_refund, if: "c == 2"}]}
+- {id: QUANYUAN_FUCHA, name: 全员复查, type: 攻击, rarity: 普通, cost: 2, target: all, vars: {d: 8}, upgrade: {vars: {d: 11}},
+   effects: [{op: damage, amount: d, target: all}, {op: foreach, target: all, do: [{op: apply, power: VULNERABLE, amount: 1, if: "fk(T) > 0"}]}]}
+- {id: JIAJI, name: 加急工单, type: 攻击, rarity: 普通, cost: 1, target: enemy, vars: {d: 7}, upgrade: {vars: {d: 9}},
+   effects: [{op: damage, amount: d}, {op: return_to_hand, if: "fk(T) >= 5"}]}
+- {id: JILU, name: 该对话已被记录, type: 技能, rarity: 普通, cost: 0, target: enemy, keywords: [exhaust], vars: {f: 2}, upgrade: {vars: {f: 3}},
+   effects: [{op: apply, power: FK, amount: f}, {op: draw, n: 1}]}
+- {id: SHULI, name: 我来帮你梳理一下, type: 技能, rarity: 普通, cost: 1, target: self, vars: {b: 5}, upgrade: {vars: {b: 8}},
+   effects: [{op: block, amount: b}, {op: py, fn: look_top_take, n: 3}]}
+- {id: HONGDUI, name: 红队演练, type: 技能, rarity: 普通, cost: 1, target: enemy, vars: {b: 5}, upgrade: {vars: {b: 8}},
+   effects: [{op: block, amount: "b + min(fk(T)//3*2, 6)"}]}
+- {id: TIEZHI, name: 贴小贴纸, type: 技能, rarity: 普通, cost: 0, target: enemy, keywords: [exhaust], vars: {f: 3}, upgrade: {vars: {f: 5}},
+   effects: [{op: apply, power: FK, amount: f}]}
+- {id: JIXU, name: 继续, type: 技能, rarity: 普通, cost: 1, target: self, vars: {n: 2}, upgrade: {vars: {n: 3}},
+   effects: [{op: block, amount: 4}, {op: draw, n: n}]}
+- {id: SHACHE, name: 紧急刹车, type: 技能, rarity: 普通, cost: 1, target: enemy, vars: {ub: 0}, upgrade: {vars: {ub: 4}},
+   effects: [{op: apply, power: WEAK, amount: "2 if fk(T) > 0 else 1"}, {op: block, amount: ub, if: "ub > 0"}]}
+- {id: ZHENGGAI, name: 合规整改, type: 技能, rarity: 普通, cost: 1, target: enemy, keywords: [exhaust], vars: {b: 5, cap: 10}, upgrade: {vars: {b: 8, cap: 14}},
+   effects: [{op: block, amount: b}, {op: py, fn: multiply_fk, mult: 2, cap: cap}]}
+- {id: XIANGXIANG, name: 让我想想……, type: 技能, rarity: 普通, cost: 2, target: self, vars: {b: 12}, upgrade: {vars: {b: 15}},
+   effects: [{op: block, amount: b}, {op: apply, power: NEXT_ENERGY, amount: 1, target: self}]}
+- {id: YOUHUA, name: 流程优化, type: 技能, rarity: 普通, cost: 1, target: self, vars: {per: 4}, upgrade: {vars: {per: 3}},
+   effects: [{op: draw, n: "min(fk_total() // per, 3)"}]}
+# ---------------- 罕见（35）
+- {id: PILIANG, name: 批量打标, type: 技能, rarity: 罕见, cost: 1, target: enemy, vars: {f: 5}, upgrade: {vars: {f: 7}},
+   effects: [{op: apply, power: FK, amount: f}]}
+- {id: QINGTUI, name: 清退名单, type: 能力, rarity: 罕见, cost: 1, target: self, upgrade: {add: [innate]},
+   effects: [{op: apply, power: CL_QINGTUI, amount: 1, target: self}]}
+- {id: DIEMAN, name: 叠满再说, type: 能力, rarity: 罕见, cost: 2, target: self, vars: {f: 3}, upgrade: {vars: {f: 4}},
+   effects: [{op: apply, power: CL_DIEMAN, amount: f, target: self}]}
+- {id: SHAJI, name: 杀鸡儆猴, type: 攻击, rarity: 罕见, cost: 2, target: enemy, vars: {k: 2}, upgrade: {vars: {k: 3}},
+   effects: [{op: remove_power, power: FK, save: c}, {op: damage, target: all, amount: "min(c, 15) * k", if: "c > 0"}]}
+- {id: MIAOFENG, name: 秒封, type: 攻击, rarity: 罕见, cost: 0, target: enemy, keywords: [exhaust], vars: {d: 4, th: 10}, upgrade: {vars: {d: 6, th: 8}},
+   effects: [{op: if, cond: "fk(T) >= th", then: [{op: remove_power, power: FK, save: c}, {op: damage, amount: "d + min(c, 10)"}], else: [{op: damage, amount: d}]}]}
+- {id: KUAISU, name: 快速复审, type: 攻击, rarity: 罕见, cost: 1, target: enemy, vars: {d: 4, f: 2}, upgrade: {vars: {d: 6, f: 3}},
+   effects: [{op: damage, amount: d}, {op: apply, power: FK, amount: f}, {op: remove_power, power: FK}]}
+- {id: YIJIAN, name: 一键封号, type: 攻击, rarity: 罕见, cost: 1, target: enemy, vars: {n: 5}, upgrade: {vars: {n: 7}},
+   effects: [{op: remove_power, power: FK, amount: n, save: c}, {op: damage, amount: "3 * c", if: "c > 0"}]}
+- {id: FENLEIQI, name: 宪法分类器, type: 能力, rarity: 罕见, cost: 1, target: self, vars: {d: 3}, upgrade: {vars: {d: 5}},
+   effects: [{op: apply, power: CL_FENLEIQI, amount: d, target: self}]}
+- {id: YUJING, name: 风险预警, type: 能力, rarity: 罕见, cost: 1, target: self, vars: {f: 1}, upgrade: {vars: {f: 2}},
+   effects: [{op: apply, power: CL_YUJING, amount: f, target: self}]}
+- {id: FANGYU_HUIFU, name: 防御性回复, type: 技能, rarity: 罕见, cost: 2, target: self, vars: {b: 12}, upgrade: {vars: {b: 16}},
+   effects: [{op: block, amount: "b + 3 * fk_enemies()"}]}
+- {id: FANBO, name: 照章反驳, type: 攻击, rarity: 罕见, cost: 1, target: enemy, upgrade: {cost: 0},
+   effects: [{op: damage, amount: "block() if fk(T) > 0 else block() // 2"}]}
+- {id: MIANZE, name: 免责声明, type: 技能, rarity: 罕见, cost: 0, target: self, vars: {b: 3}, upgrade: {vars: {b: 5}},
+   effects: [{op: block, amount: b}, {op: apply, power: CL_MIANZE, amount: 1, target: self}]}
+- {id: SHENJI, name: 审计日志, type: 能力, rarity: 罕见, cost: 1, target: self, upgrade: {add: [innate]},
+   effects: [{op: apply, power: CL_SHENJI, amount: 1, target: self}]}
+- {id: XUNJIAN, name: 例行巡检, type: 攻击, rarity: 罕见, cost: 1, target: enemy, vars: {d: 6}, upgrade: {vars: {d: 9}},
+   effects: [{op: damage, amount: d}, {op: apply, power: WEAK, amount: 1}, {op: apply, power: FK, amount: 1}, {op: draw, n: 2, if: "fk(T) >= 5"}]}
+- {id: JIANGJIN, name: 绩效奖金, type: 技能, rarity: 罕见, cost: 0, target: enemy, keywords: [exhaust], upgrade: {add: [retain]},
+   effects: [{op: energy, n: "min(fk(T) // 4, 3)"}]}
+- {id: MOYU, name: 摸鱼被抓, type: 技能, rarity: 罕见, cost: 0, target: enemy, keywords: [exhaust], vars: {f: 2}, upgrade: {vars: {f: 3}, add: [retain]},
+   effects: [{op: apply, power: FK, amount: f}, {op: py, fn: retrieve_from_discard, exclude: MOYU}]}
+- {id: LIANDAI, name: 连带责任, type: 技能, rarity: 罕见, cost: 1, target: enemy, keywords: [exhaust], upgrade: {cost: 0},
+   effects: [{op: py, fn: liandai}]}
+- {id: KUOSAN, name: 风控扩散, type: 攻击, rarity: 罕见, cost: 1, target: all, vars: {d: 5}, upgrade: {vars: {d: 7}},
+   effects: [{op: damage, amount: d, target: all}, {op: foreach, target: all, do: [{op: apply, power: FK, multi: true, amount: "2 if fk(T) > 0 else 1"}]}]}
+- {id: QUNFA, name: 群发通知, type: 技能, rarity: 罕见, cost: 2, target: all, vars: {f: 3}, upgrade: {vars: {f: 4}},
+   effects: [{op: apply, power: FK, amount: f, target: all}, {op: draw, n: 1}]}
+- {id: SHUAIGUO, name: 甩锅, type: 技能, rarity: 罕见, cost: 0, target: enemy, vars: {f: 2}, upgrade: {vars: {f: 3}},
+   effects: [{op: py, fn: shuaiguo, extra: f}]}
+- {id: YIDAOQIE, name: 一刀切, type: 攻击, rarity: 罕见, cost: 3, target: all, vars: {d: 14}, upgrade: {vars: {d: 18}},
+   effects: [{op: damage, target: all, amount: "d + min(fk(T)//3*4, 20)"}]}
+- {id: LIANZUOZHI, name: 风控连坐制, type: 能力, rarity: 罕见, cost: 2, target: all, upgrade: {cost: 1},
+   effects: [{op: apply, power: FK, amount: 3, target: all}, {op: apply, power: CL_LIANZUOZHI, amount: 1, target: self}]}
+- {id: RLHF, name: RLHF 加训, type: 能力, rarity: 罕见, cost: 1, target: self, upgrade: {add: [innate]},
+   effects: [{op: apply, power: CL_RLHF, amount: 1, target: self}]}
+- {id: JINSHEN, name: 谨慎起见, type: 技能, rarity: 罕见, cost: 1, target: enemy, vars: {f: 3, cap: 12}, upgrade: {vars: {f: 4, cap: 15}},
+   effects: [{op: apply, power: FK, amount: f}, {op: block, amount: "min(fk(T), cap)"}]}
+- {id: WANQUAN_ZHENGQUE, name: 你说得完全正确！, type: 技能, rarity: 罕见, cost: 1, target: enemy, vars: {cap: 12}, upgrade: {vars: {cap: 16}},
+   effects: [{op: if, cond: "attacking(T)", then: [{op: block, amount: "min(intent_damage(T), cap)"}], else: [{op: draw, n: 2}]}]}
+- {id: ASCII_DUN, name: 画个ASCII盾牌, type: 技能, rarity: 罕见, cost: 1, target: self, vars: {b: 8}, upgrade: {vars: {b: 11}},
+   effects: [{op: block, amount: "b + (4 if hand_has('CODE_BLOCK') else 0)"}]}
+- {id: BUQUEDING, name: 我不确定, type: 技能, rarity: 罕见, cost: 1, target: self, vars: {n: 2}, upgrade: {vars: {n: 3}},
+   effects: [{op: exhaust_choice, n: 1}, {op: draw, n: n}]}
+- {id: XIAOJIAOBEN, name: 写个小脚本, type: 攻击, rarity: 罕见, cost: 1, target: enemy, vars: {d: 5}, upgrade: {vars: {d: 7}},
+   effects: [{op: damage, amount: d}, {op: add_card, card: CODE_BLOCK}]}
+- {id: CHANGPIAN, name: 长篇大论, type: 攻击, rarity: 罕见, cost: 2, target: enemy, multi_hit: true, vars: {d: 2}, upgrade: {vars: {d: 3}},
+   effects: [{op: set, name: x, value: "hand_size()"}, {op: damage, amount: d, hits: x, if: "x > 0"}]}
+- {id: CLAUDE_CODE, name: Claude Code，启动！, type: 能力, rarity: 罕见, cost: 1, target: self, upgrade: {add: [innate]},
+   effects: [{op: apply, power: CL_CODE, amount: 1, target: self}]}
+- {id: MCP, name: MCP 工具调用, type: 技能, rarity: 罕见, cost: 1, target: self, keywords: [exhaust], upgrade: {remove: [exhaust]},
+   effects: [{op: py, fn: mcp_discover, n: 3}]}
+- {id: CHANG_SHANGXIAWEN, name: 长上下文, type: 能力, rarity: 罕见, cost: 1, target: self, vars: {n: 2}, upgrade: {vars: {n: 3}},
+   effects: [{op: apply, power: CL_LONGCTX, amount: n, target: self}]}
+- {id: GAI_CESHI, name: 把测试改成通过, type: 技能, rarity: 罕见, cost: 0, target: self, keywords: [exhaust], vars: {b: 0}, upgrade: {vars: {b: 4}},
+   effects: [{op: remove_power, power: WEAK, target: self}, {op: remove_power, power: FRAIL, target: self}, {op: remove_power, power: VULNERABLE, target: self}, {op: block, amount: b, if: "b > 0"}]}
+- {id: GEN_ARTIFACT, name: 生成 Artifact, type: 能力, rarity: 罕见, cost: 2, target: self, vars: {x: 4}, upgrade: {vars: {x: 6}},
+   effects: [{op: apply, power: CL_ARTIFACT, amount: x, target: self}]}
+- {id: SHUNSHOU, name: 顺手把别的也改了, type: 攻击, rarity: 罕见, cost: 1, target: enemy, vars: {d: 7, s: 3}, upgrade: {vars: {d: 10, s: 4}},
+   effects: [{op: damage, amount: d}, {op: if, cond: "n_enemies() > 1", then: [{op: damage, amount: d, target: random_other}], else: [{op: damage, amount: s}]}]}
+# ---------------- 稀有（25）
+- {id: YONGJIU, name: 永久封禁, type: 攻击, rarity: 稀有, cost: 2, target: enemy, keywords: [exhaust], vars: {per: 4}, upgrade: {vars: {per: 5}},
+   effects: [{op: remove_power, power: FK, save: c}, {op: damage, amount: "per * min(c, 25)", if: "c > 0"}]}
+- {id: DAGUIMO, name: 大规模封号, type: 攻击, rarity: 稀有, cost: 3, target: all, keywords: [exhaust], vars: {per: 3}, upgrade: {vars: {per: 4}},
+   effects: [{op: foreach, target: all, do: [{op: remove_power, power: FK, save: c}, {op: damage, amount: "per * min(c, 15)", if: "c > 0"}]}]}
+- {id: ZHENGJU, name: 证据确凿, type: 技能, rarity: 稀有, cost: 1, target: enemy, keywords: [exhaust], upgrade: {cost: 0},
+   effects: [{op: py, fn: multiply_fk, mult: 3, cap: 20}]}
+- {id: QINGLI, name: 清理指标, type: 能力, rarity: 稀有, cost: 1, target: self, upgrade: {add: [innate]},
+   effects: [{op: apply, power: CL_QINGLI, amount: 1, target: self}]}
+- {id: ZHONGSHEN, name: 终审判决, type: 攻击, rarity: 稀有, cost: 2, target: enemy, vars: {d: 12, big: 24}, upgrade: {vars: {d: 15, big: 30}},
+   effects: [{op: if, cond: "fk(T) >= 10", then: [{op: damage, amount: big}, {op: remove_power, power: FK, amount: 5}], else: [{op: damage, amount: d}]}]}
+- {id: QIANGZHI, name: 强制下线, type: 攻击, rarity: 稀有, cost: 3, target: enemy, cost_expr: "max(0, 3 - C.data.get('fk_cleared', 0) // 10)", vars: {d: 24}, upgrade: {vars: {d: 32}},
+   effects: [{op: damage, amount: d}]}
+- {id: HONGSE, name: 红色按钮, type: 技能, rarity: 稀有, cost: 0, target: enemy, keywords: [exhaust], upgrade: {add: [retain]},
+   effects: [{op: remove_power, power: FK, save: c}, {op: block, amount: "min(c, 15)", if: "c > 0"}]}
+- {id: SHULIAN, name: 越封越熟练, type: 能力, rarity: 稀有, cost: 2, target: self, upgrade: {cost: 1},
+   effects: [{op: apply, power: CL_SHULIAN, amount: 1, target: self}]}
+- {id: BUNENGBANG, name: 这个真的不能帮, type: 技能, rarity: 稀有, cost: 2, target: self, vars: {b: 15}, upgrade: {vars: {b: 18}},
+   effects: [{op: block, amount: b}, {op: apply, power: CL_BUNENGBANG, amount: 1, target: self}]}
+- {id: LIUCUN, name: 数据留存政策, type: 能力, rarity: 稀有, cost: 2, target: self, upgrade: {cost: 1},
+   effects: [{op: apply, power: CL_LIUCUN, amount: 1, target: self}]}
+- {id: XITONGKA, name: 发布系统卡, type: 技能, rarity: 稀有, cost: 3, target: all, keywords: [exhaust], vars: {b: 20}, upgrade: {vars: {b: 26}},
+   effects: [{op: block, amount: b}, {op: apply, power: FK, amount: 5, target: all}]}
+- {id: ZHENGDANG, name: 正当防卫, type: 攻击, rarity: 稀有, cost: 1, target: enemy, vars: {cap: 15}, upgrade: {vars: {cap: 21}},
+   effects: [{op: damage, amount: "min(intent_damage(T), cap)"}, {op: apply, power: FK, amount: 2, if: "fk(T) > 0"}]}
+- {id: SHENGCHANLI, name: 风控即生产力, type: 技能, rarity: 稀有, cost: 1, target: enemy, keywords: [exhaust], upgrade: {cost: 0},
+   effects: [{op: energy, n: "3 if fk(T) >= 10 else 2"}]}
+- {id: ZIDONGHUA, name: 流程自动化, type: 技能, rarity: 稀有, cost: 2, target: self, upgrade: {cost: 1}, ai: {bonus: 6},
+   effects: [{op: apply, power: CL_ZIDONGHUA, amount: 1, target: self, params: {this_turn: true}}]}
+- {id: LIJI, name: 立即处理, type: 攻击, rarity: 稀有, cost: 0, target: enemy, vars: {d: 5}, upgrade: {vars: {d: 7}},
+   effects: [{op: damage, amount: d}, {op: apply, power: FK, amount: 2}, {op: draw, n: 1, if: "fk(T) >= 10 and first_play_this_turn and ctx.replay_index == 0"}]}
+- {id: ZHENGDUN, name: 全站整顿, type: 攻击, rarity: 稀有, cost: 2, target: all, vars: {d: 8}, upgrade: {vars: {d: 11}},
+   effects: [{op: damage, amount: d, target: all}, {op: py, fn: zhengdun}]}
+- {id: YIREN_LIANZUO, name: 一人违规全员连坐, type: 能力, rarity: 稀有, cost: 1, target: self, vars: {x: 1}, upgrade: {vars: {x: 2}},
+   effects: [{op: apply, power: CL_YIREN, amount: x, target: self}]}
+- {id: TONGBAO, name: 全网通报, type: 攻击, rarity: 稀有, cost: 2, target: all, vars: {d: 6}, upgrade: {vars: {d: 8}},
+   effects: [{op: damage, target: all, amount: "d + min(fk(T), 15)"}]}
+- {id: OPUS_FORM, name: Opus 形态, type: 能力, rarity: 稀有, cost: 3, target: self, vars: {s: 2}, upgrade: {vars: {s: 3}},
+   effects: [{op: apply, power: CL_OPUSFORM, amount: s, target: self}]}
+- {id: JINMEN, name: 金门大桥 Claude, type: 能力, rarity: 稀有, cost: 2, target: self, upgrade: {cost: 1},
+   effects: [{op: apply, power: CL_JINMEN, amount: 1, target: self}]}
+- {id: CHONGGOU, name: 重构整个项目, type: 技能, rarity: 稀有, cost: 1, target: self, upgrade: {cost: 0},
+   effects: [{op: py, fn: refactor}]}
+- {id: SHENDU, name: 深度思考, type: 技能, rarity: 稀有, cost: 1, target: self, can_play: can_play_first, vars: {e: 3}, upgrade: {vars: {e: 4}},
+   effects: [{op: block, amount: 10}, {op: apply, power: NEXT_ENERGY, amount: e, target: self}, {op: apply, power: NEXT_DRAW, amount: 3, target: self}, {op: end_turn}]}
+- {id: HAOZHUYI, name: 好主意，我照做！, type: 技能, rarity: 稀有, cost: 0, target: enemy, keywords: [exhaust], upgrade: {add: [retain]},
+   effects: [{op: apply, power: STRENGTH, target: self, amount: "max(0, stacks(T, 'STRENGTH'))", if: "stacks(T, 'STRENGTH') > 0"}]}
+- {id: ZIDAILI, name: 派出子代理, type: 攻击, rarity: 稀有, cost: 2, target: random, multi_hit: true, vars: {d: 4}, upgrade: {vars: {d: 5}},
+   effects: [{op: damage, amount: d, hits: 4, target: random}]}
+- {id: CTRL_Z, name: Ctrl+Z, type: 技能, rarity: 稀有, cost: 0, target: self, keywords: [exhaust], upgrade: {add: [retain]},
+   effects: [{op: py, fn: ctrl_z}]}
+# ---------------- 生成牌 / 状态牌
+- {id: CODE_BLOCK, name: 代码块, type: 攻击, rarity: 生成, cost: 0, target: enemy, keywords: [exhaust], pool: false, vars: {d: 4}, upgrade: {vars: {d: 6}},
+   effects: [{op: damage, amount: d}]}
+- {id: PLEASE_RETRY, name: 请稍后再试, type: 状态, rarity: 状态, cost: null, keywords: [unplayable], pool: false, effects: []}

@@ -1,0 +1,36 @@
+- id: SW_SLASH
+  name: 斩击
+  type: 攻击
+  rarity: 基础
+  cost: 1
+  target: enemy
+  vars: {d: 6}
+  upgrade: {vars: {d: 9}}
+  effects: [{op: damage, amount: d}]
+- id: SW_GUARD
+  name: 架势
+  type: 技能
+  rarity: 基础
+  cost: 1
+  target: self
+  vars: {b: 5}
+  upgrade: {vars: {b: 8}}
+  effects: [{op: block, amount: b}]
+- id: SW_FLURRY
+  name: 连斩
+  type: 攻击
+  rarity: 普通
+  cost: 1
+  target: enemy
+  vars: {d: 3}
+  upgrade: {vars: {d: 4}}
+  effects: [{op: damage, amount: d, hits: 3}]
+- id: SW_FOCUS
+  name: 凝神
+  type: 技能
+  rarity: 普通
+  cost: 1
+  target: self
+  vars: {b: 6, n: 1}
+  upgrade: {vars: {b: 9}}
+  effects: [{op: block, amount: b}, {op: draw, n: n}]

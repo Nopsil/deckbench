@@ -1,0 +1,4 @@
+.data/
+web/node_modules/
+build/
+dist_win/

@@ -1,0 +1,6 @@
+name: demo_mod
+title: 示例 mod：剑客
+cards: [cards.yaml]
+decks: [decks.yaml]
+characters:
+  swordsman: {name: 剑客, hp: 72, energy: 3}

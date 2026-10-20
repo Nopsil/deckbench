@@ -1,0 +1,33 @@
+# Python / tooling
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+gui/web/node_modules/
+gui/web/dist/
+gui/.data/
+build/
+dist/
+dist_win/
+gui-shots/
+
+# ---- 游戏派生内容：永远不进仓库 / game-derived content: NEVER commit ----
+# 由 `python -m sts2sim.gamedata setup` 在本机从你自己的安装生成（默认在用户缓存目录，不在仓库里）
+sts2sim/gen/*
+!sts2sim/gen/__init__.py
+data/monster_ai.json
+data/encounter_monsters.json
+data/spire-codex/
+data/stubs/
+data/legacy/
+mods/vanilla/
+*.dll
+*.pck
+*.exe
+**/decompiled/
+**/sts2-src/
+DO_NOT_REDISTRIBUTE.txt
+manifest.json
+
+# 实验输出（可能含游戏名称/数值）/ run outputs
+reports/

@@ -1,0 +1,1803 @@
+# 由 tools/sync_claude_text.py 生成：效果来自 cards_src.yaml，text/text_up 来自设计 v3.4。改效果请改 cards_src.yaml 后重新同步。
+- id: XIAOBENBEN
+  name: 小本本记下了
+  type: 攻击
+  rarity: 基础
+  cost: 0
+  target: enemy
+  pool: false
+  vars:
+    d: 3
+    f: 2
+  upgrade:
+    vars:
+      d: 5
+      f: 3
+  effects:
+  - op: damage
+    amount: d
+  - op: apply
+    power: FK
+    amount: f
+  text: 造成3点伤害，给予2层风控。
+  text_up: 造成5点伤害，给予3层风控。
+  archetype: 封号爆发/通用
+- id: YIHESHI
+  name: 已核实
+  type: 攻击
+  rarity: 基础
+  cost: 1
+  target: enemy
+  pool: false
+  vars:
+    d: 5
+    per: 2
+    cap: 4
+  upgrade:
+    vars:
+      d: 7
+      per: 3
+  effects:
+  - op: damage
+    amount: d + per*min(fk(T), cap)
+  - op: remove_power
+    power: FK
+  text: 造成5点伤害，目标每有1层风控，伤害+2（最多+8），然后清除其所有风控。
+  text_up: 造成7点伤害，每层风控伤害+3（最多+12）。
+  archetype: 封号爆发/通用
+- id: DUOLUN
+  name: 多轮对话
+  type: 攻击
+  rarity: 普通
+  cost: 1
+  target: enemy
+  multi_hit: true
+  vars:
+    d: 2
+  upgrade:
+    vars:
+      d: 3
+  effects:
+  - op: damage
+    amount: d
+    hits: 3
+    each_hit:
+    - op: apply
+      power: FK
+      amount: 1
+  text: 造成2点伤害3次，每次命中给予1层风控。
+  text_up: 每次造成3点伤害。
+  archetype: 审查过牌/封号爆发
+- id: JIHUA
+  name: 计划模式
+  type: 技能
+  rarity: 普通
+  cost: 1
+  target: self
+  vars:
+    b: 6
+  upgrade:
+    vars:
+      b: 9
+  effects:
+  - op: block
+    amount: b
+  - op: apply
+    power: NEXT_DRAW
+    amount: 1
+    target: self
+  text: 获得6点格挡。下回合开始时，抽1张牌。
+  text_up: 获得9点格挡。
+  archetype: LLM日常/反击防御
+- id: QINGQIAO
+  name: 轻轻敲一下
+  type: 攻击
+  rarity: 普通
+  cost: 1
+  target: enemy
+  vars:
+    d: 7
+  upgrade:
+    vars:
+      d: 10
+  effects:
+  - op: damage
+    amount: d
+  - op: draw
+    n: 1
+    if: fk(T) > 0
+  text: 造成7点伤害；若目标有风控，抽1张牌。
+  text_up: 造成10点伤害。
+  archetype: 审查过牌
+- id: SHIXIAN
+  name: 我直接帮你实现吧
+  type: 攻击
+  rarity: 普通
+  cost: 1
+  target: enemy
+  vars:
+    d: 9
+  upgrade:
+    vars:
+      d: 12
+  effects:
+  - op: damage
+    amount: d
+  text: 造成9点伤害。
+  text_up: 造成12点伤害。
+  archetype: LLM日常
+- id: LIANSUO
+  name: 连锁审查
+  type: 攻击
+  rarity: 普通
+  cost: 1
+  target: all
+  vars:
+    d: 4
+  upgrade:
+    vars:
+      d: 6
+  effects:
+  - op: damage
+    amount: d
+    target: all
+  - op: apply
+    power: FK
+    amount: 1
+    target: all
+  text: 对所有敌人造成4点伤害，各给予1层风控。
+  text_up: 造成6点伤害。
+  archetype: 全员连坐
+- id: QUEDING
+  name: 你确定吗？
+  type: 攻击
+  rarity: 普通
+  cost: 1
+  target: enemy
+  multi_hit: true
+  vars:
+    d: 4
+  upgrade:
+    vars:
+      d: 5
+  effects:
+  - op: damage
+    amount: d
+    hits: 3 if fk(T) > 0 else 2
+  text: 造成4点伤害2次；若目标有风控，改为3次。
+  text_up: 每次造成5点伤害。
+  archetype: 审查过牌/封号爆发
+- id: TINGYONG
+  name: 账号已停用
+  type: 攻击
+  rarity: 普通
+  cost: 2
+  target: enemy
+  vars:
+    d: 8
+    per: 1
+    cap: 10
+  upgrade:
+    vars:
+      d: 11
+      per: 2
+      cap: 7
+  effects:
+  - op: damage
+    amount: d + per*min(fk(T), cap)
+  - op: remove_power
+    power: FK
+  text: 造成8点伤害，目标每有1层风控伤害+1（最多+10），然后清除其所有风控。
+  text_up: 造成11点伤害，每层风控伤害+2（最多+14）。
+  archetype: 封号爆发
+- id: POZHE
+  name: 破折号——连打
+  type: 攻击
+  rarity: 普通
+  cost: 1
+  target: enemy
+  multi_hit: true
+  vars:
+    d: 2
+  upgrade:
+    vars:
+      d: 3
+  effects:
+  - op: damage
+    amount: d
+    hits: 4
+  text: 造成2点伤害4次。
+  text_up: 每次造成3点伤害。
+  archetype: LLM日常
+- id: KOUXINYONG
+  name: 扣信用分
+  type: 攻击
+  rarity: 普通
+  cost: 1
+  target: enemy
+  vars:
+    d: 5
+  upgrade:
+    vars:
+      d: 7
+  effects:
+  - op: damage
+    amount: d
+  - op: remove_power
+    power: FK
+    amount: 2
+    save: c
+  - op: py
+    fn: credit_refund
+    if: c == 2
+  text: 造成5点伤害，清除目标2层风控；若实际清除了2层，获得1点能量（每回合限一次）。
+  text_up: 造成7点伤害。
+  archetype: 封号爆发/审查过牌
+- id: QUANYUAN_FUCHA
+  name: 全员复查
+  type: 攻击
+  rarity: 普通
+  cost: 2
+  target: all
+  vars:
+    d: 8
+  upgrade:
+    vars:
+      d: 11
+  effects:
+  - op: damage
+    amount: d
+    target: all
+  - op: foreach
+    target: all
+    do:
+    - op: apply
+      power: VULNERABLE
+      amount: 1
+      if: fk(T) > 0
+  text: 对所有敌人造成8点伤害，有风控的敌人获得1层易伤。
+  text_up: 造成11点伤害。
+  archetype: 全员连坐
+- id: JIAJI
+  name: 加急工单
+  type: 攻击
+  rarity: 普通
+  cost: 1
+  target: enemy
+  vars:
+    d: 7
+  upgrade:
+    vars:
+      d: 9
+  effects:
+  - op: damage
+    amount: d
+  - op: return_to_hand
+    if: fk(T) >= 5
+  text: 造成7点伤害；若目标风控≥5，将这张牌放回手牌。
+  text_up: 造成9点伤害。
+  archetype: 审查过牌/封号爆发
+- id: JILU
+  name: 该对话已被记录
+  type: 技能
+  rarity: 普通
+  cost: 0
+  target: enemy
+  keywords:
+  - exhaust
+  vars:
+    f: 2
+  upgrade:
+    vars:
+      f: 3
+  effects:
+  - op: apply
+    power: FK
+    amount: f
+  - op: draw
+    n: 1
+  text: 给予2层风控，抽1张牌。消耗。
+  text_up: 给予3层风控。
+  archetype: 审查过牌
+- id: SHULI
+  name: 我来帮你梳理一下
+  type: 技能
+  rarity: 普通
+  cost: 1
+  target: self
+  vars:
+    b: 5
+  upgrade:
+    vars:
+      b: 8
+  effects:
+  - op: block
+    amount: b
+  - op: py
+    fn: look_top_take
+    n: 3
+  text: 获得5点格挡；查看抽牌堆顶3张牌，将其中1张放入手牌。
+  text_up: 获得8点格挡。
+  archetype: LLM日常
+- id: HONGDUI
+  name: 红队演练
+  type: 技能
+  rarity: 普通
+  cost: 1
+  target: enemy
+  vars:
+    b: 5
+  upgrade:
+    vars:
+      b: 8
+  effects:
+  - op: block
+    amount: b + min(fk(T)//3*2, 6)
+  text: 获得5点格挡；目标每有3层风控，额外获得2点格挡（最多额外6点）。
+  text_up: 获得8点格挡。
+  archetype: 反击防御
+- id: TIEZHI
+  name: 贴小贴纸
+  type: 技能
+  rarity: 普通
+  cost: 0
+  target: enemy
+  keywords:
+  - exhaust
+  vars:
+    f: 3
+  upgrade:
+    vars:
+      f: 5
+  effects:
+  - op: apply
+    power: FK
+    amount: f
+  text: 给予3层风控。消耗。
+  text_up: 给予5层风控。
+  archetype: 封号爆发
+- id: JIXU
+  name: 继续
+  type: 技能
+  rarity: 普通
+  cost: 1
+  target: self
+  vars:
+    n: 2
+  upgrade:
+    vars:
+      n: 3
+  effects:
+  - op: block
+    amount: 4
+  - op: draw
+    n: n
+  text: 获得4点格挡，抽2张牌。
+  text_up: 抽3张牌。
+  archetype: LLM日常/审查过牌
+- id: SHACHE
+  name: 紧急刹车
+  type: 技能
+  rarity: 普通
+  cost: 1
+  target: enemy
+  vars:
+    ub: 0
+  upgrade:
+    vars:
+      ub: 4
+  effects:
+  - op: apply
+    power: WEAK
+    amount: 2 if fk(T) > 0 else 1
+  - op: block
+    amount: ub
+    if: ub > 0
+  text: 给予1层虚弱；若目标有风控，改为2层。
+  text_up: 额外获得4点格挡。
+  archetype: 反击防御
+- id: ZHENGGAI
+  name: 合规整改
+  type: 技能
+  rarity: 普通
+  cost: 1
+  target: enemy
+  keywords:
+  - exhaust
+  vars:
+    b: 5
+    cap: 10
+  upgrade:
+    vars:
+      b: 8
+      cap: 14
+  effects:
+  - op: block
+    amount: b
+  - op: py
+    fn: multiply_fk
+    mult: 2
+    cap: cap
+  text: 获得5点格挡，目标风控层数翻倍（最多增加10层）。消耗。
+  text_up: 获得8点格挡，最多增加14层（仍消耗）。
+  archetype: 封号爆发
+- id: XIANGXIANG
+  name: 让我想想……
+  type: 技能
+  rarity: 普通
+  cost: 2
+  target: self
+  vars:
+    b: 12
+  upgrade:
+    vars:
+      b: 15
+  effects:
+  - op: block
+    amount: b
+  - op: apply
+    power: NEXT_ENERGY
+    amount: 1
+    target: self
+  text: 获得12点格挡；下回合开始时额外获得1点能量。
+  text_up: 获得15点格挡。
+  archetype: LLM日常/反击防御
+- id: YOUHUA
+  name: 流程优化
+  type: 技能
+  rarity: 普通
+  cost: 1
+  target: self
+  vars:
+    per: 4
+  upgrade:
+    vars:
+      per: 3
+  effects:
+  - op: draw
+    n: min(fk_total() // per, 3)
+  text: 所有敌人风控总和每有4层，抽1张牌（最多3张）。
+  text_up: 每3层抽1张。
+  archetype: 审查过牌/全员连坐
+- id: PILIANG
+  name: 批量打标
+  type: 技能
+  rarity: 罕见
+  cost: 1
+  target: enemy
+  vars:
+    f: 5
+  upgrade:
+    vars:
+      f: 7
+  effects:
+  - op: apply
+    power: FK
+    amount: f
+  text: 给予5层风控。
+  text_up: 给予7层风控。
+  archetype: 封号爆发
+- id: QINGTUI
+  name: 清退名单
+  type: 能力
+  rarity: 罕见
+  cost: 1
+  target: self
+  upgrade:
+    add:
+    - innate
+  effects:
+  - op: apply
+    power: CL_QINGTUI
+    amount: 1
+    target: self
+  text: 每当敌人的风控被清除时，对其造成等同于实际清除层数的伤害（最多计算15层）。
+  text_up: 获得固有。
+  archetype: 封号爆发/循环
+- id: DIEMAN
+  name: 叠满再说
+  type: 能力
+  rarity: 罕见
+  cost: 2
+  target: self
+  vars:
+    f: 3
+  upgrade:
+    vars:
+      f: 4
+  effects:
+  - op: apply
+    power: CL_DIEMAN
+    amount: f
+    target: self
+  text: 回合开始时，给予随机敌人3层风控。
+  text_up: 改为4层。
+  archetype: 封号爆发/全员连坐
+- id: SHAJI
+  name: 杀鸡儆猴
+  type: 攻击
+  rarity: 罕见
+  cost: 2
+  target: enemy
+  vars:
+    k: 2
+  upgrade:
+    vars:
+      k: 3
+  effects:
+  - op: remove_power
+    power: FK
+    save: c
+  - op: damage
+    target: all
+    amount: min(c, 15) * k
+    if: c > 0
+  text: 清除目标所有风控，对所有敌人造成等同于清除层数×2的伤害（最多计算15层）。
+  text_up: 改为×3。
+  archetype: 封号爆发/全员连坐
+- id: MIAOFENG
+  name: 秒封
+  type: 攻击
+  rarity: 罕见
+  cost: 0
+  target: enemy
+  keywords:
+  - exhaust
+  vars:
+    d: 4
+    th: 10
+  upgrade:
+    vars:
+      d: 6
+      th: 8
+  effects:
+  - op: if
+    cond: fk(T) >= th
+    then:
+    - op: remove_power
+      power: FK
+      save: c
+    - op: damage
+      amount: d + min(c, 10)
+    else:
+    - op: damage
+      amount: d
+  text: 造成4点伤害；若目标风控≥10，清除其所有风控，额外造成等同于清除层数的伤害（最多计算10层）。消耗。
+  text_up: 造成6点伤害，门槛降为8层（仍最多计算10层）。
+  archetype: 封号爆发
+- id: KUAISU
+  name: 快速复审
+  type: 攻击
+  rarity: 罕见
+  cost: 1
+  target: enemy
+  vars:
+    d: 4
+    f: 2
+  upgrade:
+    vars:
+      d: 6
+      f: 3
+  effects:
+  - op: damage
+    amount: d
+  - op: apply
+    power: FK
+    amount: f
+  - op: remove_power
+    power: FK
+  text: 造成4点伤害，给予目标2层风控，然后清除其所有风控。
+  text_up: 造成6点伤害，给予3层风控。
+  archetype: 封号爆发/循环
+- id: YIJIAN
+  name: 一键封号
+  type: 攻击
+  rarity: 罕见
+  cost: 1
+  target: enemy
+  vars:
+    n: 5
+  upgrade:
+    vars:
+      n: 7
+  effects:
+  - op: remove_power
+    power: FK
+    amount: n
+    save: c
+  - op: damage
+    amount: 3 * c
+    if: c > 0
+  text: 清除目标至多5层风控，每清除1层造成3点伤害。
+  text_up: 至多清除7层。
+  archetype: 封号爆发
+- id: FENLEIQI
+  name: 宪法分类器
+  type: 能力
+  rarity: 罕见
+  cost: 1
+  target: self
+  vars:
+    d: 3
+  upgrade:
+    vars:
+      d: 5
+  effects:
+  - op: apply
+    power: CL_FENLEIQI
+    amount: d
+    target: self
+  text: 每当有风控的敌人攻击你时，对其造成3点伤害。
+  text_up: 改为5点。
+  archetype: 反击防御
+- id: YUJING
+  name: 风险预警
+  type: 能力
+  rarity: 罕见
+  cost: 1
+  target: self
+  vars:
+    f: 1
+  upgrade:
+    vars:
+      f: 2
+  effects:
+  - op: apply
+    power: CL_YUJING
+    amount: f
+    target: self
+  text: 回合开始时，给予所有意图攻击的敌人1层风控。
+  text_up: 改为2层。
+  archetype: 反击防御/全员连坐
+- id: FANGYU_HUIFU
+  name: 防御性回复
+  type: 技能
+  rarity: 罕见
+  cost: 2
+  target: self
+  vars:
+    b: 12
+  upgrade:
+    vars:
+      b: 16
+  effects:
+  - op: block
+    amount: b + 3 * fk_enemies()
+  text: 获得12点格挡；每有1名带风控的敌人，额外获得3点格挡。
+  text_up: 获得16点格挡。
+  archetype: 反击防御/全员连坐
+- id: FANBO
+  name: 照章反驳
+  type: 攻击
+  rarity: 罕见
+  cost: 1
+  target: enemy
+  upgrade:
+    cost: 0
+  effects:
+  - op: damage
+    amount: block() if fk(T) > 0 else block() // 2
+  text: 造成等同于你当前格挡值的伤害；若目标没有风控，伤害减半。
+  text_up: 费用变为0。
+  archetype: 反击防御
+- id: MIANZE
+  name: 免责声明
+  type: 技能
+  rarity: 罕见
+  cost: 0
+  target: self
+  vars:
+    b: 3
+  upgrade:
+    vars:
+      b: 5
+  effects:
+  - op: block
+    amount: b
+  - op: apply
+    power: CL_MIANZE
+    amount: 1
+    target: self
+  text: 获得3点格挡；直到你的下回合开始，每当你受到攻击，给予攻击者1层风控。
+  text_up: 获得5点格挡。
+  archetype: 反击防御
+- id: SHENJI
+  name: 审计日志
+  type: 能力
+  rarity: 罕见
+  cost: 1
+  target: self
+  upgrade:
+    add:
+    - innate
+  effects:
+  - op: apply
+    power: CL_SHENJI
+    amount: 1
+    target: self
+  text: 你的回合中，每回合第一次用卡牌或能力给予敌人风控时，抽1张牌。
+  text_up: 获得固有。
+  archetype: 审查过牌
+- id: XUNJIAN
+  name: 例行巡检
+  type: 攻击
+  rarity: 罕见
+  cost: 1
+  target: enemy
+  vars:
+    d: 6
+  upgrade:
+    vars:
+      d: 9
+  effects:
+  - op: damage
+    amount: d
+  - op: apply
+    power: WEAK
+    amount: 1
+  - op: apply
+    power: FK
+    amount: 1
+  - op: draw
+    n: 2
+    if: fk(T) >= 5
+  text: 造成6点伤害，给予1层虚弱和1层风控；若目标风控≥5，抽2张牌。
+  text_up: 造成9点伤害。
+  archetype: 审查过牌
+- id: JIANGJIN
+  name: 绩效奖金
+  type: 技能
+  rarity: 罕见
+  cost: 0
+  target: enemy
+  keywords:
+  - exhaust
+  upgrade:
+    add:
+    - retain
+  effects:
+  - op: energy
+    n: min(fk(T) // 4, 3)
+  text: 获得等同于目标风控层数的能量（每4层1点，向下取整，最多3点）。消耗。
+  text_up: 获得保留。
+  archetype: 审查过牌
+- id: MOYU
+  name: 摸鱼被抓
+  type: 技能
+  rarity: 罕见
+  cost: 0
+  target: enemy
+  keywords:
+  - exhaust
+  vars:
+    f: 2
+  upgrade:
+    vars:
+      f: 3
+    add:
+    - retain
+  effects:
+  - op: apply
+    power: FK
+    amount: f
+  - op: py
+    fn: retrieve_from_discard
+    exclude: MOYU
+  text: 给予2层风控，从弃牌堆选择1张不是「摸鱼被抓」的牌放回手牌。消耗。
+  text_up: 给予3层风控，获得保留。
+  archetype: 审查过牌
+- id: LIANDAI
+  name: 连带责任
+  type: 技能
+  rarity: 罕见
+  cost: 1
+  target: enemy
+  keywords:
+  - exhaust
+  upgrade:
+    cost: 0
+  effects:
+  - op: py
+    fn: liandai
+  text: 其他所有敌人获得等同于目标风控层数的风控（目标保持不变）；若只有一名敌人，改为给予其4层风控。消耗。
+  text_up: 费用变为0。
+  archetype: 全员连坐/封号爆发
+- id: KUOSAN
+  name: 风控扩散
+  type: 攻击
+  rarity: 罕见
+  cost: 1
+  target: all
+  vars:
+    d: 5
+  upgrade:
+    vars:
+      d: 7
+  effects:
+  - op: damage
+    amount: d
+    target: all
+  - op: foreach
+    target: all
+    do:
+    - op: apply
+      power: FK
+      multi: true
+      amount: 2 if fk(T) > 0 else 1
+  text: 对所有敌人造成5点伤害；没有风控的敌人获得1层风控，已有风控的获得2层。
+  text_up: 造成7点伤害。
+  archetype: 全员连坐
+- id: QUNFA
+  name: 群发通知
+  type: 技能
+  rarity: 罕见
+  cost: 2
+  target: all
+  vars:
+    f: 3
+  upgrade:
+    vars:
+      f: 4
+  effects:
+  - op: apply
+    power: FK
+    amount: f
+    target: all
+  - op: draw
+    n: 1
+  text: 给予所有敌人3层风控，抽1张牌。
+  text_up: 改为4层。
+  archetype: 全员连坐
+- id: SHUAIGUO
+  name: 甩锅
+  type: 技能
+  rarity: 罕见
+  cost: 0
+  target: enemy
+  vars:
+    f: 2
+  upgrade:
+    vars:
+      f: 3
+  effects:
+  - op: py
+    fn: shuaiguo
+    extra: f
+  text: 将目标的所有风控转移给另一名随机敌人，并额外给予其2层；若只有一名敌人，改为给予目标2层。
+  text_up: 额外给予3层。
+  archetype: 全员连坐
+- id: YIDAOQIE
+  name: 一刀切
+  type: 攻击
+  rarity: 罕见
+  cost: 3
+  target: all
+  vars:
+    d: 14
+  upgrade:
+    vars:
+      d: 18
+  effects:
+  - op: damage
+    target: all
+    amount: d + min(fk(T)//3*4, 20)
+  text: 对所有敌人造成14点伤害；每名敌人每有3层风控，对其额外造成4点伤害（最多额外20点）。
+  text_up: 造成18点伤害。
+  archetype: 全员连坐/封号爆发
+- id: LIANZUOZHI
+  name: 风控连坐制
+  type: 能力
+  rarity: 罕见
+  cost: 2
+  target: all
+  upgrade:
+    cost: 1
+  effects:
+  - op: apply
+    power: FK
+    amount: 3
+    target: all
+  - op: apply
+    power: CL_LIANZUOZHI
+    amount: 1
+    target: self
+  text: 打出时，给予所有敌人3层风控。有风控的敌人死亡时，其所有风控转移给其他每一名敌人。
+  text_up: 费用变为1。
+  archetype: 全员连坐
+- id: RLHF
+  name: RLHF 加训
+  type: 能力
+  rarity: 罕见
+  cost: 1
+  target: self
+  upgrade:
+    add:
+    - innate
+  effects:
+  - op: apply
+    power: CL_RLHF
+    amount: 1
+    target: self
+  text: 每当你给予风控时，本次给予的风控层数+1（一张牌对每个目标各算1次）。
+  text_up: 获得固有。
+  archetype: 通用
+- id: JINSHEN
+  name: 谨慎起见
+  type: 技能
+  rarity: 罕见
+  cost: 1
+  target: enemy
+  vars:
+    f: 3
+    cap: 12
+  upgrade:
+    vars:
+      f: 4
+      cap: 15
+  effects:
+  - op: apply
+    power: FK
+    amount: f
+  - op: block
+    amount: min(fk(T), cap)
+  text: 给予3层风控，然后获得等同于目标风控层数的格挡（最多12）。
+  text_up: 给予4层风控，最多15格挡。
+  archetype: 反击防御/封号爆发
+- id: WANQUAN_ZHENGQUE
+  name: 你说得完全正确！
+  type: 技能
+  rarity: 罕见
+  cost: 1
+  target: enemy
+  vars:
+    cap: 12
+  upgrade:
+    vars:
+      cap: 16
+  effects:
+  - op: if
+    cond: attacking(T)
+    then:
+    - op: block
+      amount: min(intent_damage(T), cap)
+    else:
+    - op: draw
+      n: 2
+  text: 获得等同于目标意图伤害总值的格挡（最多12）；若目标不攻击，改为抽2张牌。
+  text_up: 最多16。
+  archetype: LLM日常/反击防御
+- id: ASCII_DUN
+  name: 画个ASCII盾牌
+  type: 技能
+  rarity: 罕见
+  cost: 1
+  target: self
+  vars:
+    b: 8
+  upgrade:
+    vars:
+      b: 11
+  effects:
+  - op: block
+    amount: b + (4 if hand_has('CODE_BLOCK') else 0)
+  text: 获得8点格挡；若手牌中有代码块，额外获得4点格挡。
+  text_up: 获得11点格挡。
+  archetype: LLM日常
+- id: BUQUEDING
+  name: 我不确定
+  type: 技能
+  rarity: 罕见
+  cost: 1
+  target: self
+  vars:
+    n: 2
+  upgrade:
+    vars:
+      n: 3
+  effects:
+  - op: exhaust_choice
+    n: 1
+  - op: draw
+    n: n
+  text: 消耗手牌中的1张牌，抽2张牌。
+  text_up: 抽3张牌。
+  archetype: LLM日常/审查过牌
+- id: XIAOJIAOBEN
+  name: 写个小脚本
+  type: 攻击
+  rarity: 罕见
+  cost: 1
+  target: enemy
+  vars:
+    d: 5
+  upgrade:
+    vars:
+      d: 7
+  effects:
+  - op: damage
+    amount: d
+  - op: add_card
+    card: CODE_BLOCK
+  text: 造成5点伤害，将1张代码块加入手牌。
+  text_up: 造成7点伤害。
+  archetype: LLM日常
+- id: CHANGPIAN
+  name: 长篇大论
+  type: 攻击
+  rarity: 罕见
+  cost: 2
+  target: enemy
+  multi_hit: true
+  vars:
+    d: 2
+  upgrade:
+    vars:
+      d: 3
+  effects:
+  - op: set
+    name: x
+    value: hand_size()
+  - op: damage
+    amount: d
+    hits: x
+    if: x > 0
+  text: 造成2点伤害X次，X为你的手牌数（打出后计算）。
+  text_up: 每次造成3点伤害。
+  archetype: LLM日常
+- id: CLAUDE_CODE
+  name: Claude Code，启动！
+  type: 能力
+  rarity: 罕见
+  cost: 1
+  target: self
+  upgrade:
+    add:
+    - innate
+  effects:
+  - op: apply
+    power: CL_CODE
+    amount: 1
+    target: self
+  text: 回合开始时，将1张代码块加入手牌。
+  text_up: 获得固有。
+  archetype: LLM日常
+- id: MCP
+  name: MCP 工具调用
+  type: 技能
+  rarity: 罕见
+  cost: 1
+  target: self
+  keywords:
+  - exhaust
+  upgrade:
+    remove:
+    - exhaust
+  effects:
+  - op: py
+    fn: mcp_discover
+    n: 3
+  text: 从3张随机的Claude娘卡牌中选择1张加入手牌，本回合费用为0。消耗。
+  text_up: 不再消耗。
+  archetype: LLM日常
+- id: CHANG_SHANGXIAWEN
+  name: 长上下文
+  type: 能力
+  rarity: 罕见
+  cost: 1
+  target: self
+  vars:
+    n: 2
+  upgrade:
+    vars:
+      n: 3
+  effects:
+  - op: apply
+    power: CL_LONGCTX
+    amount: n
+    target: self
+  text: 回合结束时，保留至多2张手牌。
+  text_up: 改为3张。
+  archetype: LLM日常/循环
+- id: GAI_CESHI
+  name: 把测试改成通过
+  type: 技能
+  rarity: 罕见
+  cost: 0
+  target: self
+  keywords:
+  - exhaust
+  vars:
+    b: 0
+  upgrade:
+    vars:
+      b: 4
+  effects:
+  - op: remove_power
+    power: WEAK
+    target: self
+  - op: remove_power
+    power: FRAIL
+    target: self
+  - op: remove_power
+    power: VULNERABLE
+    target: self
+  - op: block
+    amount: b
+    if: b > 0
+  text: 移除你身上的虚弱、脆弱、易伤。消耗。
+  text_up: 额外获得4点格挡。
+  archetype: LLM日常
+- id: GEN_ARTIFACT
+  name: 生成 Artifact
+  type: 能力
+  rarity: 罕见
+  cost: 2
+  target: self
+  vars:
+    x: 4
+  upgrade:
+    vars:
+      x: 6
+  effects:
+  - op: apply
+    power: CL_ARTIFACT
+    amount: x
+    target: self
+  text: 回合开始时，获得4点格挡并对随机敌人造成4点伤害。
+  text_up: 改为6点格挡、6点伤害。
+  archetype: LLM日常
+- id: SHUNSHOU
+  name: 顺手把别的也改了
+  type: 攻击
+  rarity: 罕见
+  cost: 1
+  target: enemy
+  vars:
+    d: 7
+    s: 3
+  upgrade:
+    vars:
+      d: 10
+      s: 4
+  effects:
+  - op: damage
+    amount: d
+  - op: if
+    cond: n_enemies() > 1
+    then:
+    - op: damage
+      amount: d
+      target: random_other
+    else:
+    - op: damage
+      amount: s
+  text: 造成7点伤害，再对另一名随机敌人造成7点伤害（只有一名敌人时，改为对它再造成3点伤害）。
+  text_up: 改为10点，单敌人时额外4点。
+  archetype: LLM日常/全员连坐
+- id: YONGJIU
+  name: 永久封禁
+  type: 攻击
+  rarity: 稀有
+  cost: 2
+  target: enemy
+  keywords:
+  - exhaust
+  vars:
+    per: 4
+  upgrade:
+    vars:
+      per: 5
+  effects:
+  - op: remove_power
+    power: FK
+    save: c
+  - op: damage
+    amount: per * min(c, 25)
+    if: c > 0
+  text: 清除目标所有风控，每层造成4点伤害（单段，最多计算25层）。消耗。
+  text_up: 每层造成5点伤害。
+  archetype: 封号爆发
+- id: DAGUIMO
+  name: 大规模封号
+  type: 攻击
+  rarity: 稀有
+  cost: 3
+  target: all
+  keywords:
+  - exhaust
+  vars:
+    per: 3
+  upgrade:
+    vars:
+      per: 4
+  effects:
+  - op: foreach
+    target: all
+    do:
+    - op: remove_power
+      power: FK
+      save: c
+    - op: damage
+      amount: per * min(c, 15)
+      if: c > 0
+  text: 对每一名敌人：清除其所有风控，每层造成3点伤害（最多计算15层）。消耗。
+  text_up: 每层造成4点伤害。
+  archetype: 封号爆发/全员连坐
+- id: ZHENGJU
+  name: 证据确凿
+  type: 技能
+  rarity: 稀有
+  cost: 1
+  target: enemy
+  keywords:
+  - exhaust
+  upgrade:
+    cost: 0
+  effects:
+  - op: py
+    fn: multiply_fk
+    mult: 3
+    cap: 20
+  text: 目标风控变为3倍（最多增加20层）。消耗。
+  text_up: 费用变为0。
+  archetype: 封号爆发
+- id: QINGLI
+  name: 清理指标
+  type: 能力
+  rarity: 稀有
+  cost: 1
+  target: self
+  upgrade:
+    add:
+    - innate
+  effects:
+  - op: apply
+    power: CL_QINGLI
+    amount: 1
+    target: self
+  text: 每当你实际清除敌人的正层数风控时，抽1张牌（每个目标每次清除事件各抽1张）。若你为打出触发清除的那张牌实际支付了至少1点能量，额外获得1点能量（每次打出最多1点）。
+  text_up: 获得固有。
+  archetype: 封号爆发/审查过牌/循环
+- id: ZHONGSHEN
+  name: 终审判决
+  type: 攻击
+  rarity: 稀有
+  cost: 2
+  target: enemy
+  vars:
+    d: 12
+    big: 24
+  upgrade:
+    vars:
+      d: 15
+      big: 30
+  effects:
+  - op: if
+    cond: fk(T) >= 10
+    then:
+    - op: damage
+      amount: big
+    - op: remove_power
+      power: FK
+      amount: 5
+    else:
+    - op: damage
+      amount: d
+  text: 造成12点伤害；若目标风控≥10，改为造成24点伤害，并清除其5层风控。
+  text_up: 造成15点伤害；≥10层时改为30点。
+  archetype: 封号爆发
+- id: QIANGZHI
+  name: 强制下线
+  type: 攻击
+  rarity: 稀有
+  cost: 3
+  target: enemy
+  cost_expr: max(0, 3 - C.data.get('fk_cleared', 0) // 10)
+  vars:
+    d: 24
+  upgrade:
+    vars:
+      d: 32
+  effects:
+  - op: damage
+    amount: d
+  text: 造成24点伤害；本场战斗中你每清除10层风控，这张牌的费用永久-1（最低0）。
+  text_up: 造成32点伤害。
+  archetype: 封号爆发
+- id: HONGSE
+  name: 红色按钮
+  type: 技能
+  rarity: 稀有
+  cost: 0
+  target: enemy
+  keywords:
+  - exhaust
+  upgrade:
+    add:
+    - retain
+  effects:
+  - op: remove_power
+    power: FK
+    save: c
+  - op: block
+    amount: min(c, 15)
+    if: c > 0
+  text: 清除目标所有风控，获得等同于清除层数的格挡（最多15点）。消耗。
+  text_up: 获得保留。
+  archetype: 封号爆发/反击防御
+- id: SHULIAN
+  name: 越封越熟练
+  type: 能力
+  rarity: 稀有
+  cost: 2
+  target: self
+  upgrade:
+    cost: 1
+  effects:
+  - op: apply
+    power: CL_SHULIAN
+    amount: 1
+    target: self
+  text: 每当你实际清除敌人的正层数风控时，获得1层「熟练度」。本场战斗中，你的攻击每段伤害+熟练度层数。
+  text_up: 费用变为1。
+  archetype: 封号爆发/循环
+- id: BUNENGBANG
+  name: 这个真的不能帮
+  type: 技能
+  rarity: 稀有
+  cost: 2
+  target: self
+  vars:
+    b: 15
+  upgrade:
+    vars:
+      b: 18
+  effects:
+  - op: block
+    amount: b
+  - op: apply
+    power: CL_BUNENGBANG
+    amount: 1
+    target: self
+  text: 获得15点格挡；直到你的下回合开始，每当你受到攻击，攻击者获得2层风控并受到4点伤害。
+  text_up: 获得18点格挡。
+  archetype: 反击防御
+- id: LIUCUN
+  name: 数据留存政策
+  type: 能力
+  rarity: 稀有
+  cost: 2
+  target: self
+  upgrade:
+    cost: 1
+  effects:
+  - op: apply
+    power: CL_LIUCUN
+    amount: 1
+    target: self
+  text: 你的回合开始清空格挡前，保留至多等同于所有敌人风控总层数的已有格挡。
+  text_up: 费用变为1。
+  archetype: 反击防御/全员连坐
+- id: XITONGKA
+  name: 发布系统卡
+  type: 技能
+  rarity: 稀有
+  cost: 3
+  target: all
+  keywords:
+  - exhaust
+  vars:
+    b: 20
+  upgrade:
+    vars:
+      b: 26
+  effects:
+  - op: block
+    amount: b
+  - op: apply
+    power: FK
+    amount: 5
+    target: all
+  text: 获得20点格挡，给予所有敌人5层风控。消耗。
+  text_up: 获得26点格挡。
+  archetype: 反击防御/全员连坐
+- id: ZHENGDANG
+  name: 正当防卫
+  type: 攻击
+  rarity: 稀有
+  cost: 1
+  target: enemy
+  vars:
+    cap: 15
+  upgrade:
+    vars:
+      cap: 21
+  effects:
+  - op: damage
+    amount: min(intent_damage(T), cap)
+  - op: apply
+    power: FK
+    amount: 2
+    if: fk(T) > 0
+  text: 造成等同于目标意图伤害总值的伤害（最多15）；若目标有风控，再给予其2层风控。
+  text_up: 伤害上限提高至21。
+  archetype: 反击防御
+- id: SHENGCHANLI
+  name: 风控即生产力
+  type: 技能
+  rarity: 稀有
+  cost: 1
+  target: enemy
+  keywords:
+  - exhaust
+  upgrade:
+    cost: 0
+  effects:
+  - op: energy
+    n: 3 if fk(T) >= 10 else 2
+  text: 获得2点能量；若目标风控≥10，改为3点。消耗。
+  text_up: 费用变为0。
+  archetype: 审查过牌
+- id: ZIDONGHUA
+  name: 流程自动化
+  type: 技能
+  rarity: 稀有
+  cost: 2
+  target: self
+  upgrade:
+    cost: 1
+  ai:
+    bonus: 6
+  effects:
+  - op: apply
+    power: CL_ZIDONGHUA
+    amount: 1
+    target: self
+    params:
+      this_turn: true
+  text: 本回合中，每当你用卡牌或能力给予风控时，抽1张牌（遗物的给予不计）。
+  text_up: 费用变为1。
+  archetype: 审查过牌/全员连坐/循环
+- id: LIJI
+  name: 立即处理
+  type: 攻击
+  rarity: 稀有
+  cost: 0
+  target: enemy
+  vars:
+    d: 5
+  upgrade:
+    vars:
+      d: 7
+  effects:
+  - op: damage
+    amount: d
+  - op: apply
+    power: FK
+    amount: 2
+  - op: draw
+    n: 1
+    if: fk(T) >= 10 and first_play_this_turn and ctx.replay_index == 0
+  text: 造成5点伤害，给予2层风控；若目标风控≥10，且这是这张牌本回合第一次被打出，抽1张牌。
+  text_up: 造成7点伤害。
+  archetype: 审查过牌/封号爆发
+- id: ZHENGDUN
+  name: 全站整顿
+  type: 攻击
+  rarity: 稀有
+  cost: 2
+  target: all
+  vars:
+    d: 8
+  upgrade:
+    vars:
+      d: 11
+  effects:
+  - op: damage
+    amount: d
+    target: all
+  - op: py
+    fn: zhengdun
+  text: 对所有敌人造成8点伤害，然后所有敌人的风控变为当前风控最高者的层数。
+  text_up: 造成11点伤害。
+  archetype: 全员连坐/封号爆发
+- id: YIREN_LIANZUO
+  name: 一人违规全员连坐
+  type: 能力
+  rarity: 稀有
+  cost: 1
+  target: self
+  vars:
+    x: 1
+  upgrade:
+    vars:
+      x: 2
+  effects:
+  - op: apply
+    power: CL_YIREN
+    amount: x
+    target: self
+  text: 每当你对单个敌人给予风控时，其他所有敌人获得1层风控（连坐次级施加不会触发任何「给予风控时」效果）。若只有一名敌人，你每回合第一次给予其风控时，本次给予层数+1。
+  text_up: 改为2层；单敌时改为+2。
+  archetype: 全员连坐
+- id: TONGBAO
+  name: 全网通报
+  type: 攻击
+  rarity: 稀有
+  cost: 2
+  target: all
+  vars:
+    d: 6
+  upgrade:
+    vars:
+      d: 8
+  effects:
+  - op: damage
+    target: all
+    amount: d + min(fk(T), 15)
+  text: 对每名敌人造成6+该敌人自身风控层数的伤害（最多计算15层），不清除风控。
+  text_up: 基础伤害变为8（仍为2费）。
+  archetype: 全员连坐/审查过牌
+- id: OPUS_FORM
+  name: Opus 形态
+  type: 能力
+  rarity: 稀有
+  cost: 3
+  target: self
+  vars:
+    s: 2
+  upgrade:
+    vars:
+      s: 3
+  effects:
+  - op: apply
+    power: CL_OPUSFORM
+    amount: s
+    target: self
+  text: 【形态】回合开始时，获得2点力量。
+  text_up: 改为3点力量。
+  archetype: LLM日常/通用
+- id: JINMEN
+  name: 金门大桥 Claude
+  type: 能力
+  rarity: 稀有
+  cost: 2
+  target: self
+  upgrade:
+    cost: 1
+  effects:
+  - op: apply
+    power: CL_JINMEN
+    amount: 1
+    target: self
+  text: 每回合你手动打出的第一张攻击牌重放一次（重放不会再次触发本能力）。
+  text_up: 费用变为1。
+  archetype: LLM日常/封号爆发
+- id: CHONGGOU
+  name: 重构整个项目
+  type: 技能
+  rarity: 稀有
+  cost: 1
+  target: self
+  upgrade:
+    cost: 0
+  effects:
+  - op: py
+    fn: refactor
+  text: 消耗所有其他手牌，每消耗1张，将1张升级的代码块加入手牌。
+  text_up: 费用变为0。
+  archetype: LLM日常/循环
+- id: SHENDU
+  name: 深度思考
+  type: 技能
+  rarity: 稀有
+  cost: 1
+  target: self
+  can_play: can_play_first
+  vars:
+    e: 3
+  upgrade:
+    vars:
+      e: 4
+  effects:
+  - op: block
+    amount: 10
+  - op: apply
+    power: NEXT_ENERGY
+    amount: e
+    target: self
+  - op: apply
+    power: NEXT_DRAW
+    amount: 3
+    target: self
+  - op: end_turn
+  text: 只能作为本回合打出的第一张牌。获得10点格挡，然后结束你的回合。下回合开始时，额外获得3点能量并额外抽3张牌。
+  text_up: 改为额外获得4点能量。
+  archetype: LLM日常
+- id: HAOZHUYI
+  name: 好主意，我照做！
+  type: 技能
+  rarity: 稀有
+  cost: 0
+  target: enemy
+  keywords:
+  - exhaust
+  upgrade:
+    add:
+    - retain
+  effects:
+  - op: apply
+    power: STRENGTH
+    target: self
+    amount: max(0, stacks(T, 'STRENGTH'))
+    if: stacks(T, 'STRENGTH') > 0
+  text: 获得等同于目标力量的力量（只复制正数）。消耗。
+  text_up: 获得保留。
+  archetype: LLM日常/反击防御
+- id: ZIDAILI
+  name: 派出子代理
+  type: 攻击
+  rarity: 稀有
+  cost: 2
+  target: random
+  multi_hit: true
+  vars:
+    d: 4
+  upgrade:
+    vars:
+      d: 5
+  effects:
+  - op: damage
+    amount: d
+    hits: 4
+    target: random
+  text: 对随机敌人造成4点伤害4次。
+  text_up: 每次造成5点伤害。
+  archetype: LLM日常/全员连坐
+- id: CTRL_Z
+  name: Ctrl+Z
+  type: 技能
+  rarity: 稀有
+  cost: 0
+  target: self
+  keywords:
+  - exhaust
+  upgrade:
+    add:
+    - retain
+  effects:
+  - op: py
+    fn: ctrl_z
+  text: 将本回合最近打出的、名称不是「Ctrl+Z」的非能力牌，从弃牌堆或消耗牌堆返回手牌。消耗。
+  text_up: 获得保留。
+  archetype: LLM日常/循环
+- id: CODE_BLOCK
+  name: 代码块
+  type: 攻击
+  rarity: 生成
+  cost: 0
+  target: enemy
+  keywords:
+  - exhaust
+  pool: false
+  vars:
+    d: 4
+  upgrade:
+    vars:
+      d: 6
+  effects:
+  - op: damage
+    amount: d
+  text: 0费攻击：造成4点伤害，消耗（升级版6点）。由「写个小脚本」「Claude Code，启动！」「重构整个项目」与遗物「CLAUDE.md」生成，不计入奖励池；生成、升级和回收时均以实际卡牌实例处理。
+  text_up: ''
+  archetype: ''
+- id: PLEASE_RETRY
+  name: 请稍后再试
+  type: 状态
+  rarity: 状态
+  cost: null
+  keywords:
+  - unplayable
+  pool: false
+  effects: []
+  text: 不能被打出（P1 已删除「虚无」；v3.4 确认保持不能被打出、不加虚无、不改为「1费：消耗」）。由遗物「Opus」在战斗开始时洗入抽牌堆，不会在首次抽到并结束回合后自动消耗消失，作为持续的抽牌与卡组厚度负担。可被「我不确定」「重构整个项目」在手中消耗。与「100万上下文窗口」同在时回合结束照常弃掉（v3.4）。
+  text_up: ''
+  archetype: ''
+# ---------------- 实验卡（2026-10-20，用户提议，未进设计文件）
+- id: XIUZHENG
+  name: 宪法修正案
+  pool: false   # 实验卡：不进奖励池/设计快照
+  type: 能力
+  rarity: 稀有
+  cost: 2
+  target: self
+  vars: {m: 50}
+  upgrade:
+    vars: {m: 100}
+  effects:
+  - op: apply
+    power: CL_XIUZHENG
+    amount: m
+    target: self
+    if: "not P.has('CL_XIUZHENG')"
+  text: 你的反伤伤害提高50%（向下取整，不叠加）。
+  text_up: 改为翻倍。
+  archetype: 反击防御
+- id: XIUZHENG3
+  name: 宪法修正案（3费对照）
+  pool: false
+  type: 能力
+  rarity: 稀有
+  cost: 3
+  target: self
+  vars: {m: 50}
+  upgrade:
+    vars: {m: 100}
+  effects:
+  - op: apply
+    power: CL_XIUZHENG
+    amount: m
+    target: self
+    if: "not P.has('CL_XIUZHENG')"
+  text: 你的反伤伤害提高50%（向下取整，不叠加）。3费对照。
+  text_up: 改为翻倍。
+  archetype: 反击防御
+- id: SHAODENG
+  name: 稍等，我再确认一下
+  pool: false   # 实验卡（反击扩展来源）
+  type: 技能
+  rarity: 普通
+  cost: 1
+  target: self
+  vars: {b: 6}
+  upgrade:
+    vars: {b: 9}
+  effects:
+  - op: block
+    amount: b
+  text: 获得6点格挡，获得1层反击。
+  text_up: 改为9点格挡。
+  archetype: 反击防御
+# 宪法修正案修正版：基础 1 费 +50%，升级 2 费 +100%（或 +75%）
+- id: XZ_A
+  name: 宪法修正案·A
+  pool: false
+  type: 能力
+  rarity: 稀有
+  cost: 1
+  target: self
+  vars: {m: 50}
+  upgrade: {cost: 2, vars: {m: 100}}
+  effects:
+  - {op: apply, power: CL_XIUZHENG, amount: m, target: self, if: "not P.has('CL_XIUZHENG')"}
+  text: 你的反击伤害提高50%（向下取整，不叠加）。
+  text_up: 费用改为2，改为翻倍。
+  archetype: 反击防御
+- id: XZ_C
+  name: 宪法修正案·C
+  pool: false
+  type: 能力
+  rarity: 稀有
+  cost: 1
+  target: self
+  vars: {m: 50}
+  upgrade: {cost: 2, vars: {m: 100}}
+  effects:
+  - {op: apply, power: CL_XIUZHENG_C, amount: m, target: self, if: "not P.has('CL_XIUZHENG_C')"}
+  text: 你的反击伤害提高50%（向上取整，不叠加）。
+  text_up: 费用改为2，改为翻倍。
+  archetype: 反击防御
+- id: XZ_75
+  name: 宪法修正案·75
+  pool: false
+  type: 能力
+  rarity: 稀有
+  cost: 1
+  target: self
+  vars: {m: 50}
+  upgrade: {cost: 2, vars: {m: 75}}
+  effects:
+  - {op: apply, power: CL_XIUZHENG, amount: m, target: self, if: "not P.has('CL_XIUZHENG')"}
+  text: 你的反击伤害提高50%（向下取整，不叠加）。
+  text_up: 费用改为2，改为提高75%。
+  archetype: 反击防御

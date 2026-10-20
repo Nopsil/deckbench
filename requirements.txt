@@ -1,0 +1,3 @@
+pyyaml>=6
+pytest>=8   # 只跑测试需要
+openpyxl    # 只有 tools/sync_claude_text.py 读设计数据时需要

@@ -1,0 +1,49 @@
+name: claude_v34_first
+title: Claude娘 v3.4 第一份模拟（对照原版 5 角色）
+summary_md: claude_v34_summary.md
+mods: [vanilla, claude_v34]
+seed: 20261020
+fights: 200
+max_turns: 30
+agent: heuristic
+rooms: [普通, 精英, 首领]
+decks: [claude_start, ironclad_start, silent_start, defect_start, necro_start, regent_start,
+        cl_ban_a1, cl_def_a1, cl_rev_a1, cl_grp_a1, cl_llm_a1,
+        cl_ban_a2, cl_def_a2, cl_rev_a2, cl_grp_a2, cl_llm_a2, ironclad_a2, silent_a2,
+        cl_ban_a3, cl_def_a3, cl_rev_a3, cl_grp_a3, cl_llm_a3, ironclad_a3, silent_a3,
+        cl_llm_a3_opus, cl_ban_a3_sticker]
+groups:
+  - {title: 起始卡组（第1幕）, decks: [claude_start, ironclad_start, silent_start, defect_start, necro_start, regent_start]}
+  - {title: 第1幕：起始 + 3 张流派牌, decks: [claude_start, cl_ban_a1, cl_def_a1, cl_rev_a1, cl_grp_a1, cl_llm_a1]}
+  - {title: 第2幕成型卡组, decks: [cl_ban_a2, cl_def_a2, cl_rev_a2, cl_grp_a2, cl_llm_a2, ironclad_a2, silent_a2]}
+  - {title: 第3幕成型卡组, decks: [cl_ban_a3, cl_def_a3, cl_rev_a3, cl_grp_a3, cl_llm_a3, ironclad_a3, silent_a3]}
+  - {title: 第3幕遗物变体, decks: [cl_llm_a3, cl_llm_a3_opus, cl_ban_a3, cl_ban_a3_sticker]}
+extra:
+  - {deck: probe_A, encounter: DUMMY, fights: 10, max_turns: 3}
+  - {deck: probe_D, encounter: DUMMY, fights: 10, max_turns: 3}
+  - {deck: probe_noengine, encounter: DUMMY, fights: 10, max_turns: 3}
+  - {deck: probe_v331bug, encounter: DUMMY, fights: 10, max_turns: 3}
+  - {deck: probe_ctrlz, encounter: DUMMY, fights: 10, max_turns: 3}
+  - {deck: probe_A, encounter: DUMMY, fights: 5, max_turns: 3, agent: beam}
+  - {deck: probe_D, encounter: DUMMY, fights: 5, max_turns: 3, agent: beam}
+  - {deck: probe_noengine, encounter: DUMMY, fights: 5, max_turns: 3, agent: beam}
+  - {deck: probe_v331bug, encounter: DUMMY, fights: 5, max_turns: 3, agent: beam}
+legacy:
+  file: data/legacy/sim_results_v34_simple.json
+  map:
+    claude_start: [起始, Claude娘]
+    ironclad_start: [起始, 铁甲战士]
+    silent_start: [起始, 静默猎手]
+    defect_start: [起始, 故障机器人]
+    necro_start: [起始, 亡灵契约师*]
+    regent_start: [起始, 储君*]
+    cl_ban_a2: [第2幕成型, Claude娘·封号爆发]
+    cl_def_a2: [第2幕成型, Claude娘·反击防御]
+    cl_rev_a2: [第2幕成型, Claude娘·审查过牌]
+    cl_llm_a2: [第2幕成型, Claude娘·LLM日常]
+    ironclad_a2: [第2幕成型, 铁甲战士·示例]
+    cl_ban_a3: [第3幕成型, Claude娘·封号爆发]
+    cl_def_a3: [第3幕成型, Claude娘·反击防御]
+    cl_rev_a3: [第3幕成型, Claude娘·审查过牌]
+    cl_llm_a3: [第3幕成型, Claude娘·LLM日常]
+    ironclad_a3: [第3幕成型, 铁甲战士·示例]

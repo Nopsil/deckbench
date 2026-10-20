@@ -1,0 +1,12 @@
+name: quick
+title: 快速冒烟测试（每格 20 场）
+mods: [vanilla, claude_v34]
+seed: 1
+fights: 20
+max_turns: 30
+agent: heuristic
+rooms: [普通, 精英, 首领]
+decks: [claude_start, ironclad_start, cl_ban_a3, cl_rev_a3]
+extra:
+  - {deck: probe_A, encounter: DUMMY, fights: 3, max_turns: 3}
+  - {deck: probe_D, encounter: DUMMY, fights: 3, max_turns: 3}

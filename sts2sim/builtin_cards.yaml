@@ -1,0 +1,51 @@
+# 所有 mod 共用的状态牌/诅咒牌（只写机制；不含游戏原文 / mechanics only, no game text）
+- id: DAZED
+  name: 晕眩
+  type: 状态
+  rarity: 状态
+  cost: null
+  keywords: [unplayable, ethereal]
+  pool: false
+- id: WOUND
+  name: 伤口
+  type: 状态
+  rarity: 状态
+  cost: null
+  keywords: [unplayable]
+  pool: false
+- id: BURN
+  name: 灼伤
+  type: 状态
+  rarity: 状态
+  cost: null
+  keywords: [unplayable]
+  end_turn_in_hand_damage: 2
+  pool: false
+- id: INFECTION
+  name: 感染
+  type: 状态
+  rarity: 状态
+  cost: null
+  keywords: [unplayable]
+  end_turn_in_hand_damage: 3
+  pool: false
+- id: TOXIC
+  name: 毒素
+  type: 状态
+  rarity: 状态
+  cost: 1
+  target: none
+  keywords: [exhaust]
+  end_turn_in_hand_damage: 5
+  ai: {bonus: 4}
+  effects: []
+  pool: false
+- id: SLIMED
+  name: 黏液
+  type: 状态
+  rarity: 状态
+  cost: 1
+  target: none
+  keywords: [exhaust]
+  effects: [{op: draw, n: 1}]
+  pool: false

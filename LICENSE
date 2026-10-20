@@ -1,0 +1,35 @@
+MIT License
+
+Copyright (c) 2026 DeckBench contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+-------------------------------------------------------------------------------
+License scope / 许可范围
+
+This license covers only the original code and documentation written by the
+contributors of this repository. It grants NO license to any code, data, text,
+art, audio, or trademarks of Slay the Spire 2 or Mega Crit, including any code or
+data that this software generates locally from a user's own installation of the
+game. Such generated material remains subject to the game's own license/EULA and
+must not be redistributed.
+
+本许可只覆盖本仓库贡献者自己编写的代码和文档，不授予《杀戮尖塔 2》或 Mega Crit 的任何
+代码、数据、文本、美术、音频或商标的任何许可，也不覆盖本软件在用户本机从其自己的游戏安装
+生成的任何代码或数据；这些生成内容仍受游戏本身许可协议约束，不得分发。

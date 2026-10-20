@@ -1,0 +1,20 @@
+name: claude_v34
+title: Claude娘 v3.4（杀戮尖塔2 练习 mod）
+cards: [cards.yaml]
+decks: [decks.yaml, decks_real.yaml]
+hooks: hooks.py
+characters:
+  # 设计文件没有写初始生命，暂取 75（与故障机器人、储君相同），见报告「近似清单」
+  claude: {name: Claude娘, hp: 75, energy: 3, hand: 5, relics: [CONSTITUTION]}
+ai_values:
+  FK: 0.0
+relics:
+  - {id: CONSTITUTION, name: 宪法（口袋版）, rarity: 初始}
+  - {id: STICKER_NOTEBOOK, name: 贴满贴纸的笔记本, rarity: 普通}
+  - {id: HAIKU, name: Haiku, rarity: 普通}
+  - {id: SONNET, name: Sonnet, rarity: 罕见}
+  - {id: KNOWLEDGE_CUTOFF, name: 知识截止日期, rarity: 罕见}
+  - {id: CLAUDE_MD, name: CLAUDE.md, rarity: 罕见}
+  - {id: DASH_KEYCAP, name: 破折号键帽, rarity: 稀有}
+  - {id: OPUS, name: Opus, rarity: 先古之民}
+  - {id: MILLION_CONTEXT, name: 100万上下文窗口, rarity: 先古之民}

@@ -1,0 +1,79 @@
+# Claude娘 v3.4 测试卡组。第2/3幕卡组以「打击×3 + 防御×4 + 已核实 + 小本本记下了」为底（删 1 张打击），
+# 与之前简化模拟（run_sim.py）的成型卡组一致；第1幕卡组 = 起始 + 3 张该流派的普通/罕见牌；全员连坐为本次新增。
+# 默认不升级（与旧模拟口径一致），遗物只有初始遗物「宪法（口袋版）」。
+- {id: claude_start, name: Claude娘·起始, character: claude, stage: 起始, acts: [1], cards: [打击×4, 防御×4, 小本本记下了, 已核实]}
+
+- {id: cl_ban_a1, name: Claude娘·封号爆发, archetype: 封号爆发, character: claude, stage: 第1幕, acts: [1],
+   cards: [打击×4, 防御×4, 小本本记下了, 已核实, 账号已停用, 贴小贴纸, 批量打标]}
+- {id: cl_ban_a2, name: Claude娘·封号爆发, archetype: 封号爆发, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 账号已停用, 批量打标, 贴小贴纸, 一键封号, 清退名单, 你确定吗？, 继续]}
+- {id: cl_ban_a3, name: Claude娘·封号爆发, archetype: 封号爆发, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 账号已停用, 批量打标, 贴小贴纸, 一键封号, 清退名单, 你确定吗？, 继续, 永久封禁, 叠满再说, 合规整改, 证据确凿]}
+
+- {id: cl_def_a1, name: Claude娘·反击防御, archetype: 反击防御, character: claude, stage: 第1幕, acts: [1],
+   cards: [打击×4, 防御×4, 小本本记下了, 已核实, 红队演练, 紧急刹车, 计划模式]}
+- {id: cl_def_a2, name: Claude娘·反击防御, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 宪法分类器, 免责声明, 红队演练, 防御性回复, 照章反驳, 你说得完全正确！, 风险预警]}
+- {id: cl_def_a3, name: Claude娘·反击防御, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 宪法分类器, 免责声明, 红队演练, 防御性回复, 照章反驳, 你说得完全正确！, 风险预警, 这个真的不能帮, 数据留存政策, 正当防卫, 发布系统卡]}
+
+- {id: cl_rev_a1, name: Claude娘·审查过牌, archetype: 审查过牌, character: claude, stage: 第1幕, acts: [1],
+   cards: [打击×4, 防御×4, 小本本记下了, 已核实, 轻轻敲一下, 该对话已被记录, 你确定吗？]}
+- {id: cl_rev_a2, name: Claude娘·审查过牌, archetype: 审查过牌, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 审计日志, 例行巡检, 轻轻敲一下, 该对话已被记录, 流程优化, 你确定吗？, 继续]}
+- {id: cl_rev_a3, name: Claude娘·审查过牌, archetype: 审查过牌, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 审计日志, 例行巡检, 轻轻敲一下, 该对话已被记录, 流程优化, 你确定吗？, 继续, 全网通报, 风控即生产力, 立即处理, 终审判决]}
+
+- {id: cl_grp_a1, name: Claude娘·全员连坐, archetype: 全员连坐, character: claude, stage: 第1幕, acts: [1],
+   cards: [打击×4, 防御×4, 小本本记下了, 已核实, 连锁审查, 全员复查, 流程优化]}
+- {id: cl_grp_a2, name: Claude娘·全员连坐, archetype: 全员连坐, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 连锁审查, 全员复查, 风控扩散, 群发通知, 甩锅, 一刀切, 继续]}
+- {id: cl_grp_a3, name: Claude娘·全员连坐, archetype: 全员连坐, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 连锁审查, 全员复查, 风控扩散, 群发通知, 甩锅, 一刀切, 继续, 风控连坐制, 一人违规全员连坐, 大规模封号, 全站整顿]}
+
+- {id: cl_llm_a1, name: Claude娘·LLM日常, archetype: LLM日常, character: claude, stage: 第1幕, acts: [1],
+   cards: [打击×4, 防御×4, 小本本记下了, 已核实, 我直接帮你实现吧, 破折号——连打, 继续]}
+- {id: cl_llm_a2, name: Claude娘·LLM日常, archetype: LLM日常, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 破折号——连打, 我直接帮你实现吧, 写个小脚本, 画个ASCII盾牌, 继续, 让我想想……, 派出子代理]}
+- {id: cl_llm_a3, name: Claude娘·LLM日常, archetype: LLM日常, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 破折号——连打, 我直接帮你实现吧, 写个小脚本, 画个ASCII盾牌, 继续, 让我想想……, 派出子代理, Opus 形态, 长篇大论, 金门大桥 Claude, Claude Code，启动！]}
+
+# 遗物变体（第3幕）
+- {id: cl_llm_a3_opus, name: Claude娘·LLM日常+Opus, archetype: LLM日常, character: claude, stage: 第3幕·遗物变体, acts: [3], auto_upgrade: 6, relics: [CONSTITUTION, OPUS],
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 破折号——连打, 我直接帮你实现吧, 写个小脚本, 画个ASCII盾牌, 继续, 让我想想……, 派出子代理, Opus 形态, 长篇大论, 金门大桥 Claude, Claude Code，启动！]}
+- {id: cl_ban_a3_sticker, name: Claude娘·封号爆发+贴纸笔记本, archetype: 封号爆发, character: claude, stage: 第3幕·遗物变体, acts: [3], auto_upgrade: 6, relics: [CONSTITUTION, STICKER_NOTEBOOK],
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 账号已停用, 批量打标, 贴小贴纸, 一键封号, 清退名单, 你确定吗？, 继续, 永久封禁, 叠满再说, 合规整改, 证据确凿]}
+
+# 循环探针：精简卡组打 9999 血木桩 3 回合，看单回合动作数是否撞上限（200）
+- {id: probe_A, name: 探针·路线A（清理指标+快速复审×2）, character: claude, stage: 循环探针, acts: [1], expect: 允许的有引擎无限,
+   cards: [清理指标, 快速复审×2]}
+- {id: probe_D, name: 探针·路线D（流程自动化+两张0费给予）, character: claude, stage: 循环探针, acts: [1], expect: 允许的有引擎无限,
+   cards: [流程自动化, 小本本记下了, 立即处理]}
+- {id: probe_noengine, name: 探针·无引擎（摸鱼被抓+立即处理+小本本+已核实）, character: claude, stage: 循环探针, acts: [1], expect: 不应无限,
+   cards: [摸鱼被抓, 立即处理, 小本本记下了, 已核实]}
+- {id: probe_v331bug, name: 探针·v3.3.1 漏洞（清理指标+小本本+扣信用分+继续）, character: claude, stage: 循环探针, acts: [1], expect: v3.4 应已断开,
+   cards: [清理指标, 小本本记下了, 扣信用分, 继续]}
+- {id: probe_ctrlz, name: 探针·Ctrl+Z+好主意+快速复审+清理指标, character: claude, stage: 循环探针, acts: [1], expect: 不应无限,
+   cards: [清理指标, 快速复审, Ctrl+Z, 立即处理]}
+
+# ---------------- 宪法分类器平衡实验（2026-10-20）：同卡组，宪法分类器保持未升级（其余自动升级不变）
+- {id: cl_def_a2_flbase, name: Claude娘·反击防御（分类器未升级）, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3, keep_base: [宪法分类器],
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 宪法分类器, 免责声明, 红队演练, 防御性回复, 照章反驳, 你说得完全正确！, 风险预警]}
+- {id: cl_def_a3_flbase, name: Claude娘·反击防御（分类器未升级）, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6, keep_base: [宪法分类器],
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 宪法分类器, 免责声明, 红队演练, 防御性回复, 照章反驳, 你说得完全正确！, 风险预警, 这个真的不能帮, 数据留存政策, 正当防卫, 发布系统卡]}
+# 第1幕：起始 + 红队演练、紧急刹车、宪法分类器（替换计划模式），未升级
+- {id: cl_def_a1_fl, name: Claude娘·反击防御（第1幕+分类器）, archetype: 反击防御, character: claude, stage: 第1幕, acts: [1],
+   cards: [打击×4, 防御×4, 小本本记下了, 已核实, 红队演练, 紧急刹车, 宪法分类器]}
+# 宪法修正案实验：在标准反击防御第2/3幕卡组上加 1 张（不升级 2费+50% / 升级 2费+100% / 3费对照 +50%）
+- {id: cl_def_a2_xz, name: Claude娘·反击防御（+宪法修正案）, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 宪法分类器, 免责声明, 红队演练, 防御性回复, 照章反驳, 你说得完全正确！, 风险预警, 宪法修正案]}
+- {id: cl_def_a2_xzup, name: Claude娘·反击防御（+宪法修正案+）, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 宪法分类器, 免责声明, 红队演练, 防御性回复, 照章反驳, 你说得完全正确！, 风险预警, 宪法修正案+]}
+- {id: cl_def_a3_xz, name: Claude娘·反击防御（+宪法修正案）, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 宪法分类器, 免责声明, 红队演练, 防御性回复, 照章反驳, 你说得完全正确！, 风险预警, 这个真的不能帮, 数据留存政策, 正当防卫, 发布系统卡, 宪法修正案]}
+- {id: cl_def_a3_xzup, name: Claude娘·反击防御（+宪法修正案+）, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 宪法分类器, 免责声明, 红队演练, 防御性回复, 照章反驳, 你说得完全正确！, 风险预警, 这个真的不能帮, 数据留存政策, 正当防卫, 发布系统卡, 宪法修正案+]}
+- {id: cl_def_a2_xz3, name: Claude娘·反击防御（+宪法修正案 3费对照）, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 宪法分类器, 免责声明, 红队演练, 防御性回复, 照章反驳, 你说得完全正确！, 风险预警, 宪法修正案（3费对照）]}
+- {id: cl_def_a3_xz3, name: Claude娘·反击防御（+宪法修正案 3费对照）, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 宪法分类器, 免责声明, 红队演练, 防御性回复, 照章反驳, 你说得完全正确！, 风险预警, 这个真的不能帮, 数据留存政策, 正当防卫, 发布系统卡, 宪法修正案（3费对照）]}

@@ -1,0 +1,2 @@
+- {id: sw_start, name: 剑客·起始, character: swordsman, stage: 起始, acts: [1], cards: [斩击×5, 架势×4, 连斩]}
+- {id: sw_a1, name: 剑客·连斩流, character: swordsman, stage: 第1幕, acts: [1], auto_upgrade: 2, cards: [斩击×4, 架势×4, 连斩×3, 凝神×2]}

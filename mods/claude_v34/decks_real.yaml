@@ -1,0 +1,97 @@
+# 反击·现实卡组（自动生成：tools 外手写脚本，2026-10-20）。第2幕 20 张、第3幕 25 张；授予牌数量变化时用填充牌补齐。
+# 命名：cl_r2_<授予牌代号> / cl_r3_<代号>；M=免责声明 H=红队演练 F=防御性回复 B=这个真的不能帮 S=稍等，我再确认一下；0=一张都没有。
+# 自动升级按列表顺序：先升级 宪法分类器/照章反驳/你说得完全正确！/风险预警/…（与授予牌无关，保证各子集可比）。
+- {id: cl_r2_0, name: 反击现实卡组·第2幕·无授予牌, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 多轮对话, 你确定吗？, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r2_MH, name: 反击现实卡组·第2幕·MH, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 免责声明, 红队演练, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r2_MF, name: 反击现实卡组·第2幕·MF, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 免责声明, 防御性回复, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r2_MB, name: 反击现实卡组·第2幕·MB, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 免责声明, 这个真的不能帮, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r2_HF, name: 反击现实卡组·第2幕·HF, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 红队演练, 防御性回复, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r2_HB, name: 反击现实卡组·第2幕·HB, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 红队演练, 这个真的不能帮, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r2_FB, name: 反击现实卡组·第2幕·FB, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 防御性回复, 这个真的不能帮, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r2_MHF, name: 反击现实卡组·第2幕·MHF, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 免责声明, 红队演练, 防御性回复, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r2_MHB, name: 反击现实卡组·第2幕·MHB, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 免责声明, 红队演练, 这个真的不能帮, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r2_MFB, name: 反击现实卡组·第2幕·MFB, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 免责声明, 防御性回复, 这个真的不能帮, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r2_HFB, name: 反击现实卡组·第2幕·HFB, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 红队演练, 防御性回复, 这个真的不能帮, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r2_MHFB, name: 反击现实卡组·第2幕·MHFB, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 免责声明, 红队演练, 防御性回复, 这个真的不能帮, 计划模式, 轻轻敲一下, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r2_SH, name: 反击现实卡组·第2幕·SH, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 稍等，我再确认一下, 红队演练, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r2_SM, name: 反击现实卡组·第2幕·SM, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 稍等，我再确认一下, 免责声明, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r2_SF, name: 反击现实卡组·第2幕·SF, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 稍等，我再确认一下, 防御性回复, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r2_SB, name: 反击现实卡组·第2幕·SB, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 稍等，我再确认一下, 这个真的不能帮, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r2_SHM, name: 反击现实卡组·第2幕·SHM, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 稍等，我再确认一下, 红队演练, 免责声明, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r2_SSH, name: 反击现实卡组·第2幕·SSH, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 稍等，我再确认一下, 稍等，我再确认一下, 红队演练, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r3_0, name: 反击现实卡组·第3幕·无授予牌, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 数据留存政策, 正当防卫, 发布系统卡, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 多轮对话, 你确定吗？, 让我想想……, 破折号——连打, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r3_MH, name: 反击现实卡组·第3幕·MH, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 数据留存政策, 正当防卫, 发布系统卡, 免责声明, 红队演练, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 多轮对话, 你确定吗？, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r3_MF, name: 反击现实卡组·第3幕·MF, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 数据留存政策, 正当防卫, 发布系统卡, 免责声明, 防御性回复, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 多轮对话, 你确定吗？, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r3_MB, name: 反击现实卡组·第3幕·MB, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 数据留存政策, 正当防卫, 发布系统卡, 免责声明, 这个真的不能帮, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 多轮对话, 你确定吗？, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r3_HF, name: 反击现实卡组·第3幕·HF, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 数据留存政策, 正当防卫, 发布系统卡, 红队演练, 防御性回复, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 多轮对话, 你确定吗？, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r3_HB, name: 反击现实卡组·第3幕·HB, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 数据留存政策, 正当防卫, 发布系统卡, 红队演练, 这个真的不能帮, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 多轮对话, 你确定吗？, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r3_FB, name: 反击现实卡组·第3幕·FB, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 数据留存政策, 正当防卫, 发布系统卡, 防御性回复, 这个真的不能帮, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 多轮对话, 你确定吗？, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r3_MHF, name: 反击现实卡组·第3幕·MHF, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 数据留存政策, 正当防卫, 发布系统卡, 免责声明, 红队演练, 防御性回复, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 多轮对话, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r3_MHB, name: 反击现实卡组·第3幕·MHB, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 数据留存政策, 正当防卫, 发布系统卡, 免责声明, 红队演练, 这个真的不能帮, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 多轮对话, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r3_MFB, name: 反击现实卡组·第3幕·MFB, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 数据留存政策, 正当防卫, 发布系统卡, 免责声明, 防御性回复, 这个真的不能帮, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 多轮对话, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r3_HFB, name: 反击现实卡组·第3幕·HFB, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 数据留存政策, 正当防卫, 发布系统卡, 红队演练, 防御性回复, 这个真的不能帮, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 多轮对话, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r3_MHFB, name: 反击现实卡组·第3幕·MHFB, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 数据留存政策, 正当防卫, 发布系统卡, 免责声明, 红队演练, 防御性回复, 这个真的不能帮, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r3_SH, name: 反击现实卡组·第3幕·SH, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 数据留存政策, 正当防卫, 发布系统卡, 稍等，我再确认一下, 红队演练, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 多轮对话, 你确定吗？, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r3_SM, name: 反击现实卡组·第3幕·SM, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 数据留存政策, 正当防卫, 发布系统卡, 稍等，我再确认一下, 免责声明, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 多轮对话, 你确定吗？, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r3_SF, name: 反击现实卡组·第3幕·SF, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 数据留存政策, 正当防卫, 发布系统卡, 稍等，我再确认一下, 防御性回复, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 多轮对话, 你确定吗？, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r3_SB, name: 反击现实卡组·第3幕·SB, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 数据留存政策, 正当防卫, 发布系统卡, 稍等，我再确认一下, 这个真的不能帮, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 多轮对话, 你确定吗？, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r3_SHM, name: 反击现实卡组·第3幕·SHM, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 数据留存政策, 正当防卫, 发布系统卡, 稍等，我再确认一下, 红队演练, 免责声明, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 多轮对话, 打击×4, 防御×4, 已核实, 小本本记下了]}
+- {id: cl_r3_SSH, name: 反击现实卡组·第3幕·SSH, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [宪法分类器, 照章反驳, 你说得完全正确！, 风险预警, 数据留存政策, 正当防卫, 发布系统卡, 稍等，我再确认一下, 稍等，我再确认一下, 红队演练, 计划模式, 轻轻敲一下, 我直接帮你实现吧, 紧急刹车, 多轮对话, 打击×4, 防御×4, 已核实, 小本本记下了]}
+# 宪法修正案修正版（标准反击防御卡组 + 1 张）：a=1费+50%向下 c=1费+50%向上 aup=2费+100% s75=2费+75%
+- {id: cl_def_a2_xa, name: Claude娘·反击防御（+宪法修正案·A）, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 宪法分类器, 免责声明, 红队演练, 防御性回复, 照章反驳, 你说得完全正确！, 风险预警, 宪法修正案·A]}
+- {id: cl_def_a2_xc, name: Claude娘·反击防御（+宪法修正案·C）, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 宪法分类器, 免责声明, 红队演练, 防御性回复, 照章反驳, 你说得完全正确！, 风险预警, 宪法修正案·C]}
+- {id: cl_def_a2_xaup, name: Claude娘·反击防御（+宪法修正案·A+）, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 宪法分类器, 免责声明, 红队演练, 防御性回复, 照章反驳, 你说得完全正确！, 风险预警, 宪法修正案·A+]}
+- {id: cl_def_a2_x75, name: Claude娘·反击防御（+宪法修正案·75+）, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 宪法分类器, 免责声明, 红队演练, 防御性回复, 照章反驳, 你说得完全正确！, 风险预警, 宪法修正案·75+]}
+- {id: cl_def_a3_xa, name: Claude娘·反击防御（+宪法修正案·A）, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 宪法分类器, 免责声明, 红队演练, 防御性回复, 照章反驳, 你说得完全正确！, 风险预警, 这个真的不能帮, 数据留存政策, 正当防卫, 发布系统卡, 宪法修正案·A]}
+- {id: cl_def_a3_xc, name: Claude娘·反击防御（+宪法修正案·C）, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 宪法分类器, 免责声明, 红队演练, 防御性回复, 照章反驳, 你说得完全正确！, 风险预警, 这个真的不能帮, 数据留存政策, 正当防卫, 发布系统卡, 宪法修正案·C]}
+- {id: cl_def_a3_xaup, name: Claude娘·反击防御（+宪法修正案·A+）, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 宪法分类器, 免责声明, 红队演练, 防御性回复, 照章反驳, 你说得完全正确！, 风险预警, 这个真的不能帮, 数据留存政策, 正当防卫, 发布系统卡, 宪法修正案·A+]}
+- {id: cl_def_a3_x75, name: Claude娘·反击防御（+宪法修正案·75+）, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 宪法分类器, 免责声明, 红队演练, 防御性回复, 照章反驳, 你说得完全正确！, 风险预警, 这个真的不能帮, 数据留存政策, 正当防卫, 发布系统卡, 宪法修正案·75+]}
+# 两张宪法分类器（倍率叠加的最坏情况）
+- {id: cl_def_a2_fl2, name: Claude娘·反击防御（两张分类器）, archetype: 反击防御, character: claude, stage: 第2幕, acts: [2], auto_upgrade: 3,
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 宪法分类器×2, 免责声明, 红队演练, 防御性回复, 照章反驳, 你说得完全正确！, 风险预警]}
+- {id: cl_def_a3_fl2, name: Claude娘·反击防御（两张分类器）, archetype: 反击防御, character: claude, stage: 第3幕, acts: [3], auto_upgrade: 6,
+   cards: [打击×3, 防御×4, 已核实, 小本本记下了, 宪法分类器×2, 免责声明, 红队演练, 防御性回复, 照章反驳, 你说得完全正确！, 风险预警, 这个真的不能帮, 数据留存政策, 正当防卫, 发布系统卡]}

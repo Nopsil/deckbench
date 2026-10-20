@@ -1,0 +1,9 @@
+name: beam_compare
+title: 启发式 vs 束搜索 AI 对照（第1幕起始 + 流派卡组）
+mods: [vanilla, claude_v34]
+seed: 20261020
+fights: 60
+max_turns: 30
+agent: beam
+rooms: [普通, 精英]
+decks: [claude_start, ironclad_start, silent_start, cl_ban_a1, cl_def_a1, cl_rev_a1, cl_grp_a1, cl_llm_a1]
