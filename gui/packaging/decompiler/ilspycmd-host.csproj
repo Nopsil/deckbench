@@ -1,0 +1,18 @@
+<!-- Self-contained host for the unmodified ilspycmd 9.1.0.7988 (MIT). Build (needs .NET 9 SDK):
+       dotnet tool install -g ilspycmd --version 9.1.0.7988
+       dotnet publish -c Release -r win-x64 --self-contained -o out-win -p:IlspyToolDir=<.store/ilspycmd/9.1.0.7988/ilspycmd/9.1.0.7988/tools/net8.0/any>
+     The output folder ships as DeckBench\decompiler\ so players don't need the .NET SDK. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <AssemblyName>ilspycmd-host</AssemblyName>
+    <RootNamespace>IlspyHost</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="$(IlspyToolDir)/*.dll" Exclude="$(IlspyToolDir)/System.Collections.Immutable.dll;$(IlspyToolDir)/System.Reflection.Metadata.dll"><Private>true</Private></Reference>
+  </ItemGroup>
+</Project>

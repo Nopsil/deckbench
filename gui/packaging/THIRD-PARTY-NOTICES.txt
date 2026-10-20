@@ -1,0 +1,50 @@
+DeckBench - third-party notices / 第三方组件声明
+==============================================
+
+DeckBench's own code is MIT-licensed (see LICENSE; that license covers only our own code).
+This Windows package also contains the following third-party components, each under its own license.
+Full license texts are in the "notices" folder.
+
+本打包版还包含以下第三方组件，各自遵循其许可证；完整许可证文本见 notices 文件夹。
+
+Decompiler (folder "decompiler") / 反编译器
+-------------------------------------------
+- ilspycmd 9.1.0.7988, ICSharpCode.Decompiler, ICSharpCode.ILSpyX - MIT License,
+  Copyright (c) 2011-2025 AlphaSierraPapa for the ILSpy team. https://github.com/icsharpcode/ILSpy
+  (notices/ILSpy-license.txt). Shipped unmodified; started through a small host (ilspycmd-host.exe,
+  source in gui/packaging/decompiler/ of the DeckBench repository).
+- .NET 9 runtime (self-contained) - MIT License, Copyright (c) .NET Foundation and Contributors.
+  https://github.com/dotnet/runtime (notices/dotnet-runtime-LICENSE.txt, notices/dotnet-runtime-THIRD-PARTY-NOTICES.txt)
+- Microsoft.Extensions.* (Configuration, DependencyInjection, Hosting, Logging, Options, ...),
+  System.Collections.Immutable, System.Reflection.Metadata, System.Composition.AttributedModel,
+  System.Diagnostics.EventLog, System.Security.Cryptography.* - MIT License, .NET Foundation. https://github.com/dotnet/runtime
+- McMaster.Extensions.CommandLineUtils / Hosting.CommandLine - Apache License 2.0 (notices/Apache-2.0.txt).
+  https://github.com/natemcmaster/CommandLineUtils
+- NuGet.Common / Configuration / Frameworks / Packaging / Protocol / Versioning - Apache License 2.0
+  (notices/Apache-2.0.txt), Copyright (c) .NET Foundation. https://github.com/NuGet/NuGet.Client
+- Mono.Cecil - MIT License, Copyright (c) 2008-2015 Jb Evain, (c) 2008-2011 Novell, Inc. https://github.com/jbevain/cecil
+- Newtonsoft.Json - MIT License, Copyright (c) 2007 James Newton-King. https://github.com/JamesNK/Newtonsoft.Json
+- K4os.Compression.LZ4 - MIT License, Copyright (c) 2017 Milosz Krajewski. https://github.com/MiloszKrajewski/K4os.Compression.LZ4
+
+Application runtime (DeckBench.exe, folder "_internal") / 程序运行时
+-------------------------------------------------------------------
+- Python 3.12 - Python Software Foundation License. https://docs.python.org/3/license.html
+- PyInstaller bootloader - GPL-2.0 with the PyInstaller bootloader exception (permits distributing bundled apps
+  under any license). https://github.com/pyinstaller/pyinstaller
+- FastAPI (MIT), Starlette (BSD-3-Clause), Uvicorn (BSD-3-Clause), Pydantic / pydantic-core (MIT), AnyIO (MIT),
+  h11 (MIT), click (BSD-3-Clause), python-multipart (Apache-2.0), PyYAML (MIT), typing_extensions (PSF),
+  annotated-types (MIT), idna (BSD-3-Clause)
+- pywebview (BSD-3-Clause), pythonnet (MIT), clr_loader (MIT), bottle (MIT), proxy_tools (MIT), pywin32-ctypes (BSD-3-Clause)
+
+Web UI (bundled JavaScript) / 界面
+----------------------------------
+- Vue, vue-router (MIT), Naive UI (MIT), ECharts / vue-echarts (Apache-2.0 / MIT), marked (MIT),
+  DOMPurify (Apache-2.0 or MPL-2.0), @vicons/tabler (MIT; Tabler Icons MIT)
+
+The MIT license text: see notices/ILSpy-license.txt (same terms, different copyright holders).
+The Apache License 2.0 text: see notices/Apache-2.0.txt.
+
+Game / 游戏
+-----------
+This package contains NO files, code, data, text or art from Slay the Spire 2 or Mega Crit.
+本打包版不包含《杀戮尖塔 2》或 Mega Crit 的任何文件、代码、数据、文本或美术。

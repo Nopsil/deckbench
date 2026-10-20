@@ -214,12 +214,31 @@ def require_codex():
 
 
 # ---------------------------------------------------------------- 生成
+def _bundled_decompiler_dir():
+    """打包版（Windows exe）自带的自包含反编译器目录：<exe 目录>/decompiler/（含 .NET 运行时，不需要装 .NET SDK）。"""
+    cands = [os.path.join(os.path.dirname(ROOT), "decompiler")]
+    if getattr(sys, "frozen", False):
+        cands.insert(0, os.path.join(os.path.dirname(os.path.abspath(sys.executable)), "decompiler"))
+    for d in cands:
+        for exe in ("ilspycmd-host.exe", "ilspycmd-host"):
+            if os.path.isfile(os.path.join(d, exe)):
+                return d, os.path.join(d, exe)
+    return None, None
+
+
 def _find_ilspy():
+    """返回 (可执行文件, 框架引用目录或 None)。优先：DECKBENCH_ILSPY → 自带反编译器 → 系统里的 ilspycmd。"""
+    env = os.environ.get("DECKBENCH_ILSPY")
+    if env and os.path.exists(env):
+        return env, os.environ.get("DECKBENCH_ILSPY_REFS") or None
+    d, exe = _bundled_decompiler_dir()
+    if exe:
+        return exe, d          # 自包含发布目录里就是 .NET 9 运行时程序集，可直接作框架引用
     for c in (shutil.which("ilspycmd"), os.path.expanduser("~/.dotnet/tools/ilspycmd"),
               os.path.expanduser("~/.dotnet/tools/ilspycmd.exe")):
         if c and os.path.exists(c):
-            return c
-    return None
+            return c, None
+    return None, None
 
 
 def _net9_dir():
@@ -233,8 +252,18 @@ def _net9_dir():
     return None
 
 
+ILSPY_HELP = (
+    "需要反编译器 ilspycmd 才能在本机读取你的游戏 / ilspycmd is required to read your game locally.\n"
+    "打包版自带反编译器（decompiler 文件夹），请确认解压完整 / the packaged app ships one in the 'decompiler' folder; re-extract the zip.\n"
+    "源码版 / source version:\n"
+    "  1) 安装 .NET 9 SDK / install the .NET 9 SDK: https://dotnet.microsoft.com/download/dotnet/9.0\n"
+    "  2) dotnet tool install -g ilspycmd --version 9.1.0.7988")
+
+
 def _run(argv, **kw):
     print("  $", " ".join(argv[:4]), "..." if len(argv) > 4 else "", flush=True)
+    if os.name == "nt":
+        kw.setdefault("creationflags", 0x08000000)   # CREATE_NO_WINDOW：打包版不弹黑色控制台
     p = subprocess.run(argv, **kw)
     if p.returncode != 0:
         raise GameDataError(f"命令失败 / command failed ({p.returncode}): {argv[0]}")
@@ -255,10 +284,9 @@ def setup(game_dir=None, keep_src=False):
         except Exception:
             rel = {}
     print("版本 / version:", rel.get("version", "?"), "branch:", rel.get("branch", "?"), "sha256:", digest[:16], flush=True)
-    ilspy = _find_ilspy()
+    ilspy, refs = _find_ilspy()
     if ilspy is None:
-        raise GameDataError("需要 ilspycmd 来在本机反编译你的游戏 / ilspycmd is required:\n"
-                            "  dotnet tool install -g ilspycmd --version 9.1.0.7988   (需要 .NET 9 SDK / requires .NET 9)")
+        raise GameDataError(ILSPY_HELP)
     out_dir = os.path.join(cache_root(), digest[:16])
     tmp_out = out_dir + ".tmp"
     shutil.rmtree(tmp_out, ignore_errors=True)
@@ -266,7 +294,7 @@ def setup(game_dir=None, keep_src=False):
     src = tempfile.mkdtemp(prefix="deckbench-src-")
     try:
         argv = [ilspy, "-p", "--nested-directories", "-o", src]
-        net9 = _net9_dir()
+        net9 = refs or _net9_dir()
         if net9:
             argv += ["-r", net9]
         else:

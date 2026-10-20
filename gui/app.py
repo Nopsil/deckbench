@@ -83,13 +83,53 @@ def _setup_clr():
     return False
 
 
+_WAIT_TITLE = "DeckBench - 首次运行 / First run"
+
+
+def _please_wait():
+    """Windows：生成数据期间显示一个「请稍候」提示框，生成结束后自动关闭。返回关闭函数。"""
+    msg = ("正在从你本机的游戏安装生成数据，大约 1–2 分钟，请稍候……\n完成后界面会自动打开。\n\n"
+           "Generating data from your own game install (about 1–2 minutes)...\nThe app will open automatically when done.")
+    print(msg, flush=True)
+    if os.name != "nt":
+        return lambda: None
+    import ctypes
+    u32 = ctypes.windll.user32
+    t = threading.Thread(target=lambda: u32.MessageBoxW(None, msg, _WAIT_TITLE, 0x40 | 0x40000), daemon=True)
+    t.start()
+
+    def close():
+        for _ in range(20):
+            h = u32.FindWindowW(None, _WAIT_TITLE)
+            if h:
+                u32.PostMessageW(h, 0x0010, 0, 0)   # WM_CLOSE
+                return
+            if not t.is_alive():
+                return
+            time.sleep(0.1)
+    return close
+
+
 def _ensure_game_or_exit():
     """必须有玩家自己安装的游戏：首次运行在本机生成数据；找不到安装就提示并退出。"""
     from sts2sim import gamedata
     try:
+        gamedata.verify()
+        return
+    except gamedata.GameDataError:
+        pass
+    close = lambda: None  # noqa: E731
+    try:
+        if gamedata.find_dll() is not None or gamedata._previous_game_dir():
+            close = _please_wait()
         gamedata.ensure()
-    except gamedata.GameDataError as e:
-        msg = str(e)
+    except Exception as e:  # noqa  — GameDataError 或生成过程中的意外错误，都给出可读提示
+        close()
+        if not isinstance(e, gamedata.GameDataError):
+            import traceback
+            traceback.print_exc()
+        msg = str(e) if isinstance(e, gamedata.GameDataError) else (
+            f"生成数据失败 / failed to generate data: {e!r}\n请把 data\\app.log 发给作者 / please send data\\app.log to the author.")
         print(msg, file=sys.stderr, flush=True)
         if os.name == "nt":
             try:
@@ -98,6 +138,7 @@ def _ensure_game_or_exit():
             except Exception:
                 pass
         sys.exit(2)
+    close()
 
 
 def main():
