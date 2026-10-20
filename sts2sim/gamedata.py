@@ -351,10 +351,7 @@ def setup(game_dir=None, keep_src=False):
     finally:
         shutil.rmtree(src, ignore_errors=True)
         if not os.environ.get("DECKBENCH_TEMP"):
-            try:
-                os.rmdir(troot)      # 空了就删掉
-            except OSError:
-                pass
+            shutil.rmtree(troot, ignore_errors=True)   # 我们自己的目录（ilspycmd 还会留下 NuGetScratch），用完整个删掉
     manifest = {"format": FORMAT, "game_dir": game_dir or os.path.dirname(dll), "dll_path": dll, "dll_sha256": digest,
                 "release_info": rel, "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
                 "note": "Generated locally from your own install. Do not redistribute. / 由你本机安装生成，请勿分发。"}
