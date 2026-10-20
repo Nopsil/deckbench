@@ -13,6 +13,7 @@ from ..rt.boot import game as G
 from .mentor import lib
 
 CHARS = {"IRONCLAD": "Ironclad", "SILENT": "Silent", "DEFECT": "Defect", "NECROBINDER": "Necrobinder", "REGENT": "Regent"}
+_POL = {}   # 每进程每角色缓存一个 PPO 网络（选牌用）
 ANCIENTS = {"OROBAS", "PAEL", "TEZCATARA", "NONUPEIPE", "TANX", "VAKUU"}
 
 
@@ -73,12 +74,12 @@ class PpoNonCombat:
     """混入 StrongAgent 子类：局外决策用 spire-mentor PPO，失败回退 super()。"""
     ppo_surfaces = ("map_select", "card_reward", "rest_site", "shop", "event")
 
-    def _ppo(self, surface, msg):
+    def _ppo(self, surface, msg, stat=None):
         st = self._run.state
         p = self.player
         ch = CHARS.get(p.Character.Id.Entry)
         ps = self.mstats.setdefault("ppo", {})
-        k = ps.setdefault(surface, [0, 0])
+        k = ps.setdefault(stat or surface, [0, 0])
         if ch is None or surface not in self.ppo_surfaces:
             k[1] += 1
             return None
@@ -186,7 +187,73 @@ class PpoNonCombat:
             self._remove_target = None
             if any(o is t for o in options) and max_sel >= 1:
                 return [t]
+        if getattr(self, "ppo_select", False) and max_sel >= 1:
+            r = self._ppo_card_select(list(options), min_sel, max_sel)
+            if r is not None:
+                return r
         return super().select_cards(options, min_sel, max_sel)
+
+    # ---------- 局外选牌（锻造/删牌/变形/附魔）：用 spire-mentor 的 Python 构造器 + 同一个 ONNX 网络 ----------
+    _PROMPTS = {"UpgradeSelectionPrompt": "TO_UPGRADE", "RemoveSelectionPrompt": "TO_REMOVE",
+                "TransformSelectionPrompt": "TO_TRANSFORM", "EnchantSelectionPrompt": "TO_ENCHANT"}
+
+    def _prompt_key(self):
+        import sys
+        f = sys._getframe(2)
+        for _ in range(16):
+            if f is None:
+                return None
+            if "prefs" in f.f_locals:
+                try:
+                    pr = f.f_locals["prefs"].Prompt
+                except Exception:  # noqa
+                    return None
+                for attr, key in self._PROMPTS.items():
+                    if pr is getattr(G.CardSelectorPrefs, attr, object()):
+                        return key
+                return None
+            f = f.f_back
+        return None
+
+    def _ppo_card_select(self, opts, min_sel, max_sel):
+        from .combat import cm
+        try:
+            if cm().IsInProgress:
+                return None
+        except Exception:  # noqa
+            pass
+        key = self._prompt_key()
+        stat = {"TO_UPGRADE": "smith", "TO_REMOVE": "removal", "TO_TRANSFORM": "transform", "TO_ENCHANT": "enchant"}.get(key)
+        if stat is None or not opts:
+            return None
+        ps = self.mstats.setdefault("ppo", {}).setdefault(stat, [0, 0])
+        ch = CHARS.get(self.player.Character.Id.Entry)
+        try:
+            lib()
+            import realgame_ppo as RP
+            pol = _POL.get(ch)
+            if pol is None:
+                pol, err = RP.load_ppo_policy(None, ch)
+                if pol is None:
+                    raise RuntimeError(err)
+                _POL[ch] = pol
+            st = envelope({"type": "card_select", "prompt_key": key, "cards": [dict(_card(c), index=i) for i, c in enumerate(opts)],
+                           "min_count": int(min_sel), "max_count": int(max_sel)}, self._run.state, self.player)
+            d = RP._build_card_select(st, None)
+            if d is None:
+                raise RuntimeError("no decision")
+            probs, _ = pol.distribution(d.obs, d.actions, d.metrics)
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except BaseException as e:  # noqa
+            ps[1] += 1
+            self.mstats.setdefault("ppo_err", {}).setdefault(f"{stat}:{type(e).__name__}", 0)
+            self.mstats["ppo_err"][f"{stat}:{type(e).__name__}"] += 1
+            return None
+        ps[0] += 1
+        k = max(1, min(int(min_sel) if min_sel > 0 else 1, int(max_sel), len(opts)))
+        order = sorted(range(len(opts)), key=lambda i: -float(probs[i]))
+        return [opts[i] for i in order[:k]]
 
     # ---------- 事件：只接 Neow 和先古之民（选项是枚举 id / 遗物 id，不需要游戏文本） ----------
     def event_option(self, event, options, run):
@@ -208,6 +275,34 @@ class PpoNonCombat:
             r = self._ppo("event", {"type": "event", "options": opts})
             if r is not None and r[1].get("action") == "choose":
                 return int(r[1]["index"])
+        elif getattr(self, "ppo_events", False):
+            # 其它事件：英文选项文本在运行时从本机游戏安装读（mentor_text.py），不进仓库
+            from .mentor_text import event_option_text
+            opts = []
+            for i, o in enumerate(options):
+                tx = event_option_text(event, o)
+                if tx is None:
+                    opts = None
+                    break
+                d = {"index": i, "id": "choose_event_option", "action": "choose_event_option", "label": tx[0],
+                     "description": tx[1], "enabled": not o.IsLocked, "event_id": eid,
+                     "text_key": str(getattr(o, "TextKey", "") or ""),
+                     "relic_id": o.Relic.Id.Entry if getattr(o, "Relic", None) is not None else ""}
+                wk = getattr(o, "WillKillPlayer", None)
+                if callable(wk):
+                    try:
+                        d["will_kill_player"] = bool(wk(self.player))
+                    except Exception:  # noqa
+                        pass
+                opts.append(d)
+            if opts and sum(1 for d in opts if d["enabled"]) >= 2:
+                r = self._ppo("event", {"type": "event", "options": opts}, stat="event_other")
+                if r is not None and r[1].get("action") == "choose":
+                    i = int(r[1]["index"])
+                    if not options[i].IsLocked:
+                        return i
+            else:
+                self.mstats.setdefault("ppo", {}).setdefault("event_other", [0, 0])[1] += 1
         else:
             self.mstats.setdefault("ppo", {}).setdefault("event_other", [0, 0])[1] += 1
         return super().event_option(event, options, run)

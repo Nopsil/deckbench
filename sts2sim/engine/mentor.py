@@ -339,7 +339,8 @@ def map_action(a, player, acts, alive):
     raise Unsupported(f"unknown action {a}")
 
 
-def make_mentor_agent(seed=0, sims=1000, threads=1, fallback_search=True, mentor_rooms=None, noncombat=False, **kw):
+def make_mentor_agent(seed=0, sims=1000, threads=1, fallback_search=True, mentor_rooms=None, noncombat=False,
+                      boss_sims=None, elite_sims=None, ppo_events=False, ppo_select=False, **kw):
     """局外 = learned（StrongAgent）；战斗 = spire-mentor MCTS，不支持时回退到 learned-search（或 learned）。"""
     from .strong import StrongAgent
     bases = (StrongAgent,)
@@ -356,6 +357,10 @@ def make_mentor_agent(seed=0, sims=1000, threads=1, fallback_search=True, mentor
             self.mentor_rooms = mentor_rooms      # None = 所有战斗；或 {"Boss"} 等
             self.mstats = {"mentor": 0, "fallback": 0, "reasons": {}, "mcts_sec": 0.0}
             self._k = 0
+            # 按房间类型的模拟次数（spire-mentor 自己的 eval-cheap：普通 1000、首领 4000）
+            self.room_sims = {k: v for k, v in (("Boss", boss_sims), ("Elite", elite_sims)) if v}
+            self.ppo_select = ppo_select   # mentor-full：局外选牌（锻造/删牌/变形/附魔）也交给 PPO
+            self.ppo_events = ppo_events   # mentor-full：普通事件也交给 PPO（需要本机游戏的英文文本）
 
         def combat_action(self, cs, player, acts):
             if not self._in_child and (self.mentor_rooms is None or self.room_kind in self.mentor_rooms):
@@ -364,7 +369,7 @@ def make_mentor_agent(seed=0, sims=1000, threads=1, fallback_search=True, mentor
                 t = time.perf_counter()
                 try:
                     a, info = mcts_action(cs, player, acts, self.room_kind, getattr(getattr(self, "_run", None), "ascension", 0),
-                                       sims=self.sims, threads=self.threads, seed=(seed * 7919 + self._k) & 0xFFFFFFFF)
+                                       sims=self.room_sims.get(self.room_kind, self.sims), threads=self.threads, seed=(seed * 7919 + self._k) & 0xFFFFFFFF)
                     self.mstats["mentor"] += 1
                     if "alt_of" in info:
                         self.mstats["alt"] = self.mstats.get("alt", 0) + 1

@@ -39,6 +39,9 @@ def agents_batch():
     return AGENTS_BATCH + [{
         "id": "mentor-full", "name": "spire-mentor 整局 AI（外部）",
         "desc": "战斗用 spire-mentor 的 MCTS，选牌/路线/商店/休息用它的 PPO 网络；只支持 5 个原版角色（模组角色回退学习版 AI）；约 30–50 秒/局",
+        "available": ok, "hint": "" if ok else MENTOR_HINT}, {
+        "id": "mentor-full-ev", "name": "spire-mentor 整局 AI＋事件（外部，A10 最强）",
+        "desc": "在上一项基础上，普通事件和锻造/删牌/变形/附魔也交给 PPO（事件英文文本运行时从你的游戏安装读），首领/精英战 4000 次模拟；约 50–130 秒/局",
         "available": ok, "hint": "" if ok else MENTOR_HINT}]
 
 

@@ -18,3 +18,9 @@ def test_mentor_full_available_when_dirs_exist(monkeypatch, tmp_path):
     monkeypatch.setenv("DECKBENCH_MENTOR_PY", str(tmp_path / "py"))
     a = {x["id"]: x for x in backend.agents_batch()}["mentor-full"]
     assert a["available"] is True and a["hint"] == ""
+
+
+def test_mentor_full_ev_listed(monkeypatch):
+    monkeypatch.delenv("DECKBENCH_MENTOR_SITE", raising=False)
+    a = {x["id"]: x for x in backend.agents_batch()}["mentor-full-ev"]
+    assert a["available"] is False

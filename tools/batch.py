@@ -37,7 +37,7 @@ def make_agent(name, seed, **kw):
         load_learned()
         from sts2sim.engine.imitate import ImitationAgent
         return ImitationAgent(seed=s, **kw)
-    if name in ("mentor-mcts", "mentor-boss", "mentor-full"):
+    if name in ("mentor-mcts", "mentor-boss", "mentor-full", "mentor-full-ev"):
         # 外部 spire-mentor（Rust）MCTS 打战斗；不认识的内容回退 learned-search。需要用户本地构建 sts2_rs（见 docs/DEVELOPER.md）
         from sts2sim.engine.weights import load_learned
         load_learned()
@@ -49,6 +49,12 @@ def make_agent(name, seed, **kw):
             kw.setdefault("boss_depth", 99)
         if name == "mentor-full":
             kw = dict(kw, noncombat=True)
+        if name == "mentor-full-ev":
+            # mentor-full + 普通事件、局外选牌（锻造/删牌/变形/附魔）也交给 PPO；首领/精英默认 4000 模拟（A10 实测最好）
+            # 事件选项的英文文本运行时从本机游戏安装读（sts2sim/gameloc.py），读不到就回退
+            kw = dict(kw, noncombat=True, ppo_events=True, ppo_select=True)
+            kw.setdefault("boss_sims", 4000)
+            kw.setdefault("elite_sims", 4000)
         if os.name == "nt":      # 回退搜索要 os.fork()，Windows 上没有 → 回退到不搜索的 learned
             kw.setdefault("fallback_search", False)
         return make_mentor_agent(seed=s, **kw)
@@ -167,8 +173,10 @@ def main():
     ap.add_argument("--start", type=int, default=0)
     ap.add_argument("--procs", type=int, default=mp.cpu_count())
     ap.add_argument("--out", default=None)
-    ap.add_argument("--agent", default="heuristic", choices=["heuristic", "search", "strong", "strong-nosearch", "planner", "planner-search", "learned", "learned-search", "learned-boss", "imitation", "mentor-mcts", "mentor-boss", "mentor-full"])
+    ap.add_argument("--agent", default="heuristic", choices=["heuristic", "search", "strong", "strong-nosearch", "planner", "planner-search", "learned", "learned-search", "learned-boss", "imitation", "mentor-mcts", "mentor-boss", "mentor-full", "mentor-full-ev"])
     ap.add_argument("--sims", type=int, default=0, help="mentor-*：每个决策的 MCTS 模拟次数（默认 1000）")
+    ap.add_argument("--boss-sims", type=int, default=0, help="mentor-*：首领战每步模拟次数（mentor-full-ev 默认 4000）")
+    ap.add_argument("--elite-sims", type=int, default=0, help="mentor-*：精英战每步模拟次数（mentor-full-ev 默认 4000）")
     ap.add_argument("--width", type=int, default=6)
     ap.add_argument("--depth", type=int, default=1)
     ap.add_argument("--variant", default=None, help="Claude娘 简化变体（cards_v35.VARIANTS 的键）")
@@ -192,6 +200,10 @@ def main():
         akw.update(boss_aware=not a.no_boss_aware)
         if a.sims:
             akw["sims"] = a.sims
+        if a.boss_sims:
+            akw["boss_sims"] = a.boss_sims
+        if a.elite_sims:
+            akw["elite_sims"] = a.elite_sims
     with mp.Pool(a.procs, initializer=_init, initargs=({"name": a.agent, "kw": akw,
                                                                "variant": a.variant, "force": [x for x in a.force.split(",") if x],
                                                                "replace": [x for x in a.replace.split(",") if x], "log_dir": a.log_dir, "timeout": a.timeout or (60 if a.agent == "heuristic" else 900)},)) as pool:
