@@ -5,7 +5,7 @@ param(
   [string]$Work = "",
   [string]$Py = "",
   [string]$Decompiler = "",
-  [string]$Version = "0.1.0"
+  [string]$Version = "0.1.1"
 )
 $ErrorActionPreference = "Stop"
 $Repo = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path

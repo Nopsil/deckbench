@@ -64,7 +64,7 @@ python -m sts2sim.gamedata setup [--game-dir PATH] [--keep-src]   # 生成；--k
 python -m sts2sim.gamedata status                                 # 查看当前缓存绑定的安装、哈希、版本
 ```
 
-环境变量 / environment variables：`DECKBENCH_GAME_DIR`（游戏目录）、`DECKBENCH_CACHE`（缓存根目录）。
+环境变量 / environment variables：`DECKBENCH_GAME_DIR`（游戏目录）、`DECKBENCH_CACHE`（缓存根目录）、`DECKBENCH_TEMP`（反编译临时目录，默认是缓存根目录下的 `tmp\`，不用系统 TEMP / decompile scratch dir, defaults to `<cache>/tmp`, not the system TEMP）。
 
 ## 命令行整局批量运行 / Full-run batches from the command line
 
@@ -84,7 +84,8 @@ PYTHONPATH=. .venv/bin/python tools/batch.py --char Claude --asc 10 --n 100 --ag
 | `--n` / `--start` | `20` / `0` | 跑多少局 / 从第几号种子开始（种子 `R<start>`…） |
 | `--procs` | CPU 核数 | 并行进程数 |
 | `--out` | 无 | 每局结果写成 JSONL |
-| `--agent` | `heuristic` | `heuristic`（快）、`learned`（推荐）、`learned-search`、`learned-boss`、`strong`、`strong-nosearch`、`planner`、`planner-search`、`search`、`imitation` |
+| `--agent` | `heuristic` | `heuristic`（快）、`learned`（推荐）、`learned-search`、`learned-boss`、`strong`、`strong-nosearch`、`planner`、`planner-search`、`search`、`imitation`、`mentor-mcts`、`mentor-boss`（需外部 spire-mentor） |
+| `--sims` | 1000 | `mentor-*` 每个决策的 MCTS 模拟次数 |
 | `--width` / `--depth` | `6` / `1` | `search` AI 的搜索宽度/深度 |
 | `--variant` | 无 | Claude娘简化变体（`mods/claude_v35/cards_v35.py` 的 `VARIANTS` 键） |
 | `--force` | 空 | 强制加入起始牌组的牌，逗号分隔，`ID+` 为升级版（单卡 A/B 用） |
@@ -101,7 +102,7 @@ PYTHONPATH=. .venv/bin/python tools/batch.py --char Claude --asc 10 --n 100 --ag
 
 ## 可选：spire-mentor（更强的 MCTS 战斗 AI）/ Optional: spire-mentor
 
-- **spire-mentor（更强的 MCTS 战斗 AI：agent 名 `mentor-mcts` / `mentor-boss`，在 `tools/batch.py` 的 `make_agent` 里；目前 batch 命令行的 `--agent` 选项还没列出它们）**：它的仓库包含游戏数据，所以**不内置**。
+- **spire-mentor（更强的 MCTS 战斗 AI：`tools/batch.py --agent mentor-mcts` 或 `mentor-boss`，`--sims N` 调每步模拟次数，默认 1000；统计会打印 MCTS 决策数与回退比例）**：它的仓库包含游戏数据，所以**不内置**。
   需要的话请自己克隆并按其说明构建 `sts2_rs`，然后设置：
   `DECKBENCH_MENTOR_SITE=<装了 sts2_rs 的 site-packages>`、`DECKBENCH_MENTOR_PY=<spire-mentor 的 sts2-pycli/python 目录>`。
   未配置时这些 AI 会报错或回退到 `learned-search`，其他功能不受影响。
@@ -201,9 +202,9 @@ tests/               单元测试
 dotnet tool install -g ilspycmd --version 9.1.0.7988
 dotnet publish gui\packaging\decompiler\ilspycmd-host.csproj -c Release -r win-x64 --self-contained -o <decompiler 目录> -p:IlspyToolDir=<ilspycmd 工具目录 tools\net8.0\any>
 # 2) 打包（Python 3.12 venv 里装 requirements-gui.txt + pyinstaller；需要 Node.js）
-powershell -ExecutionPolicy Bypass -File gui\packaging\build.ps1 -Work <工作目录> -Py <venv>\Scripts\python.exe -Decompiler <decompiler 目录> -Version 0.1.0
+powershell -ExecutionPolicy Bypass -File gui\packaging\build.ps1 -Work <工作目录> -Py <venv>\Scripts\python.exe -Decompiler <decompiler 目录> -Version 0.1.1
 # 3) 审计：确认包里没有任何游戏文件/数据/生成代码（可选：与游戏安装、本机缓存逐文件比对哈希）
-powershell -ExecutionPolicy Bypass -File gui\packaging\audit.ps1 -Path <工作目录>\DeckBench-0.1.0-win64.zip -GameDir "<游戏目录>" -Cache "$env:LOCALAPPDATA\deckbench"
+powershell -ExecutionPolicy Bypass -File gui\packaging\audit.ps1 -Path <工作目录>\DeckBench-0.1.1-win64.zip -GameDir "<游戏目录>" -Cache "$env:LOCALAPPDATA\deckbench"
 ```
 
 - `build.ps1` 只打包 **git 跟踪的文件**（`git ls-files`），所以本机生成的 `game.py`、缓存等不可能混进去；临时文件/缓存都放在 `-Work` 目录。
@@ -219,3 +220,9 @@ powershell -ExecutionPolicy Bypass -File gui\packaging\audit.ps1 -Path <工作�
 - 首次生成需要 .NET 9 SDK + ilspycmd；转译器针对 v0.111 系列验证过，游戏大版本更新后可能需要更新转译器/补丁（`tools/cs2py_*.py`、`tools/cs_patches.py`、`sts2sim/rt/patches.py`）。
 - Windows 上没有 fork，带搜索的 AI 不可用；`tools/batch.py` 命令行只支持 Linux/macOS。
 - 图形界面第一次生成数据时（1–2 分钟）只有一个「请稍候」提示框，没有进度条。
+- 和真实游戏 DLL 的对拍（第三方无头工具 sts2-cli，100 场幕 1 战斗逐步对照）：0.1.1 里 97 场完全一致。剩下 3 场都是储君的 Tyranny / Foregone Conclusion：
+  游戏在**玩家回合开始时**要求选牌（`AfterPlayerTurnStart` / `BeforeHandDraw`），我们的引擎会正确给出选牌；sts2-cli 的 `end_turn` 在等待新回合时不处理这种待选状态，
+  当成卡死，最后强制结束（它自己的日志里先打出了同样数量的候选牌，再报 “EndTurn stuck … forcing game_over”）。这是 sts2-cli 的问题，不是模拟器的。
+  *Parity vs the real DLL (via the third-party headless tool sts2-cli, 100 act-1 fights, step by step): 97/100 identical in 0.1.1. The other 3 are Regent's Tyranny / Foregone Conclusion,
+  which ask for a card choice at the start of the player's turn. We surface that choice correctly; sts2-cli's `end_turn` treats the pending choice as a deadlock and forces game over
+  (its own log shows the same number of options first). This is an sts2-cli limitation, not a simulator bug.*
