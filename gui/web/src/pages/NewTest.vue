@@ -48,6 +48,11 @@
                 <n-slider v-model:value="b.procs" :min="1" :max="cat.cpu" :step="1" />
               </div>
             </div>
+            <div style="margin-top:16px">
+              <div class="label">指定游戏种子 <span class="faint">（可选）</span></div>
+              <n-input v-model:value="b.gameSeed" clearable placeholder="例：7F3K9Q2ZB8MA（游戏里的种子）；留空 = 按上面的局数和起始种子批量" style="max-width:420px" />
+              <div v-if="gameSeedCanon" class="hint">只打这一局：种子 <b class="mono">{{ gameSeedCanon }}</b>（已按游戏规则转大写、O→0、I→1），并记录逐步决策日志。局数和起始种子此时不起作用。</div>
+            </div>
           </div>
 
           <div class="panel">
@@ -208,7 +213,7 @@ const title = ref('')
 const starting = ref(false)
 const uploading = ref(false)
 const saved = JSON.parse(localStorage.getItem('nt.form') || '{}')
-const b = reactive({ char: 'Ironclad', asc: 0, n: 100, start: 0, procs: 4, agent: 'heuristic', variants: [], force: [], replace: [], ...(saved.b || {}) })
+const b = reactive({ char: 'Ironclad', asc: 0, n: 100, start: 0, procs: 4, agent: 'heuristic', variants: [], force: [], replace: [], gameSeed: '', ...(saved.b || {}) })
 const c = reactive({ source: 'preset', preset: 'quick', mods: ['vanilla'], decks: [], rooms: ['普通', '精英', '首领'], max_turns: 30, fights: 20, seed: 1, agent: 'heuristic', procs: 4, ...(saved.c || {}) })
 watch([b, c, kind], () => {
   localStorage.setItem('nt.form', JSON.stringify({ b, c }))
@@ -262,13 +267,14 @@ const combatTotal = computed(() => {
   return n
 })
 const autoTitle = computed(() => (kind.value === 'batch' ? runTitle({ kind: 'batch', params: { ...b } }) : (c.source === 'preset' ? (preset.value?.title || '') : '自定义战斗实验')))
+const gameSeedCanon = computed(() => (b.gameSeed || '').toUpperCase().replace(/O/g, '0').replace(/I/g, '1').trim())
 const canStart = computed(() => kind.value === 'batch' ? b.n > 0 : (c.source === 'preset' ? !!c.preset : c.decks.length > 0 && c.rooms.length > 0))
 
 async function start() {
   starting.value = true
   try {
     let params
-    if (kind.value === 'batch') params = { char: b.char, asc: b.asc, n: b.n, start: b.start, procs: b.procs, agent: b.agent, variants: b.char === 'Claude' ? b.variants : [], force: b.force, replace: b.replace }
+    if (kind.value === 'batch') params = { char: b.char, asc: b.asc, n: gameSeedCanon.value ? 1 : b.n, start: b.start, procs: b.procs, agent: b.agent, variants: b.char === 'Claude' ? b.variants : [], force: b.force, replace: b.replace, ...(gameSeedCanon.value ? { game_seed: gameSeedCanon.value } : {}) }
     else if (c.source === 'preset') params = { preset: c.preset, fights: c.fights, seed: c.seed, agent: c.agent, procs: c.procs }
     else params = { mods: c.mods, decks: c.decks, rooms: c.rooms, max_turns: c.max_turns, fights: c.fights, seed: c.seed, agent: c.agent, procs: c.procs }
     const m = await api.post('/api/runs', { kind: kind.value, params, title: title.value || autoTitle.value })

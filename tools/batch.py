@@ -104,6 +104,33 @@ def force_cards_hook(force, replace=()):
     return hook
 
 
+def wrap_log(ag, char, asc, seed):
+    """AGENT["log_dir"] 设了就包一层逐步决策日志：<log_dir>/<角色>_A<进阶>_<种子>.jsonl（见 sts2sim/engine/decision_log.py）。"""
+    d = AGENT.get("log_dir")
+    if not d:
+        return ag
+    import os
+    from sts2sim.engine.decision_log import DecisionLogger
+    if ag is None:   # heuristic：和 RunDriver 默认一样建
+        import zlib
+        from sts2sim.engine.agents import HeuristicAgent
+        ag = HeuristicAgent(seed=zlib.crc32(str(seed).encode()) & 0xFFFF)
+    os.makedirs(d, exist_ok=True)
+    return DecisionLogger(ag, os.path.join(d, f"{char}_A{asc}_{seed}.jsonl"), agent_name=AGENT["name"])
+
+
+def game_seeds(spec):
+    """--seed 'A,B,…'：真游戏种子（按游戏规则规范化：大写、O→0、I→1、去空格）。"""
+    from sts2sim.engine.seed import canonicalize, warnings
+    out = []
+    for raw in [x for x in spec.split(",") if x.strip()]:
+        c = canonicalize(raw)
+        for w in warnings(raw, c):
+            print("seed:", w)
+        out.append(c)
+    return out
+
+
 def _one(args):
     import signal
     char, asc, seed = args
@@ -113,7 +140,7 @@ def _one(args):
     signal.alarm(AGENT.get("timeout", 600))
     try:
         hooks = [force_cards_hook(AGENT["force"], AGENT.get("replace", ()))] if AGENT.get("force") or AGENT.get("replace") else []
-        ag = make_agent(AGENT["name"], seed, **AGENT["kw"])
+        ag = wrap_log(make_agent(AGENT["name"], seed, **AGENT["kw"]), char, asc, seed)
         r = play_run(char, asc, seed, agent=ag, setup_hooks=hooks)
     except RunTimeout:
         import traceback
@@ -150,8 +177,13 @@ def main():
     ap.add_argument("--no-boss-aware", action="store_true", help="关闭首领感知（选牌/休息）")
     ap.add_argument("--boss-search", action="store_true", help="strong-nosearch 下只在首领战开搜索")
     ap.add_argument("--timeout", type=int, default=0, help="每局秒数上限（默认 heuristic 60，其余 900）")
+    ap.add_argument("--seed", default="", help="指定真游戏种子（逗号分隔，可多个）；给了就只打这些局，忽略 --n/--start")
+    ap.add_argument("--log-dir", default="", help="逐步决策日志目录（每局一个 JSONL）")
     a = ap.parse_args()
-    jobs = [(a.char, a.asc, f"R{i}") for i in range(a.start, a.start + a.n)]
+    if a.seed:
+        jobs = [(a.char, a.asc, s) for s in game_seeds(a.seed)]
+    else:
+        jobs = [(a.char, a.asc, f"R{i}") for i in range(a.start, a.start + a.n)]
     t = time.time()
     akw = {"width": a.width, "depth": a.depth} if a.agent == "search" else {}
     if a.agent.startswith(("strong", "planner", "learned", "imitation")):
@@ -162,7 +194,7 @@ def main():
             akw["sims"] = a.sims
     with mp.Pool(a.procs, initializer=_init, initargs=({"name": a.agent, "kw": akw,
                                                                "variant": a.variant, "force": [x for x in a.force.split(",") if x],
-                                                               "replace": [x for x in a.replace.split(",") if x], "timeout": a.timeout or (60 if a.agent == "heuristic" else 900)},)) as pool:
+                                                               "replace": [x for x in a.replace.split(",") if x], "log_dir": a.log_dir, "timeout": a.timeout or (60 if a.agent == "heuristic" else 900)},)) as pool:
         res = pool.map(_one, jobs, chunksize=1)
     dt = time.time() - t
     wins = sum(r["victory"] for r in res)

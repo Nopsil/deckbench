@@ -190,6 +190,8 @@ class LocalPythonBackend(SimBackend):
                                "--procs", str(int(p.get("procs") or os.cpu_count() or 1)), "--agent", p.get("agent", "heuristic"),
                                "--variant", "+".join(p.get("variants") or []), "--force", ",".join(p.get("force") or []),
                                "--replace", ",".join(p.get("replace") or []), "--out", out)
+            if p.get("game_seed"):   # 指定真游戏种子：只打这一局，并写逐步决策日志到 <run_dir>/steps/
+                argv += ["--game-seed", str(p["game_seed"]), "--log-dir", os.path.join(run_dir, "steps")]
             return argv, worker_env(), paths.SIM_ROOT
         if kind == "combat":
             exp = {}

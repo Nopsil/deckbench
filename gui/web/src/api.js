@@ -84,7 +84,7 @@ export function runTitle(m) {
   if (m.title) return m.title
   const p = m.params || {}
   if (m.kind === 'batch') {
-    let t = `${store.charName(p.char)} A${p.asc ?? 0} × ${p.n}`
+    let t = p.game_seed ? `${store.charName(p.char)} A${p.asc ?? 0} 种子 ${p.game_seed}` : `${store.charName(p.char)} A${p.asc ?? 0} × ${p.n}`
     if (p.force && p.force.length) t += ` ＋${p.force.map((x) => store.cardName(x)).join('、')}`
     if (p.replace && p.replace.length) t += ` －${p.replace.map((x) => store.cardName(x)).join('、')}`
     if (p.variants && p.variants.length) t += ` [${p.variants.join('+')}]`

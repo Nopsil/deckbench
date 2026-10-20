@@ -39,7 +39,8 @@ def _one_safe(args):
     A = batch.AGENT
     hooks = [batch.force_cards_hook(A["force"], A.get("replace", ()))] if A.get("force") or A.get("replace") else []
     try:
-        r = play_run(char, asc, seed, agent=batch.make_agent(A["name"], seed, **A["kw"]), setup_hooks=hooks)
+        ag = batch.wrap_log(batch.make_agent(A["name"], seed, **A["kw"]), char, asc, seed)
+        r = play_run(char, asc, seed, agent=ag, setup_hooks=hooks)
         d = r.to_dict()
     except Exception:
         import traceback
@@ -58,14 +59,18 @@ def _batch_init(cfg):
 
 def cmd_batch(a):
     import batch  # noqa: F401  (tools/batch.py)
-    jobs = [(a.char, a.asc, f"R{i}") for i in range(a.start, a.start + a.n)]
+    if a.game_seed:
+        jobs = [(a.char, a.asc, s) for s in batch.game_seeds(a.game_seed)]
+    else:
+        jobs = [(a.char, a.asc, f"R{i}") for i in range(a.start, a.start + a.n)]
     akw = {"width": a.width, "depth": a.depth} if a.agent == "search" else {}
     if a.agent.startswith(("strong", "learned")):
         akw.update(boss_aware=True, boss_search=False)
     cfg = {"name": a.agent, "kw": akw, "variant": a.variant or None,
            "force": [x for x in a.force.split(",") if x], "replace": [x for x in a.replace.split(",") if x],
-           "timeout": a.timeout or (60 if a.agent == "heuristic" else 900)}
-    print(f"整局批量：{a.char} A{a.asc}，{a.n} 局（种子 R{a.start}…R{a.start + a.n - 1}），AI {a.agent}，"
+           "timeout": a.timeout or (60 if a.agent == "heuristic" else 900), "log_dir": a.log_dir or None}
+    seeds = f"种子 {jobs[0][2]}" if a.game_seed else f"种子 R{a.start}…R{a.start + a.n - 1}"
+    print(f"整局批量：{a.char} A{a.asc}，{len(jobs)} 局（{seeds}），AI {a.agent}，"
           f"变体 {a.variant or '无'}，加入 {cfg['force'] or '无'}，移除 {cfg['replace'] or '无'}，并行 {a.procs}", flush=True)
     emit("PROGRESS", {"done": 0, "total": len(jobs)})
     t = time.time()
@@ -244,6 +249,8 @@ def main(argv=None):
     b.add_argument("--force", default="")
     b.add_argument("--replace", default="")
     b.add_argument("--timeout", type=int, default=0)
+    b.add_argument("--game-seed", default="", help="真游戏种子（逗号分隔）；给了就忽略 --n/--start")
+    b.add_argument("--log-dir", default="", help="逐步决策日志目录（每局一个 JSONL）")
     c = sub.add_parser("combat")
     c.add_argument("experiment")
     c.add_argument("--fights", type=int)
