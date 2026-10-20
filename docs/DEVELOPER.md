@@ -84,7 +84,7 @@ PYTHONPATH=. .venv/bin/python tools/batch.py --char Claude --asc 10 --n 100 --ag
 | `--n` / `--start` | `20` / `0` | 跑多少局 / 从第几号种子开始（种子 `R<start>`…） |
 | `--procs` | CPU 核数 | 并行进程数 |
 | `--out` | 无 | 每局结果写成 JSONL |
-| `--agent` | `heuristic` | `heuristic`（快）、`learned`（推荐）、`learned-search`、`learned-boss`、`strong`、`strong-nosearch`、`planner`、`planner-search`、`search`、`imitation`、`mentor-mcts`、`mentor-boss`（需外部 spire-mentor） |
+| `--agent` | `heuristic` | `heuristic`（快）、`learned`（推荐）、`learned-search`、`learned-boss`、`strong`、`strong-nosearch`、`planner`、`planner-search`、`search`、`imitation`、`mentor-mcts`、`mentor-boss`、`mentor-full`（需外部 spire-mentor） |
 | `--sims` | 1000 | `mentor-*` 每个决策的 MCTS 模拟次数 |
 | `--width` / `--depth` | `6` / `1` | `search` AI 的搜索宽度/深度 |
 | `--variant` | 无 | Claude娘简化变体（`mods/claude_v35/cards_v35.py` 的 `VARIANTS` 键） |
@@ -100,23 +100,55 @@ PYTHONPATH=. .venv/bin/python tools/batch.py --char Claude --asc 10 --n 100 --ag
 `tools/tune_cma.py`（CMA-ES 自我对局调参 → `data/ai_weights.json`）、`tools/imitate.py`（模仿学习 → `data/imitation_model.json`）、
 `tools/trace_run.py`（单局逐步追踪）、`tools/ai_eval.sh` / `tools/ai_summary.py`（AI 对比）。Gym 接口：`from sts2sim.engine.gym import Sts2Env`（见模块文档字符串）。
 
-## 可选：spire-mentor（更强的 MCTS 战斗 AI）/ Optional: spire-mentor
+## 可选：spire-mentor（更强的 AI）/ Optional: spire-mentor
 
-- **spire-mentor（更强的 MCTS 战斗 AI：`tools/batch.py --agent mentor-mcts` 或 `mentor-boss`，`--sims N` 调每步模拟次数，默认 1000；统计会打印 MCTS 决策数与回退比例）**：它的仓库包含游戏数据，所以**不内置**。
-  需要的话请自己克隆并按其说明构建 `sts2_rs`，然后设置：
-  `DECKBENCH_MENTOR_SITE=<装了 sts2_rs 的 site-packages>`、`DECKBENCH_MENTOR_PY=<spire-mentor 的 sts2-pycli/python 目录>`。
-  未配置时这些 AI 会报错或回退到 `learned-search`，其他功能不受影响。
+[spire-mentor](https://github.com/tfriedel/spire-mentor)（MIT，Rust）是第三方的游戏重写 + AI。它的仓库包含游戏文本和提取的数据，所以**本项目不内置、不分发它的任何东西**（代码、网络、数据都不带）。
+需要的话请自己克隆并按它的说明用 maturin 构建 Python 绑定 `sts2_rs`。
+*spire-mentor is an external, third-party dependency. Its repository contains game text/data, so DeckBench ships nothing from it (no code, networks or data). Clone and build it yourself.*
+
+三个 AI（`tools/batch.py --agent …`）：
+
+| AI | 战斗 | 局外（选牌、路线、商店、休息、Neow/先古之民） |
+|---|---|---|
+| `mentor-mcts` | spire-mentor MCTS（`--sims`，默认 1000） | 我们的 learned |
+| `mentor-boss` | 只有首领战用 MCTS | 我们的 learned |
+| `mentor-full` | spire-mentor MCTS | spire-mentor 的 PPO 网络（每角色一个 ONNX）；其他事件、宝箱、锻造选牌仍用 learned |
+
+- 统计会打印 MCTS 决策数与回退比例；`mentor-full` 还会打印每类局外决策“网络/回退”的次数。
+- 遇到 spire-mentor 不认识的牌/遗物/怪物、调用出错，或者 Rust 端 panic（例如找不到 PPO 网络），都会**回退到我们自己的 AI**，不会中断批量运行。
+- **只支持原版 5 个角色。** 模组角色（如 Claude娘）的局外决策和不认识的战斗都会回退到 learned AI。
+  *Only the 5 vanilla characters are supported; mod characters (e.g. Claude) fall back to the learned AI.*
+- 参考：A0 每角色 60 局，`mentor-full` 胜率 23–63%，约 25–55 秒/局（单进程）；A10 目前没有胜局。
+
+**配置 / Setup**：设置两个环境变量指向你自己构建的 spire-mentor：
 
 ```bash
 # Linux/macOS
-export DECKBENCH_MENTOR_SITE=/path/to/venv/lib/python3.13/site-packages
-export DECKBENCH_MENTOR_PY=/path/to/spire-mentor/sts2-pycli/python
+export DECKBENCH_MENTOR_SITE=/path/to/venv/lib/python3.13/site-packages   # 装了 sts2_rs 的 site-packages
+export DECKBENCH_MENTOR_PY=/path/to/spire-mentor/sts2-pycli/python        # 它的 sts2_hint 包所在目录
 ```
 ```powershell
 # Windows PowerShell
 $env:DECKBENCH_MENTOR_SITE = "C:\path\to\venv\Lib\site-packages"
 $env:DECKBENCH_MENTOR_PY = "C:\path\to\spire-mentor\sts2-pycli\python"
 ```
+
+**`mentor-full` 的 PPO 网络**：它们在 spire-mentor 仓库的 `sts2-pycli/data/ppo/`（`champions.toml` + 每角色的 `.onnx`）。
+`sts2_rs` 按**编译时**的路径找它们：`<构建时的 sts2-rs 目录>/../sts2-pycli/data/ppo`。所以请在完整的 spire-mentor 克隆里构建，构建后不要移动或删除这个目录。
+找不到网络时 Rust 会 panic，我们会捕获并把局外决策回退到 learned（统计里的 `errors` 会显示出来）。
+上游另有 `STS2_RUNAI_PPO=<model.onnx>` 只能指定一个网络（所有角色共用），一般不需要。
+*The PPO networks live in spire-mentor's `sts2-pycli/data/ppo/`; `sts2_rs` locates them via its compile-time path `<sts2-rs>/../sts2-pycli/data/ppo`, so build inside a full checkout and keep that directory in place. If they are missing, the Rust panic is caught and non-combat decisions fall back to the learned AI.*
+
+**图形界面 / GUI**：设置好上面两个环境变量后再启动 DeckBench，「新建测试 → 整局批量 → AI」里的「spire-mentor 整局 AI（外部）」才能选；没配置时是灰的，并显示提示。
+Windows 上回退时不使用搜索（没有 `os.fork()`）。打包版 exe 能否加载你自己构建的 `sts2_rs` 取决于构建环境（abi3，Python ≥ 3.11），属于实验功能；加载失败会全部回退到 learned。
+*In the GUI, the "spire-mentor" agent is enabled only when both variables are set before launch; otherwise it is greyed out with a hint. Loading your own `sts2_rs` from the packaged exe is experimental; on failure everything falls back to the learned AI.*
+
+**已知上游问题：v0.111 的 19 张新牌（SIDESTEP 等）/ Known upstream bug: 19 v0.111 cards**
+spire-mentor 已经实现了这些牌，但 `state_from_dict` 查牌 id 时只查 `CardId::all()`（v0.107.1 的牌表），漏了 `CardId::V0111_ONLY`，
+所以只要牌组里有这些牌，每次战斗决策都会报 `UnsupportedStateError` 并回退到我们的 AI（Silent 约 5.5%、Ironclad 约 3.8% 的战斗决策）。
+我们有一个很小的本地补丁 [`docs/patches/spire-mentor-v0111-cards.patch`](patches/spire-mentor-v0111-cards.patch)（只改 spire-mentor 自己的代码，两处加 `.chain(CardId::V0111_ONLY.iter())`，不含游戏文本或数据）。
+在你的 spire-mentor 克隆里 `cd sts2-rs && git apply <补丁>`，再重新构建 `sts2_rs`；打补丁后回退降到约 0.2–0.3%。
+*spire-mentor implements these cards, but `state_from_dict` only searches `CardId::all()` (the v0.107.1 set) and misses `CardId::V0111_ONLY`, so decks with them fall back to our AI. A tiny code-only patch (no game text/data) is in `docs/patches/spire-mentor-v0111-cards.patch`: apply it in your spire-mentor checkout (`cd sts2-rs && git apply …`) and rebuild.*
 
 ## 旧版 YAML 战斗模拟器 / Legacy YAML combat simulator
 
@@ -202,9 +234,9 @@ tests/               单元测试
 dotnet tool install -g ilspycmd --version 9.1.0.7988
 dotnet publish gui\packaging\decompiler\ilspycmd-host.csproj -c Release -r win-x64 --self-contained -o <decompiler 目录> -p:IlspyToolDir=<ilspycmd 工具目录 tools\net8.0\any>
 # 2) 打包（Python 3.12 venv 里装 requirements-gui.txt + pyinstaller；需要 Node.js）
-powershell -ExecutionPolicy Bypass -File gui\packaging\build.ps1 -Work <工作目录> -Py <venv>\Scripts\python.exe -Decompiler <decompiler 目录> -Version 0.1.1
+powershell -ExecutionPolicy Bypass -File gui\packaging\build.ps1 -Work <工作目录> -Py <venv>\Scripts\python.exe -Decompiler <decompiler 目录> -Version 0.1.2
 # 3) 审计：确认包里没有任何游戏文件/数据/生成代码（可选：与游戏安装、本机缓存逐文件比对哈希）
-powershell -ExecutionPolicy Bypass -File gui\packaging\audit.ps1 -Path <工作目录>\DeckBench-0.1.1-win64.zip -GameDir "<游戏目录>" -Cache "$env:LOCALAPPDATA\deckbench"
+powershell -ExecutionPolicy Bypass -File gui\packaging\audit.ps1 -Path <工作目录>\DeckBench-0.1.2-win64.zip -GameDir "<游戏目录>" -Cache "$env:LOCALAPPDATA\deckbench"
 ```
 
 - `build.ps1` 只打包 **git 跟踪的文件**（`git ls-files`），所以本机生成的 `game.py`、缓存等不可能混进去；临时文件/缓存都放在 `-Work` 目录。

@@ -1,0 +1,27 @@
+spire-mentor (https://github.com/tfriedel/spire-mentor, MIT): let state_from_dict resolve the
+19 v0.111.0-only card ids (CardId::V0111_ONLY), which CardId::all() (the v0.107.1 set) leaves out.
+Code-only change to spire-mentor's own (MIT) source; contains no game text or data.
+Apply inside your own spire-mentor checkout:  cd spire-mentor/sts2-rs && git apply <this file>
+(or: patch -p1 < <this file>), then rebuild sts2_rs with maturin.
+
+--- a/crates/sts2-wire/src/state_dict.rs
++++ b/crates/sts2-wire/src/state_dict.rs
+@@ -1894,14 +1894,17 @@
+     // (e.g. `RUPTURE`, `VICIOUS`) resolve against the canonical
+     // `RUPTURE_CARD` / `VICIOUS_CARD` ids. Mirrors the same fallback
+     // wired into `names::card_id_from_str` via `sts2-rs-u5zc`.
++    // DeckBench local patch: also resolve the v0.111.0-only cards (CardId::V0111_ONLY),
++    // which `CardId::all()` (the v0.107.1 universe) leaves out.
+     if let Some(c) = CardId::all()
+         .iter()
++        .chain(CardId::V0111_ONLY.iter())
+         .copied()
+         .find(|k| k.to_python_name() == s)
+     {
+         return Some(c);
+     }
+-    CardId::all().iter().copied().find(|k| {
++    CardId::all().iter().chain(CardId::V0111_ONLY.iter()).copied().find(|k| {
+         let canonical = k.to_python_name();
+         canonical.strip_suffix("_CARD") == Some(s)
+     })

@@ -139,6 +139,8 @@ $env:DECKBENCH_GAME_DIR = "D:\SteamLibrary\steamapps\common\Slay the Spire 2"
 ## 进阶 / Advanced
 
 - [docs/DEVELOPER.md](docs/DEVELOPER.md)：命令行批量运行（全部参数）、首次生成的内部原理、可选的 spire-mentor AI、旧版战斗模拟器、目录结构、测试（含 Linux/macOS 命令）。
+- 可选的更强 AI：自己构建第三方 [spire-mentor](https://github.com/tfriedel/spire-mentor) 后，可以用 `mentor-full`（它的 MCTS 打战斗 + PPO 网络做局外决策，只支持 5 个原版角色）。spire-mentor 不随本项目分发；它在 v0.111 的 19 张新牌（SIDESTEP 等）上有一个已知的读取问题，我们提供了一个很小的本地补丁。详见 [docs/DEVELOPER.md](docs/DEVELOPER.md#可选spire-mentor更强的-ai--optional-spire-mentor)。
+  *Optional stronger AI: build the third-party spire-mentor yourself to use `mentor-full` (vanilla characters only). It is not shipped with DeckBench; a known upstream loader bug for 19 v0.111 cards (SIDESTEP etc.) has a small local patch. See docs/DEVELOPER.md.*
 - [docs/MODDING.md](docs/MODDING.md)：用 YAML + Python 写自己的 mod（卡牌、能力、遗物、卡组、实验）。
 - [gui/README.md](gui/README.md)：图形界面的结构和打包。
 - [CONTRIBUTING.md](CONTRIBUTING.md)：贡献须知（不接受任何游戏内容）。
