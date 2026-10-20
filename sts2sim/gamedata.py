@@ -63,6 +63,11 @@ def cache_root():
     return os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache"), "deckbench")
 
 
+def temp_root():
+    """反编译的临时目录根：DECKBENCH_TEMP，否则放在缓存目录里（不用系统 TEMP，避免 C: 盘空间不足）。"""
+    return os.environ.get("DECKBENCH_TEMP") or os.path.join(cache_root(), "tmp")
+
+
 def _steam_roots():
     roots = []
     if os.name == "nt":
@@ -294,7 +299,9 @@ def setup(game_dir=None, keep_src=False):
     tmp_out = out_dir + ".tmp"
     shutil.rmtree(tmp_out, ignore_errors=True)
     os.makedirs(tmp_out)
-    src = tempfile.mkdtemp(prefix="deckbench-src-")
+    troot = temp_root()
+    os.makedirs(troot, exist_ok=True)
+    src = tempfile.mkdtemp(prefix="deckbench-src-", dir=troot)
     try:
         argv = [ilspy, "-p", "--nested-directories", "-o", src]
         net9 = refs or _net9_dir()
@@ -304,7 +311,7 @@ def setup(game_dir=None, keep_src=False):
             print("警告：没找到 .NET 9 运行时，反编译质量可能下降 / warning: .NET 9 runtime not found", flush=True)
         argv += ["-r", bin_dir, dll]
         print("[1/3] 本机反编译 / decompiling locally ...", flush=True)
-        _run(argv, stdout=subprocess.DEVNULL)
+        _run(argv, stdout=subprocess.DEVNULL, env=dict(os.environ, TEMP=troot, TMP=troot, TMPDIR=troot))
         core = os.path.join(src, "MegaCrit", "Sts2", "Core")
         if not os.path.isdir(core):
             raise GameDataError("反编译结果里没有预期的命名空间 / unexpected decompiler output layout")
@@ -343,6 +350,11 @@ def setup(game_dir=None, keep_src=False):
             shutil.copytree(src, os.path.join(tmp_out, "src"))
     finally:
         shutil.rmtree(src, ignore_errors=True)
+        if not os.environ.get("DECKBENCH_TEMP"):
+            try:
+                os.rmdir(troot)      # 空了就删掉
+            except OSError:
+                pass
     manifest = {"format": FORMAT, "game_dir": game_dir or os.path.dirname(dll), "dll_path": dll, "dll_sha256": digest,
                 "release_info": rel, "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
                 "note": "Generated locally from your own install. Do not redistribute. / 由你本机安装生成，请勿分发。"}
