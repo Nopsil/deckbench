@@ -89,7 +89,7 @@ PYTHONPATH=. .venv/bin/python tools/batch.py --char Claude --asc 10 --n 100 --ag
 | `--boss-sims` / `--elite-sims` | 同 `--sims`（`mentor-full-ev` 为 4000） | `mentor-*` 首领 / 精英战每步的模拟次数 |
 | `--seed` | 空 | 真游戏种子（逗号分隔可多个；按游戏规则转大写、O→0、I→1）；给了就忽略 `--n/--start` |
 | `--log-dir` | 空 | 每局一个逐步决策日志 JSONL（`<角色>_A<进阶>_<种子>.jsonl`） |
-| `--style` / `--force-pick` / `--force-pick-first` | 空 | 风格规则：`lirixuan`（杂耍流铁甲）；见到这些牌就拿；战斗里先打 |
+| `--style` / `--force-pick` / `--force-pick-first` | 空 | 风格规则：`lirixuan`（JUGGLING 流铁甲）；见到这些牌就拿；战斗里先打 |
 | `--width` / `--depth` | `6` / `1` | `search` AI 的搜索宽度/深度 |
 | `--variant` | 无 | Claude娘简化变体（`mods/claude_v35/cards_v35.py` 的 `VARIANTS` 键） |
 | `--force` | 空 | 强制加入起始牌组的牌，逗号分隔，`ID+` 为升级版（单卡 A/B 用） |

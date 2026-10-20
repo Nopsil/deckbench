@@ -1,6 +1,6 @@
 """风格偏好（不花钱的规则版）：在任意 agent 外面套一层「看到某些牌就一定拿」。
 
-例：模仿 B 站主播 李日月轩 的铁甲：杂耍（JUGGLING）见到就拿。
+例：JUGGLING 流铁甲：JUGGLING见到就拿。
   ForcePickAgent(inner, picks={"JUGGLING"}, shop=True)
 - 卡牌奖励里有 picks 中的牌 → 直接拿（多张时按 picks 顺序）
 - shop=True：商店里有且买得起 → 先买它，再按内层 agent 的清单买
@@ -83,7 +83,7 @@ class ForcePickAgent:
                 ids = [str(o.OptionId).upper() for o in options]
                 smith = next((i for i, o in enumerate(options) if "SMITH" in ids[i] and getattr(o, "IsEnabled", True)), None)
                 if smith is not None and _hp(self._inner) >= 0.45 and any(self._raw_pick(c) for c in self._inner.player.Deck.Cards):
-                    self._inner.last_reason = "风格规则：先敲杂耍（固有）"
+                    self._inner.last_reason = "风格规则：先敲JUGGLING（固有）"
                     return smith
             except Exception:  # noqa
                 pass

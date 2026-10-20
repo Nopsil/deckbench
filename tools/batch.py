@@ -204,7 +204,7 @@ def main():
     ap.add_argument("--no-boss-aware", action="store_true", help="关闭首领感知（选牌/休息）")
     ap.add_argument("--boss-search", action="store_true", help="strong-nosearch 下只在首领战开搜索")
     ap.add_argument("--timeout", type=int, default=0, help="每局秒数上限（默认 heuristic 60，其余 900）")
-    ap.add_argument("--style", default="", choices=["", "lirixuan"], help="风格：lirixuan = 杂耍流铁甲（杂耍必拿、攻击优先、冲精英，见 sts2sim/engine/style.py）")
+    ap.add_argument("--style", default="", choices=["", "lirixuan"], help="风格：lirixuan = JUGGLING 流铁甲（JUGGLING必拿、攻击优先、冲精英，见 sts2sim/engine/style.py）")
     ap.add_argument("--force-pick-first", action="store_true", help="配合 --force-pick：战斗里能打出就先打")
     ap.add_argument("--force-pick", default="", help="风格规则：卡牌奖励/商店里见到这些牌（ID，逗号分隔）就拿，例 JUGGLING")
     ap.add_argument("--seed", default="", help="指定真游戏种子（逗号分隔，可多个）；给了就只打这些局，忽略 --n/--start")

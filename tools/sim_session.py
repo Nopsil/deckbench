@@ -26,7 +26,7 @@ def main():
     ap.add_argument("--replay", default="")
     ap.add_argument("--persona", default="")
     ap.add_argument("--fallback", default="learned")
-    ap.add_argument("--style", default="", help="lirixuan：auto 代打用「模仿李日月轩」风格")
+    ap.add_argument("--style", default="", help="lirixuan：auto 代打用JUGGLING 流铁甲风格（sts2sim/engine/style.py）")
     a = ap.parse_args()
     out = os.fdopen(os.dup(1), "w", encoding="utf-8", buffering=1)
     sys.stdout = sys.stderr

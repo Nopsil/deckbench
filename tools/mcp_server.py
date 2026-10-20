@@ -28,9 +28,10 @@ RUNS = os.environ.get("DECKBENCH_MCP_RUNS") or os.path.join(__import__("sts2sim.
 CHARS = ["Ironclad", "Silent", "Defect", "Necrobinder", "Regent"]
 PERSONAS = {
     "qianwen": "千问娘：国风元气大小姐，爱冒险、嘴硬，理由用一句不超过 30 字的俏皮中文台词。",
-    "lirixuan": ("模仿 B 站主播 李日月轩（铁甲战士）：杂耍（JUGGLING）见到就拿、商店必买、火堆先敲杂耍拿固有；"
-                 "攻哈——攻击优先、懦夫才防，删牌先删防御；偏爱愤怒/怨恨/重锤/痛殴/完美打击/预备打击/流星锤/祭品/放血/添柴/劫掠/跃跃欲试，"
-                 "遗物偏爱蛇眼/假蛇眼/硫磺；路线多冲精英；出牌先打杂耍，把最强的攻击留作本回合第 3 张。auto 代打也按这个风格。"),
+    "lirixuan": ("JUGGLING 流铁甲战士风格（参考一位中文主播的公开打法）：JUGGLING 见到就拿、商店必买、火堆先升级 JUGGLING 拿固有；"
+                 "攻击优先、少拿防御，删牌先删防御；偏爱 ANGER、SPITE、BLUDGEON、THRASH、PERFECTED_STRIKE、SETUP_STRIKE、BOLAS、OFFERING、"
+                 "BLOODLETTING、STOKE、PILLAGE、EXPECT_A_FIGHT，遗物偏爱 SNECKO_EYE / FAKE_SNECKO_EYE / BRIMSTONE；路线多冲精英；"
+                 "出牌先打 JUGGLING，把最强的攻击留作本回合第 3 张。auto 代打也按这个风格。"),
 }
 LOCK = threading.Lock()
 
@@ -202,7 +203,7 @@ def build(host="127.0.0.1", port=8765, host_check=True):
     @mcp.tool()
     def new_run(seed: str, character: str = "Ironclad", ascension: int = 0, persona: str = "") -> str:
         """开新的一局。seed：游戏里的种子（自动按游戏规则规范化：大写、O→0、I→1）；character：Ironclad/Silent/Defect/Necrobinder/Regent；
-        ascension：0-10；persona：可选风格，qianwen（千问娘）/ lirixuan（模仿李日月轩：杂耍必拿、攻哈、冲精英；auto 代打也用这个风格）/ 或直接写一段风格说明。返回第一个决策。"""
+        ascension：0-10；persona：可选风格，qianwen（千问娘）/ lirixuan（JUGGLING 流铁甲：JUGGLING 必拿、攻击优先、冲精英；auto 代打也用这个风格）/ 或直接写一段风格说明。返回第一个决策。"""
         with LOCK:
             if character not in CHARS:
                 return f"角色只能是 {CHARS}"

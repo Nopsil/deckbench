@@ -1,13 +1,13 @@
-"""「模仿李日月轩」铁甲风格（免费规则版，套在 learned/StrongAgent 上）。
+"""JUGGLING 流铁甲风格 lirixuan（参考一位中文主播的公开打法；免费规则版，套在 learned/StrongAgent 上）。
 
 规则（根据公开直播风格整理的免费规则版）：
-- 杂耍 JUGGLING：卡牌奖励/商店必拿（无上限）；火堆优先敲杂耍（拿固有）
+- JUGGLING：卡牌奖励/商店必拿（无上限）；火堆优先敲JUGGLING（拿固有）
 - 攻击牌评分 ×1.3、防御牌 ×0.6；删牌先删防御
-- 杂耍组件加分：ANGER SPITE BLUDGEON THRASH PERFECTED_STRIKE SETUP_STRIKE BOLAS OFFERING BLOODLETTING
+- JUGGLING 组件加分：ANGER SPITE BLUDGEON THRASH PERFECTED_STRIKE SETUP_STRIKE BOLAS OFFERING BLOODLETTING
   STOKE PILLAGE EXPECT_A_FIGHT（+TWIN_STRIKE POMMEL_STRIKE BREAKTHROUGH MIND_BLAST WHISTLE 小加分）
 - 遗物：SNECKO_EYE / FAKE_SNECKO_EYE / BRIMSTONE / DOLLYS_MIRROR 优先
 - 路线：精英收益调高、弱牌组惩罚减半（多冲精英）
-- 出牌：手里有杂耍先打；杂耍生效时，本回合第 3 张攻击换成手里最强的可出攻击
+- 出牌：手里有JUGGLING先打；JUGGLING生效时，本回合第 3 张攻击换成手里最强的可出攻击
 用法：apply_lirixuan(agent) 原地改类（agent 需是 StrongAgent 系，例如 batch.make_agent("learned")）。
 """
 from .agents import _name, card_cost, dvar
@@ -55,25 +55,25 @@ class LiXuanMixin:
 
     def marginal(self, card, deck, act=None):
         if card.Id.Entry == STAR:
-            return 100.0                        # 杂耍永远不嫌多
+            return 100.0                        # JUGGLING永远不嫌多
         return super().marginal(card, deck, act)
 
     def card_reward(self, cards, alternatives):
         cs = [getattr(x, "Card", x) for x in cards]
         for c in cs:
-            if c.Id.Entry == STAR:              # 覆盖 PPO：见杂耍就拿
+            if c.Id.Entry == STAR:              # 覆盖 PPO：见JUGGLING就拿
                 self.forced = getattr(self, "forced", 0) + 1
-                self.last_reason = "杂耍永远不嫌多"
+                self.last_reason = "JUGGLING永远不嫌多"
                 return c
         r = super().card_reward(cards, alternatives)
         if hasattr(self, "_ppo"):
-            # mentor-full：PPO 跳过或拿了防御技能时，若有杂耍组件/攻击，改拿（攻哈 / 懦夫才防）
+            # mentor-full：PPO 跳过或拿了防御技能时，若有JUGGLING 组件/攻击，改拿（攻哈 / 懦夫才防）
             weak = r is None or (_name(r.Type) != "Attack" and dvar(r, "Block") > 0)
             if weak:
                 boost = [c for c in cs if c.Id.Entry in BOOST]
                 if boost:
                     r = max(boost, key=lambda c: BOOST[c.Id.Entry])
-                    self.last_reason = "攻哈：杂耍组件"
+                    self.last_reason = "攻哈：JUGGLING 组件"
         return r
 
     def select_cards(self, options, min_sel, max_sel):
@@ -94,7 +94,7 @@ class LiXuanMixin:
             hp = self.player.Creature.CurrentHp / max(1, self.player.Creature.MaxHp)
             raw = any(c.Id.Entry == STAR and not c.IsUpgraded for c in self.player.Deck.Cards)
             if smith is not None and raw and hp >= 0.45:
-                return smith                    # 先敲杂耍
+                return smith                    # 先敲JUGGLING
         except Exception:  # noqa
             pass
         return r
@@ -159,7 +159,7 @@ class LiXuanMixin:
         star = next((a for a in plays if a[1].Id.Entry == STAR), None)
         a = None
         if star is not None:
-            a = star                                     # 一张杂耍先出
+            a = star                                     # 一张JUGGLING先出
         if a is None:
             a = super().combat_action(cs, player, acts)
             if (self.swap3 and a is not None and a[0] == "play" and _name(a[1].Type) == "Attack" and n_atk == 2
@@ -185,5 +185,5 @@ def apply_lirixuan(agent):
     agent.__class__ = type("LiXuan" + cls.__name__, (LiXuanMixin, cls), {})
     agent.forced = 0
     if hasattr(agent, "_ppo") or hasattr(agent, "mstats"):
-        agent.swap3 = False                     # mentor：出牌全交给 MCTS（只保留「杂耍先出」）
+        agent.swap3 = False                     # mentor：出牌全交给 MCTS（只保留「JUGGLING先出」）
     return agent
