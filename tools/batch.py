@@ -108,7 +108,8 @@ def _one(args):
     signal.alarm(AGENT.get("timeout", 600))
     try:
         hooks = [force_cards_hook(AGENT["force"], AGENT.get("replace", ()))] if AGENT.get("force") or AGENT.get("replace") else []
-        r = play_run(char, asc, seed, agent=make_agent(AGENT["name"], seed, **AGENT["kw"]), setup_hooks=hooks)
+        ag = make_agent(AGENT["name"], seed, **AGENT["kw"])
+        r = play_run(char, asc, seed, agent=ag, setup_hooks=hooks)
     except RunTimeout:
         import traceback
         return {"victory": False, "floor": -1, "act": 0, "path": [], "combats": [], "seed": seed, "char": char,
@@ -116,6 +117,8 @@ def _one(args):
     finally:
         signal.alarm(0)
     d = r.to_dict()
+    if getattr(ag, "mstats", None):
+        d["mstats"] = ag.mstats
     d["seed"] = seed
     d["char"] = char
     d["asc"] = asc
@@ -132,7 +135,8 @@ def main():
     ap.add_argument("--start", type=int, default=0)
     ap.add_argument("--procs", type=int, default=mp.cpu_count())
     ap.add_argument("--out", default=None)
-    ap.add_argument("--agent", default="heuristic", choices=["heuristic", "search", "strong", "strong-nosearch", "planner", "planner-search", "learned", "learned-search", "learned-boss", "imitation"])
+    ap.add_argument("--agent", default="heuristic", choices=["heuristic", "search", "strong", "strong-nosearch", "planner", "planner-search", "learned", "learned-search", "learned-boss", "imitation", "mentor-mcts", "mentor-boss"])
+    ap.add_argument("--sims", type=int, default=0, help="mentor-*：每个决策的 MCTS 模拟次数（默认 1000）")
     ap.add_argument("--width", type=int, default=6)
     ap.add_argument("--depth", type=int, default=1)
     ap.add_argument("--variant", default=None, help="Claude娘 简化变体（cards_v35.VARIANTS 的键）")
@@ -147,6 +151,10 @@ def main():
     akw = {"width": a.width, "depth": a.depth} if a.agent == "search" else {}
     if a.agent.startswith(("strong", "planner", "learned", "imitation")):
         akw.update(boss_aware=not a.no_boss_aware, boss_search=a.boss_search)
+    if a.agent.startswith("mentor"):
+        akw.update(boss_aware=not a.no_boss_aware)
+        if a.sims:
+            akw["sims"] = a.sims
     with mp.Pool(a.procs, initializer=_init, initargs=({"name": a.agent, "kw": akw,
                                                                "variant": a.variant, "force": [x for x in a.force.split(",") if x],
                                                                "replace": [x for x in a.replace.split(",") if x], "timeout": a.timeout or (60 if a.agent == "heuristic" else 900)},)) as pool:
@@ -164,6 +172,11 @@ def main():
             loss[(c[1], c[6] if len(c) > 6 else (0 if c[0] <= 17 else 1 if c[0] <= 34 else 2))].append(c[4])
     print("  avg HP loss:", {f"{k[0]}@act{k[1]+1}": round(sum(v) / len(v), 1) for k, v in sorted(loss.items())},
           "| combats won", sum(1 for r in res for c in r["combats"] if c[5]), "| avg floor", round(sum(floors) / len(floors), 1))
+    ms = [r["mstats"] for r in res if r.get("mstats")]
+    if ms:
+        nm, nf = sum(m["mentor"] for m in ms), sum(m["fallback"] for m in ms)
+        print(f"  mentor decisions {nm}, fallback {nf} ({nf / max(1, nm + nf):.1%}), "
+              f"mcts {sum(m['mcts_sec'] for m in ms) / max(1, nm) * 1000:.0f} ms/decision")
     for r in errs[:5]:
         ls = r["error"].splitlines()
         print("ERR", r["seed"], ls[0][:200], "|", ls[-2][:200] if len(ls) > 1 else "")

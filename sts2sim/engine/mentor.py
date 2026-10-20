@@ -1,8 +1,8 @@
 """spire-mentor（外部 Rust 引擎）做战斗搜索的桥接。
 
 spire-mentor 不在本仓库里（它的仓库带游戏文本/数据），需要用户自己克隆并构建 Python 绑定：
-  STS2SIM_MENTOR_SITE = sts2_rs 所在的 site-packages（maturin develop 装好的 venv）
-  STS2SIM_MENTOR_PY   = spire-mentor/sts2-pycli/python（用它的 sts2_hint.adapter 把状态转成线格式）
+  DECKBENCH_MENTOR_SITE = sts2_rs 所在的 site-packages（maturin develop 装好的 venv）
+  DECKBENCH_MENTOR_PY = spire-mentor/sts2-pycli/python（用它的 sts2_hint.adapter 把状态转成线格式）
 流程：我们的 CombatState → Sts2Headless combat_play 形状的 dict → sts2_hint.adapter.translate
      → sts2_rs.state_from_dict → sts2_rs.mcts_recommend → 映射回我们的动作。
 任何牌/遗物/能力/怪物/药水不被识别（如 Claude娘 模组内容）就抛 Unsupported，调用方回退到自己的搜索。
@@ -211,7 +211,7 @@ def to_headless(cs, player, room_kind="Monster", with_rng=True):
                    "block": int(player.Creature.Block), "gold": int(player.Gold),
                    "relics": [{"id": r.Id.Entry, "name": r.Id.Entry,
                                **({"counter": int(r.DisplayAmount)} if _safe(lambda: r.ShowCounter, False) else {})}
-                              for r in player.Relics],
+                              for r in player.Relics if not _pickup_only(r)],
                    "potions": []},
         "player_powers": [_power(p) for p in player.Creature.Powers],
         "game_version": "v0.111.0",
@@ -238,6 +238,17 @@ def to_headless(cs, player, room_kind="Monster", with_rng=True):
     return st, pots, alive
 
 
+_PICKUP_ONLY = {"_get_Rarity", "_get_HasUponPickupEffect", "AfterObtained", "_get_CanonicalVars", "IsAllowed",
+                "_get_ExtraHoverTips", "_get_HoverTips", "Rarity", "HasUponPickupEffect", "CanonicalVars",
+                "ExtraHoverTips", "HoverTips", "_cs_name"}
+
+
+def _pickup_only(r):
+    """只有拾取效果、对战斗无影响的遗物（如 DOWSING_ROD、NEOWS_SACRIFICE）不传给 spire-mentor。"""
+    d = set(type(r).__dict__) - {k for k in type(r).__dict__ if k.startswith("__")}
+    return bool(d) and d <= _PICKUP_ONLY
+
+
 def _revives(e):
     return any(p.Id.Entry in ("ILLUSION_POWER", "REATTACH_POWER", "ADAPTABLE_POWER") for p in e.Powers)
 
@@ -260,6 +271,8 @@ def to_wire(cs, player, room_kind="Monster", ascension=0, seed=0):
         reg = ad._registry_power_names()
         bad = [q["id"] for q in st["player_powers"] + [x for e in st["enemies"] + st["dead_enemies"] for x in e["powers"]]
                if q["id"] not in reg and q["id"].removesuffix("_POWER") not in reg]
+        rreg = ad._registry_names("relic")
+        bad += [r["id"] for r in st["player"]["relics"] if r["id"] not in rreg]
         raise Unsupported(f"dropped {drops} {bad}")
     wp = []
     for p in pots:
@@ -286,8 +299,18 @@ def mcts_action(cs, player, acts, room_kind="Monster", ascension=0, sims=1000, t
     best = next((x for x in r["actions"] if x.get("is_best")), None)
     if best is None:
         raise Unsupported("no recommendation")
-    a = best["action"]
-    return map_action(a, player, acts, alive), best
+    try:
+        return map_action(best["action"], player, acts, alive), best
+    except Unsupported as e:
+        # 最优动作在我们这边被挡掉（多为 combat.py 的 MAX_SAME_CARD 防死循环限制）：按 Q 排名取下一个能映射的动作
+        for x in r["actions"]:
+            if x is best:
+                continue
+            try:
+                return map_action(x["action"], player, acts, alive), dict(x, alt_of=str(e))
+            except Unsupported:
+                pass
+        raise
 
 
 def map_action(a, player, acts, alive):
@@ -304,9 +327,10 @@ def map_action(a, player, acts, alive):
         for x in acts:
             if x[0] == "play" and x[1] is card and (tgt is None or x[2] is tgt or x[2] is None):
                 return x
-        raise Unsupported(f"unmappable play {a}")
+        inacts = any(x[0] == "play" and x[1] is card for x in acts)
+        raise Unsupported(f"unmappable play {card.Id.Entry} canplay={_safe(card.CanPlay, None)} inacts={inacts} tgt={tgt is not None}")
     if kind in ("potion", "drink_potion"):
-        slots = list(player.PotionSlots)
+        slots = [p for p in player.PotionSlots if p is not None]   # sts2_rs 把空槽压缩掉了
         pot = slots[a["slot"]]
         for x in acts:
             if x[0] == "potion" and x[1] is pot and (tgt is None or x[2] is tgt or x[2] is None):
@@ -335,9 +359,11 @@ def make_mentor_agent(seed=0, sims=1000, threads=1, fallback_search=True, mentor
                 self._k += 1
                 t = time.perf_counter()
                 try:
-                    a, _ = mcts_action(cs, player, acts, self.room_kind, getattr(getattr(self, "_run", None), "ascension", 0),
+                    a, info = mcts_action(cs, player, acts, self.room_kind, getattr(getattr(self, "_run", None), "ascension", 0),
                                        sims=self.sims, threads=self.threads, seed=(seed * 7919 + self._k) & 0xFFFFFFFF)
                     self.mstats["mentor"] += 1
+                    if "alt_of" in info:
+                        self.mstats["alt"] = self.mstats.get("alt", 0) + 1
                     self.mstats["mcts_sec"] += time.perf_counter() - t
                     return a
                 except Unsupported as e:
