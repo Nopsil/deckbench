@@ -460,9 +460,9 @@
  "me.p.counter": "Stacks add up",
  "me.p.single": "On or off",
  "me.p.max": "Max stacks",
- "me.p.decay": "Loses per turn",
- "me.p.decayHint": "Stacks lost at the start of the owner's turn (empty = none)",
- "me.p.expire": "Clear at turn end",
+ "me.p.decay": "Lose 1 stack each turn",
+ "me.p.decayHint": "At the start or end of the owner's own turn",
+ "me.p.expire": "Remove completely",
  "me.p.triggers": "Triggers (when → what)",
  "me.r.add": "New relic",
  "me.r.none": "No relics yet",
@@ -637,5 +637,8 @@
  "me.err.noSuchMod": "No mod named '{name}'",
  "me.err.builtinName": "'{name}' is a built-in mod's name; choose another folder name",
  "me.err.notUtf8": "Files in the zip are not UTF-8 text",
- "me.legacyNote": "This is an old-format mod (decks for the combat simulator only). Add a character to test it in full runs."
+ "me.legacyNote": "This is an old-format mod (decks for the combat simulator only). Add a character to test it in full runs.",
+ "me.p.never": "never",
+ "me.p.atStart": "At the owner's turn start",
+ "me.p.atEnd": "At the owner's turn end"
 }

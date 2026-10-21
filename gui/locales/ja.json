@@ -460,9 +460,9 @@
  "me.p.counter": "重ねるほど増える",
  "me.p.single": "有無のみ",
  "me.p.max": "最大スタック",
- "me.p.decay": "毎ターン減少",
- "me.p.decayHint": "持ち主のターン開始時に減る数（空欄＝減らない）",
- "me.p.expire": "ターン終了で消える",
+ "me.p.decay": "毎ターン1スタック減る",
+ "me.p.decayHint": "持ち主のターン開始時または終了時に1減る",
+ "me.p.expire": "すべて消える",
  "me.p.triggers": "トリガー（いつ→何を）",
  "me.r.add": "新しいレリック",
  "me.r.none": "まだレリックがありません",
@@ -637,5 +637,8 @@
  "me.err.noSuchMod": "「{name}」というMODが見つかりません",
  "me.err.builtinName": "「{name}」は付属MODの名前です。別のフォルダー名にしてください",
  "me.err.notUtf8": "zip内のファイルがUTF-8テキストではありません",
- "me.legacyNote": "旧形式のMOD（戦闘実験用デッキのみ）です。フルランで試すにはキャラクターを追加してください。"
+ "me.legacyNote": "旧形式のMOD（戦闘実験用デッキのみ）です。フルランで試すにはキャラクターを追加してください。",
+ "me.p.never": "しない",
+ "me.p.atStart": "持ち主のターン開始時",
+ "me.p.atEnd": "持ち主のターン終了時"
 }

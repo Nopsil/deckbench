@@ -754,6 +754,7 @@ class Mod:
         for cid, cls in self.char_classes.items():
             R.CHARACTERS[cid] = cls
         _patch_ancient_fallbacks()
+        _patch_reward_fallback()
         self._register_ai()
         _ACTIVE.append(self)
         return dict(self.char_classes)
@@ -1308,6 +1309,25 @@ def _patch_ancient_fallbacks():
         self.AncientCard = player.PlayerRng.Rewards.NextItem(items).Id
     setup._ym = True
     G.DustyTome.SetupForPlayer = setup
+
+
+def _patch_reward_fallback():
+    """模组卡池小（比如某个事件一次要给 8 张不重复的普通牌）时：不重复的牌不够了，就允许重复，而不是整局报错。
+    只对 YAML 角色生效；原版角色和卡池够大的模组走原来的逻辑（随机数消耗不变）。"""
+    name = "CreateForReward__Player_IEnumerableOfCardModel_CardCreationOptions"
+    orig = getattr(G.CardFactory, name)
+    if getattr(orig, "_ym", False):
+        return
+
+    def create(player, blacklist, options):
+        try:
+            return orig(player, blacklist, options)
+        except G.CsException:
+            if type(player.Character) not in _YAML_CHARS or not G.Seq(blacklist).Any():
+                raise
+            return orig(player, G.Seq([]), options)
+    create._ym = True
+    setattr(G.CardFactory, name, staticmethod(create))
 
 
 # ---------------------------------------------------------------- 入口

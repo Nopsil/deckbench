@@ -460,9 +460,9 @@
  "me.p.counter": "按层数叠加",
  "me.p.single": "只有有 / 没有",
  "me.p.max": "最多几层",
- "me.p.decay": "每回合减少",
- "me.p.decayHint": "在拥有者回合开始时减少几层（空着不减）",
- "me.p.expire": "回合结束清空",
+ "me.p.decay": "每回合减 1 层",
+ "me.p.decayHint": "在拥有者自己的回合开始或结束时减 1 层",
+ "me.p.expire": "整个清空",
  "me.p.triggers": "触发（什么时候做什么）",
  "me.r.add": "新遗物",
  "me.r.none": "还没有遗物",
@@ -637,5 +637,8 @@
  "me.err.noSuchMod": "找不到叫「{name}」的 mod",
  "me.err.builtinName": "「{name}」是自带 mod 的名字，换一个文件夹名再保存",
  "me.err.notUtf8": "压缩包里的文件不是 UTF-8 文本",
- "me.legacyNote": "这个 mod 是旧格式（只有战斗实验用的牌组）。整局试跑要先加一个角色。"
+ "me.legacyNote": "这个 mod 是旧格式（只有战斗实验用的牌组）。整局试跑要先加一个角色。",
+ "me.p.never": "不会",
+ "me.p.atStart": "拥有者回合开始时",
+ "me.p.atEnd": "拥有者回合结束时"
 }

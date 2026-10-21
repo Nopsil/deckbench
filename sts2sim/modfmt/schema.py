@@ -707,9 +707,26 @@ def validate(mod, fullrun=True):
                     v.err(f"{where}.{k}", f"{k} 应该是非负整数", f"{k} must be a non-negative integer")
         pool = [c for c in mod["cards"] if c["pool"] and c["rarity"] in ("Common", "Uncommon", "Rare")]
         for r in ("Common", "Uncommon", "Rare"):
-            if not any(c["rarity"] == r for c in pool):
-                v.err("cards", f"整局奖励需要至少一张「{ {'Common': '普通', 'Uncommon': '罕见', 'Rare': '稀有'}[r] }」牌",
+            # 选牌奖励一次给 3 张不重复的牌，首领奖励 3 张全是稀有 → 每种稀有度至少 3 张
+            k = sum(1 for c in pool if c["rarity"] == r)
+            if mod["characters"] and k == 0:
+                v.err("cards", f"整局奖励需要卡池里至少有一张「{ {'Common': '普通', 'Uncommon': '罕见', 'Rare': '稀有'}[r] }」牌",
                       f"full runs need at least one {r} card in the pool")
+            elif mod["characters"] and k < 3:
+                v.warn("cards", f"卡池里每种稀有度最好至少 3 张（选牌奖励一次给 3 张，不够时会出现重复的牌）；「{ {'Common': '普通', 'Uncommon': '罕见', 'Rare': '稀有'}[r] }」现在只有 {k} 张",
+                      f"each rarity should have at least 3 cards in the pool (rewards offer 3 cards; with fewer, cards repeat); {r} has {k}")
+        # 商店一次摆 2 张攻击、2 张技能、1 张能力（不重复、不算基础牌），卡池里不够就会出错
+        need = {"Attack": 2, "Skill": 2, "Power": 1}
+        have = {t: sum(1 for c in pool if c["type"] == t) for t in need}
+        if mod["characters"] and any(have[t] < n for t, n in need.items()):
+            v.err("cards", f"商店需要卡池里至少有 2 张攻击、2 张技能、1 张能力（不算基础牌）；现在是 攻击 {have['Attack']}、技能 {have['Skill']}、能力 {have['Power']}",
+                  f"the shop needs at least 2 Attacks, 2 Skills and 1 Power in the pool (Basic cards don't count); "
+                  f"now: {have['Attack']} Attack, {have['Skill']} Skill, {have['Power']} Power")
+        for cid, ch in mod["characters"].items():
+            for it in ch.get("starting_deck") or []:
+                if parse_deck_item(it)[2]:
+                    v.warn(f"characters.{cid}.starting_deck", f"「{it}」：起始牌组里的升级标记 + 目前不生效，会给普通版",
+                           f"'{it}': the upgrade mark + in a starting deck has no effect yet; the base version is used")
         if mod.get("hooks") and not mod.get("fullrun_hooks"):
             v.warn("mod.yaml hooks", "hooks.py 是给旧版战斗模拟器写的，整局不会加载它；只靠 hooks.py 实现的能力/遗物在整局里没有效果",
                    "hooks.py is for the legacy combat simulator and is not loaded in full runs")

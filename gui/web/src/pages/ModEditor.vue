@@ -169,9 +169,9 @@
                 <div><div class="label">{{ t('me.k.name') }}</div><n-input v-model:value="power.name" /></div>
                 <div><div class="label">{{ t('me.p.kind') }}</div><n-select v-model:value="power.type" :options="[{ value: 'Buff', label: t('me.p.buff') }, { value: 'Debuff', label: t('me.p.debuff') }]" /></div>
                 <div><div class="label">{{ t('me.p.stack') }}</div><n-select v-model:value="power.stack" :options="[{ value: 'Counter', label: t('me.p.counter') }, { value: 'Single', label: t('me.p.single') }]" /></div>
-                <div><div class="label">{{ t('me.p.max') }}</div><n-input-number :value="power.max ?? null" clearable :min="1" @update:value="(v) => (power.max = v ?? undefined)" /></div>
-                <div><div class="label">{{ t('me.p.decay') }}</div><n-input-number :value="power.decay ?? null" clearable :min="1" @update:value="(v) => (power.decay = v ?? undefined)" /><div class="hint">{{ t('me.p.decayHint') }}</div></div>
-                <div><div class="label">{{ t('me.p.expire') }}</div><n-switch :value="!!power.expire" @update:value="(v) => (power.expire = v ? 'turn_end' : undefined)" /></div>
+                <div><div class="label">{{ t('me.p.max') }}</div><n-input-number :value="power.max ?? null" clearable :min="1" placeholder="" @update:value="(v) => (power.max = v ?? undefined)" /></div>
+                <div><div class="label">{{ t('me.p.decay') }}</div><n-select :value="power.decay || null" clearable :placeholder="t('me.p.never')" :options="whenOptions" @update:value="(v) => (power.decay = v || undefined)" /><div class="hint">{{ t('me.p.decayHint') }}</div></div>
+                <div><div class="label">{{ t('me.p.expire') }}</div><n-select :value="power.expire || null" clearable :placeholder="t('me.p.never')" :options="whenOptions" @update:value="(v) => (power.expire = v || undefined)" /></div>
               </div>
               <div style="margin-top:14px"><div class="label">{{ t('me.k.text') }}</div><n-input v-model:value="power.text" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }" /></div>
               <div style="margin-top:16px"><div class="label">{{ t('me.p.triggers') }}</div><mod-triggers v-model="power.triggers" :schema="schema" :ctx="ctx" /></div>
@@ -311,6 +311,7 @@ const ctx = computed(() => ({
   powerOptions: ((mod.value && mod.value.powers) || []).map((p) => ({ value: p.id, label: (p.name || p.id) + ' · ' + p.id })),
   cardOptions: ((mod.value && mod.value.cards) || []).map((c) => ({ value: c.id, label: (c.name || c.id) + ' · ' + c.id })),
 }))
+const whenOptions = computed(() => [{ value: 'turn_start', label: t('me.p.atStart') }, { value: 'turn_end', label: t('me.p.atEnd') }])
 const relicOptions = computed(() => mod.value.relics.map((r) => ({ value: r.id, label: (r.name || r.id) + ' · ' + r.id })))
 const agentOptions = computed(() => ((store.catalog && store.catalog.agents_batch) || []).filter((a) => a.available !== false).map((a) => ({ value: a.id, label: a.name })))
 const poolByRarity = computed(() => {
