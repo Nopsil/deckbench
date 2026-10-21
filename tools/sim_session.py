@@ -26,7 +26,7 @@ def main():
     ap.add_argument("--replay", default="")
     ap.add_argument("--persona", default="")
     ap.add_argument("--fallback", default="learned")
-    ap.add_argument("--style", default="", help="lirixuan：auto 代打用JUGGLING 流铁甲风格（sts2sim/engine/style.py）")
+    ap.add_argument("--style", default="", help="打法风格：auto 代打用的风格（standard / juggler，见 sts2sim/engine/style.py）")
     a = ap.parse_args()
     out = os.fdopen(os.dup(1), "w", encoding="utf-8", buffering=1)
     sys.stdout = sys.stderr
@@ -77,9 +77,12 @@ def main():
         seed = canonicalize(a.seed)
         replay = json.load(open(a.replay, encoding="utf-8")) if a.replay else []
         fb = batch.make_agent(a.fallback, seed) if a.fallback else None
-        if fb is not None and a.style == "lirixuan":
-            from sts2sim.engine.style import apply_lirixuan
-            fb = apply_lirixuan(fb)
+        if fb is not None and a.style:
+            from sts2sim.engine.style import apply_style
+            try:
+                fb = apply_style(fb, a.style, a.fallback)
+            except ValueError as e:   # 旧存档里的风格 id 不认识了：按标准打，不中断
+                print("style:", e, "-> standard", file=sys.stderr)
         ag = InteractiveAgent(io, replay=replay, fallback=fb, persona=a.persona or None)
         lg = DecisionLogger(ag, a.log, agent_name="mcp", meta={"seed": seed, "char": a.char, "asc": a.asc})
         drv = RunDriver(a.char, a.asc, seed, agent=lg)

@@ -89,7 +89,8 @@ PYTHONPATH=. .venv/bin/python tools/batch.py --char Claude --asc 10 --n 100 --ag
 | `--boss-sims` / `--elite-sims` | 同 `--sims`（`mentor-full-ev` 为 4000） | `mentor-*` 首领 / 精英战每步的模拟次数 |
 | `--seed` | 空 | 真游戏种子（逗号分隔可多个；按游戏规则转大写、O→0、I→1）；给了就忽略 `--n/--start` |
 | `--log-dir` | 空 | 每局一个逐步决策日志 JSONL（`<角色>_A<进阶>_<种子>.jsonl`） |
-| `--style` / `--force-pick` / `--force-pick-first` | 空 | 风格规则：`lirixuan`（JUGGLING 流铁甲）；见到这些牌就拿；战斗里先打 |
+| `--style` | `standard` | 打法风格：`standard`（标准，不加规则）、`juggler`（杂耍流：优先拿杂耍 JUGGLING，偏好多段攻击和反直觉的组合；要 `strong` / `learned` / `planner` / `imitation` / `modai` / `mentor` 系 AI）。`tools/ab_card.py` 也有 `--style` |
+| `--force-pick` / `--force-pick-first` | 空 | 见到这些牌就拿；战斗里先打 |
 | `--width` / `--depth` | `6` / `1` | `search` AI 的搜索宽度/深度 |
 | `--variant` | 无 | Claude娘简化变体（`mods/claude_v35/cards_v35.py` 的 `VARIANTS` 键） |
 | `--force` | 空 | 强制加入起始牌组的牌，逗号分隔，`ID+` 为升级版（单卡 A/B 用） |
@@ -281,3 +282,11 @@ powershell -ExecutionPolicy Bypass -File gui\packaging\audit.ps1 -Path <工作�
   *Parity vs the real DLL (via the third-party headless tool sts2-cli, 100 act-1 fights, step by step): 97/100 identical in 0.1.1. The other 3 are Regent's Tyranny / Foregone Conclusion,
   which ask for a card choice at the start of the player's turn. We surface that choice correctly; sts2-cli's `end_turn` treats the pending choice as a deadlock and forces game over
   (its own log shows the same number of options first). This is an sts2-cli limitation, not a simulator bug.*
+
+## 打法风格 / Play styles
+
+打法风格是叠在 AI 上的一层规则，注册表在 `sts2sim/engine/style.py` 的 `STYLES`：每个风格有四种语言的名字和说明、`apply` 函数（`None` = 不改 AI）、能叠在哪些 AI 上（AI id 前缀）。批量（`--style`）、单卡 A/B、图形界面（「新建测试 → 整局批量」的「打法风格」下拉框、`GET /api/styles`、运行参数 `style`）和 MCP（`new_run(style=…)`、`list_styles`）都从这里读。每局结果 JSONL 里有 `style` 字段。
+
+加一个新风格：写一个 mixin（参考 `JugglerMixin`）和 `apply_xxx(agent)`，在 `STYLES` 里加一项，再把 id 加进 `tools/batch.py` 的 `STYLE_IDS`；`tests/test_style.py` 会检查两边一致，并检查 `standard` 和不加风格的结果完全相同。
+
+*Play styles are a rule layer on top of an AI, registered in `STYLES` in `sts2sim/engine/style.py` (names/descriptions in four languages, an `apply` function, compatible AI prefixes). Batch `--style`, `ab_card.py --style`, the GUI dropdown / `GET /api/styles` / run param `style`, and MCP `new_run(style=…)` / `list_styles` all read it. Each run record has a `style` field.*

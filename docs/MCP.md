@@ -19,7 +19,8 @@ python tools/mcp_server.py --http --port 8765   # streamable-HTTP → http://127
 ## 工具 / Tools
 | 工具 | 说明 |
 |---|---|
-| `new_run(seed, character, ascension, persona)` | 种子按游戏规则规范化（大写、O→0、I→1）；persona 可选：`qianwen`、`lirixuan`（JUGGLING 流铁甲风格，`auto` 代打也用这个风格），或任意一段风格描述 |
+| `new_run(seed, character, ascension, persona, style)` | 种子按游戏规则规范化（大写、O→0、I→1）；persona 可选：`qianwen`、`juggler`（杂耍流说明，同时把 style 设成 `juggler`），或任意一段风格描述；style 是 `auto` 代打用的打法风格：`standard`（默认）或 `juggler`（杂耍流：优先拿杂耍 JUGGLING，偏好多段攻击和反直觉的组合） |
+| `list_styles()` | 列出可用的打法风格 |
 | `get_state()` | 楼层/生命/金币/遗物/药水/牌组 + 当前界面 + 战斗（能量、手牌、敌人生命/意图/能力）+ 带编号的合法选项 |
 | `act(option_index, reason, indices, option)` | 执行一个选项；多选界面用 `indices`；`option` 可以写选项文字或 ID（如 `JUGGLING`、`跳过`），比选项号稳定；非法选项返回错误并保持原状 |
 | `auto(steps, until)` | 交给内置 AI 代打；`until`：`combat_end` / `floor` / `screen:<名字>` |

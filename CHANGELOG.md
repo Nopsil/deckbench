@@ -17,6 +17,9 @@
 - YAML 角色的卡池太小时（比如某事件一次要 8 张不重复的普通牌），奖励改为允许重复而不是整局报错；原版角色不受影响。
   *For YAML characters with small pools, reward generation allows repeats instead of crashing the run; base characters are unaffected.*
 
+- **打法风格可以切换**：AI 上面可以再叠一层「打法风格」，先有「标准」（不加规则）和「杂耍流」（优先拿杂耍 JUGGLING，偏好多段攻击和反直觉的组合，攻击优先、多冲精英；要学习版 / 通用 AI / 强 AI 这类 AI）。图形界面「新建测试 → 整局批量」多了「打法风格」下拉框（指定种子单局也能用），运行记录、报告和历史里会显示用的风格；命令行 `tools/batch.py --style`、`tools/ab_card.py --style`；MCP `new_run(style=…)` 和新工具 `list_styles`。原来的风格 id 改名为中性的 `juggler`。
+  *Switchable play styles: an optional rule layer on top of the AI. Ships with Standard (no rules) and Juggler (always takes Juggling, favors multi-hit attacks and counter-intuitive combos, attacks over block, more elites; needs a learned/general/strong AI). New "Play style" dropdown in New Test → Full runs (also for a single game seed); the style is shown in the run page, report and history. CLI `--style` for `tools/batch.py` and `tools/ab_card.py`; MCP `new_run(style=…)` and `list_styles`. The previous style id was renamed to the neutral `juggler`.*
+
 ## 0.1.3 (2026-10)
 
 - **修复：宝箱遗物从来没有真正拿到手。** 真游戏是在界面里发放宝箱遗物的，模拟器没有那个界面，所以以前所有模拟（批量、图形界面）里选了宝箱遗物也不会进遗物栏。现在默认修好（批量、图形界面、MCP 都一样）。**之前版本测出的胜率和层数都是在没有宝箱遗物的情况下测的**，会偏低，和新版本的数字不能直接比较；本说明下面引用的 AI 对比数字也是修复前测的。只为复现旧数字时可设 `DECKBENCH_TREASURE_FIX=0`。

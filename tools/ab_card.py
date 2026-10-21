@@ -1,7 +1,7 @@
 """单卡 A/B：同一批种子，各跑一遍「原始起始牌组」和「起始牌组 + 指定牌」（可选替换掉 1 张），做配对比较。
 
   PYTHONPATH=. python3 tools/ab_card.py --char Claude --asc 0 --n 400 --force CLAUDE_CLASSIFIER [--replace CLAUDE_STRIKE]
-      [--variant classifier_flat] [--agent strong-nosearch] [--base-variant ...]
+      [--variant classifier_flat] [--agent strong-nosearch] [--base-variant ...] [--style juggler]
   YAML 模组：再加 --mod mods/claude_yaml（可多次）
 
 强制加牌发生在进入第一幕之前，种子相同 → 地图、遭遇、奖励池的随机序列相同，两边的差别只来自牌组（以及因此改变的决策）。
@@ -20,9 +20,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import batch  # noqa: E402
 
 
-def run(char, asc, seeds, agent, force, replace, variant, procs, mods=()):
+def run(char, asc, seeds, agent, force, replace, variant, procs, mods=(), style="standard"):
     cfg = {"name": agent, "kw": {}, "variant": variant, "force": force, "replace": replace, "mods": list(mods),
-           "timeout": 60 if agent == "heuristic" else 900}
+           "style": style, "timeout": 60 if agent == "heuristic" else 900}
     with mp.Pool(procs, initializer=batch._init, initargs=(cfg,)) as pool:
         return pool.map(batch._one, [(char, asc, s) for s in seeds], chunksize=1)
 
@@ -60,16 +60,18 @@ def main():
     ap.add_argument("--base-variant", default=None)
     ap.add_argument("--procs", type=int, default=mp.cpu_count())
     ap.add_argument("--out", default=None, help="把两组原始结果写到 <out>_A.jsonl / <out>_B.jsonl")
+    ap.add_argument("--style", default="standard", choices=batch.STYLE_IDS, help="打法风格（两组都用同一个）：standard / juggler，见 tools/batch.py --help")
     ap.add_argument("--mod", action="append", default=[], help="YAML 模组文件夹（可多次）；牌 id 写游戏里的 id，如 CLAUDE_CLASSIFIER")
     a = ap.parse_args()
+    a.style = batch.check_style(a.style, a.agent)
     seeds = [f"R{i}" for i in range(a.start, a.start + a.n)]
     sp = lambda x: [y for y in x.split(",") if y]  # noqa
     mods = [os.path.abspath(m) for m in a.mod]
     if mods:
         batch._check_mods(mods, a.char, a.variant)
     t = time.time()
-    A = run(a.char, a.asc, seeds, a.agent, sp(a.base_force), [], a.base_variant, a.procs, mods)
-    B = run(a.char, a.asc, seeds, a.agent, sp(a.force), sp(a.replace), a.variant, a.procs, mods)
+    A = run(a.char, a.asc, seeds, a.agent, sp(a.base_force), [], a.base_variant, a.procs, mods, a.style)
+    B = run(a.char, a.asc, seeds, a.agent, sp(a.force), sp(a.replace), a.variant, a.procs, mods, a.style)
     if a.out:
         for tag, res in (("A", A), ("B", B)):
             with open(f"{a.out}_{tag}.jsonl", "w") as f:
@@ -77,7 +79,7 @@ def main():
                     f.write(json.dumps(r, default=str, ensure_ascii=False) + "\n")
     sa, sb = stats(A), stats(B)
     lab = f"+{a.force}" + (f" -{a.replace}" if a.replace else "") + (f" [{a.variant}]" if a.variant else "")
-    print(f"{a.char} A{a.asc} {a.agent} N={a.n}  A=基线{(' +' + a.base_force) if a.base_force else ''}  B={lab}  ({time.time() - t:.0f}s)")
+    print(f"{a.char} A{a.asc} {a.agent}{'' if a.style == 'standard' else ' style ' + a.style} N={a.n}  A=基线{(' +' + a.base_force) if a.base_force else ''}  B={lab}  ({time.time() - t:.0f}s)")
     for k, name in (("floor", "平均层数"), ("boss1", "到达幕1首领"), ("act2", "到达幕2"), ("win", "胜率"), ("loss_a1", "幕1每场掉血")):
         print(f"  {name:8s} A {sa[k]:.3f}  B {sb[k]:.3f}")
     for name, key in (("层数", lambda r: r["floor"]), ("到达幕2", lambda r: float(r["act"] >= 1)),

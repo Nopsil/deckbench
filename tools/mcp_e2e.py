@@ -47,13 +47,17 @@ async def scenario(session, tag):
     assert "第一个Neow选项，赌一把！" in reasons, "理由没写进 decision_log"
     print(f"[{tag}] export:", json.dumps(exp, ensure_ascii=False)[:400])
     print(f"[{tag}] list_runs:\n" + (await call("list_runs"))[-400:])
-    # lirixuan 风格：auto 代打用 style.py 规则，打到第 1 幕首领前不出错
-    t = await call("new_run", seed="R1", character="Ironclad", ascension=0, persona="lirixuan")
+    # 杂耍流打法风格：auto 代打用 style.py 规则，打到第 1 幕首领前不出错
+    sl = await call("list_styles")
+    assert "standard" in sl and "juggler" in sl, sl
+    assert "只能是" in await call("new_run", seed="R1", style="nope")
+    t = await call("new_run", seed="R1", character="Ironclad", ascension=0, style="juggler")
     t = await call("auto", steps=400, until="screen:shop")
     assert "❌" not in t and "fatal" not in t.lower(), t[-500:]
     if "本局结束" in t:
         assert "遗物（" in t and "牌组（" in t, "结局应列出全部遗物和牌组"
-    print(f"[{tag}] lirixuan auto ->", t[:160].replace("\n", " | "))
+    print(f"[{tag}] juggler auto ->", t[:160].replace("\n", " | "))
+    assert "风格 juggler" in await call("list_runs")
     print(f"[{tag}] OK: {len(rows)} 行日志，{exp['decisions']} 个决策")
 
 

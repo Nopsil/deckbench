@@ -29,10 +29,10 @@ RUNS = os.environ.get("DECKBENCH_MCP_RUNS") or os.path.join(__import__("sts2sim.
 CHARS = ["Ironclad", "Silent", "Defect", "Necrobinder", "Regent"]
 PERSONAS = {
     "qianwen": "千问娘：国风元气大小姐，爱冒险、嘴硬，理由用一句不超过 30 字的俏皮中文台词。",
-    "lirixuan": ("JUGGLING 流铁甲战士风格（参考一位中文主播的公开打法）：JUGGLING 见到就拿、商店必买、火堆先升级 JUGGLING 拿固有；"
-                 "攻击优先、少拿防御，删牌先删防御；偏爱 ANGER、SPITE、BLUDGEON、THRASH、PERFECTED_STRIKE、SETUP_STRIKE、BOLAS、OFFERING、"
-                 "BLOODLETTING、STOKE、PILLAGE、EXPECT_A_FIGHT，遗物偏爱 SNECKO_EYE / FAKE_SNECKO_EYE / BRIMSTONE；路线多冲精英；"
-                 "出牌先打 JUGGLING，把最强的攻击留作本回合第 3 张。auto 代打也按这个风格。"),
+    "juggler": ("杂耍流铁甲战士：优先拿杂耍（JUGGLING），偏好多段攻击和反直觉的组合。JUGGLING 见到就拿、商店必买、火堆先升级 JUGGLING 拿固有；"
+                "攻击优先、少拿防御，删牌先删防御；偏爱 ANGER、SPITE、BLUDGEON、THRASH、PERFECTED_STRIKE、SETUP_STRIKE、BOLAS、OFFERING、"
+                "BLOODLETTING、STOKE、PILLAGE、EXPECT_A_FIGHT，遗物偏爱 SNECKO_EYE / FAKE_SNECKO_EYE / BRIMSTONE；路线多冲精英；"
+                "出牌先打 JUGGLING，把最强的攻击留作本回合第 3 张。auto 代打也按这个风格。"),
 }
 LOCK = threading.Lock()
 
@@ -269,22 +269,35 @@ def build(host="127.0.0.1", port=8765, host_check=True):
         "同一种子 + 同一串选项 = 同一局，replay.md 可以拿去真游戏里照着复刻。"), host=host, port=port, **kw)
 
     @mcp.tool()
-    def new_run(seed: str, character: str = "Ironclad", ascension: int = 0, persona: str = "") -> str:
+    def new_run(seed: str, character: str = "Ironclad", ascension: int = 0, persona: str = "", style: str = "") -> str:
         """开新的一局。seed：游戏里的种子（自动按游戏规则规范化：大写、O→0、I→1）；character：Ironclad/Silent/Defect/Necrobinder/Regent；
-        ascension：0-10；persona：可选风格，qianwen（千问娘）/ lirixuan（JUGGLING 流铁甲：JUGGLING 必拿、攻击优先、冲精英；auto 代打也用这个风格）/ 或直接写一段风格说明。返回第一个决策。"""
+        ascension：0-10；persona：可选的说话/思路人设，qianwen（千问娘）/ juggler（杂耍流说明，同时把 style 设成 juggler）/ 或直接写一段风格说明；
+        style：auto 代打用的打法风格，standard（标准，默认）/ juggler（杂耍流：优先拿 JUGGLING，偏好多段攻击和反直觉的组合，攻击优先、冲精英）。
+        list_styles 列出全部打法风格。返回第一个决策。"""
+        from sts2sim.engine import style as ST
         with LOCK:
             if character not in CHARS:
                 return f"角色只能是 {CHARS}"
+            try:
+                sid = ST.resolve(style or (persona if persona in ST.STYLES else ""))
+            except ValueError:
+                return f"打法风格只能是 {list(ST.STYLES)}"
             c = canonicalize(seed)
             rid = time.strftime("%m%d-%H%M%S") + "-" + c[:12] + "-" + uuid.uuid4().hex[:4]
             ptext = PERSONAS.get(persona, persona)
             s = Session(rid, {"seed": c, "char": character, "asc": int(ascension), "persona": persona, "persona_text": ptext,
-                              "fallback": "learned", "style": "lirixuan" if persona == "lirixuan" else "", "created": time.strftime("%Y-%m-%d %H:%M:%S")})
+                              "fallback": "learned", "style": "" if sid == ST.DEFAULT else sid, "created": time.strftime("%Y-%m-%d %H:%M:%S")})
             s.start(replay=[])
             SESS[rid] = s
             CUR["id"] = rid
             w = seed_warnings(seed, c)
             return ("\n".join("注意：" + x for x in w) + "\n" if w else "") + _state_text(s)
+
+    @mcp.tool()
+    def list_styles() -> str:
+        """可用的打法风格（new_run 的 style 参数）：id、名字、说明、能叠在哪些内置 AI 上（MCP 的 auto 代打用 learned）。"""
+        from sts2sim.engine import style as ST
+        return "\n".join(f"{s['id']}：{s['name']}（{s['desc']}）" for s in ST.list_styles("zhs"))
 
     @mcp.tool()
     def get_state(run_id: str = "") -> str:
@@ -402,7 +415,7 @@ def build(host="127.0.0.1", port=8765, host_check=True):
                     m = json.load(open(p, encoding="utf-8"))
                     e = m.get("ended") or {}
                     st = ("胜利" if e.get("victory") else f"失败@{e.get('floor')}") if e.get("type") == "end" else ("出错" if e else "进行中")
-                    out.append(f"{rid} | {m['char']} A{m['asc']} 种子 {m['seed']} | {m.get('n_choices', 0)} 步 | {st}"
+                    out.append(f"{rid} | {m['char']} A{m['asc']} 种子 {m['seed']} | 风格 {m.get('style') or 'standard'} | {m.get('n_choices', 0)} 步 | {st}"
                                + (" | 当前" if rid == CUR["id"] else ""))
         return "\n".join(out) or "还没有对局"
 

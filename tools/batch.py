@@ -8,6 +8,7 @@ import time
 
 
 AGENT = {"name": "heuristic", "kw": {}}
+STYLE_IDS = ["standard", "juggler"]   # 和 sts2sim/engine/style.py 的 STYLES 一致（tests/test_style.py 检查）
 
 
 def make_agent(name, seed, **kw):
@@ -154,6 +155,34 @@ def game_seeds(spec):
     return out
 
 
+def build_agent(seed):
+    """按 AGENT 建这一局的 AI：make_agent → --force-pick → 打法风格（sts2sim/engine/style.py 的 STYLES）。批量和图形界面共用。"""
+    from sts2sim.engine import style as ST
+    ag = make_agent(AGENT["name"], seed, **AGENT["kw"])
+    if AGENT.get("force_pick"):
+        from sts2sim.engine.prefs import ForcePickAgent
+        ag = ForcePickAgent(ag, AGENT["force_pick"], play_first=AGENT.get("force_pick_first", False))
+    sid = ST.resolve(AGENT.get("style"))
+    if sid != ST.DEFAULT:
+        ag = ST.apply_style(ag, sid, AGENT["name"])
+    return ag
+
+
+def check_style(style_id, agent_name):
+    """主进程里先检查风格 id 和 AI 能不能叠（不行就大白话报错退出，不开子进程）。返回规范化的 id。"""
+    from sts2sim.engine import style as ST
+    try:
+        sid = ST.resolve(style_id)
+    except ValueError as e:
+        sys.stderr.write(f"打法风格 / play style: {e}\n")
+        raise SystemExit(2)
+    if not ST.compatible(sid, agent_name):
+        sys.stderr.write(f"打法风格「{sid}」不能叠在 AI「{agent_name}」上，可用：{', '.join(a + '*' for a in ST.STYLES[sid]['agents'])}\n"
+                         f"play style '{sid}' does not work with agent '{agent_name}'\n")
+        raise SystemExit(2)
+    return sid
+
+
 def _one(args):
     import signal
     char, asc, seed = args
@@ -163,14 +192,7 @@ def _one(args):
     signal.alarm(AGENT.get("timeout", 600))
     try:
         hooks = [force_cards_hook(AGENT["force"], AGENT.get("replace", ()))] if AGENT.get("force") or AGENT.get("replace") else []
-        ag = make_agent(AGENT["name"], seed, **AGENT["kw"])
-        if AGENT.get("force_pick"):
-            from sts2sim.engine.prefs import ForcePickAgent
-            ag = ForcePickAgent(ag, AGENT["force_pick"], play_first=AGENT.get("force_pick_first", False))
-        if AGENT.get("style") == "lirixuan":
-            from sts2sim.engine.style import apply_lirixuan
-            ag = apply_lirixuan(ag)
-        ag = wrap_log(ag, char, asc, seed)
+        ag = wrap_log(build_agent(seed), char, asc, seed)
         r = play_run(char, asc, seed, agent=ag, setup_hooks=hooks)
     except RunTimeout:
         import traceback
@@ -179,7 +201,8 @@ def _one(args):
     finally:
         signal.alarm(0)
     d = r.to_dict()
-    if AGENT.get("force_pick") or AGENT.get("style"):
+    d["style"] = AGENT.get("style") or "standard"
+    if AGENT.get("force_pick") or (AGENT.get("style") or "standard") != "standard":
         d["forced_picks"] = getattr(ag, "forced", None)
     if getattr(ag, "mstats", None):
         d["mstats"] = ag.mstats
@@ -231,12 +254,15 @@ def main():
     ap.add_argument("--no-boss-aware", action="store_true", help="关闭首领感知（选牌/休息）")
     ap.add_argument("--boss-search", action="store_true", help="strong-nosearch 下只在首领战开搜索")
     ap.add_argument("--timeout", type=int, default=0, help="每局秒数上限（默认 heuristic 60，其余 900）")
-    ap.add_argument("--style", default="", choices=["", "lirixuan"], help="风格：lirixuan = JUGGLING 流铁甲（JUGGLING必拿、攻击优先、冲精英，见 sts2sim/engine/style.py）")
+    ap.add_argument("--style", default="standard", choices=STYLE_IDS, type=lambda x: x.strip().lower() or "standard",
+                    help="打法风格：standard = 标准（不加规则）；juggler = 杂耍流（优先拿 JUGGLING，偏好多段攻击和反直觉的组合，攻击优先、冲精英；"
+                         "要 strong/learned/modai/mentor 系 AI）。见 sts2sim/engine/style.py")
     ap.add_argument("--force-pick-first", action="store_true", help="配合 --force-pick：战斗里能打出就先打")
     ap.add_argument("--force-pick", default="", help="风格规则：卡牌奖励/商店里见到这些牌（ID，逗号分隔）就拿，例 JUGGLING")
     ap.add_argument("--seed", default="", help="指定真游戏种子（逗号分隔，可多个）；给了就只打这些局，忽略 --n/--start")
     ap.add_argument("--log-dir", default="", help="逐步决策日志目录（每局一个 JSONL）")
     a = ap.parse_args()
+    a.style = check_style(a.style, a.agent)
     if a.mod:
         _check_mods(a.mod, a.char, a.variant)
     if a.seed:
@@ -263,7 +289,7 @@ def main():
     wins = sum(r["victory"] for r in res)
     errs = [r for r in res if r["error"]]
     floors = sorted(r["floor"] for r in res)
-    print(f"{a.char} A{a.asc}: {wins}/{len(res)} wins, errors {len(errs)}, median floor {floors[len(floors)//2]}, "
+    print(f"{a.char} A{a.asc} [{a.agent}, style {a.style}]: {wins}/{len(res)} wins, errors {len(errs)}, median floor {floors[len(floors)//2]}, "
           f"acts reached {[sum(1 for r in res if r['act'] >= k) for k in range(3)]}, {dt:.1f}s ({len(res)/dt:.2f} runs/s)")
     import collections
     loss = collections.defaultdict(list)
