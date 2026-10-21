@@ -1050,7 +1050,7 @@ class Mod:
                 if per:
                     SE.POWER_VALUE[ent] = (lambda per: lambda a, e, k, fl: min(a * per, float(e.CurrentHp)) * k)(per)
         fn = self.data.get("ai_hooks")
-        if fn:
+        if fn and os.environ.get("DECKBENCH_MOD_AI_HOOKS", "1") != "0":     # =0：只用通用 AI 估值（对比用）
             m = self._exec_py(fn)
             if hasattr(m, "register"):
                 m.register(self)
@@ -1384,6 +1384,18 @@ def load(src, variant=None, strict=True):
     chars = mod.build()
     _LOADED[key] = mod
     return chars
+
+
+def check(src, variant=None):
+    """只检查不注册（主进程用，避免先注册一套、子进程再换变体注册第二套）。
+    返回 (角色 ID 列表, 问题, 提醒)；问题/提醒都是 (位置, 中文, English)。"""
+    try:
+        data = S.load_mod_dir(src) if isinstance(src, str) else src
+        data = apply_variant(data, variant)
+    except ModFormatError as e:
+        return [], e.problems, []
+    problems, warnings = S.validate(data, fullrun=True)
+    return list((data.get("characters") or {})), problems, warnings
 
 
 def loaded():

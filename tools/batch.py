@@ -3,6 +3,7 @@ import argparse
 import json
 import multiprocessing as mp
 import os
+import sys
 import time
 
 
@@ -86,6 +87,12 @@ def _alarm(*_):
 
 
 def _load_mods(char):
+    if AGENT.get("mods"):
+        # YAML 数据 mod（整局）：--mod <文件夹>，可以多个；--variant 作用在这些 mod 上
+        from sts2sim.engine import yamlmod
+        for d in AGENT["mods"]:
+            yamlmod.load(d, variant=AGENT.get("variant"))
+        return
     if char.startswith("Claude"):
         import sys
         import os
@@ -182,6 +189,25 @@ def _one(args):
     return d
 
 
+def _check_mods(dirs, char, variant):
+    """在主进程里先检查一遍（不注册）：格式有错就用大白话报出来并退出（不要等到每个子进程各报一遍）。"""
+    from sts2sim.engine import yamlmod
+    chars, bad = [], []
+    for d in dirs:
+        if not os.path.isdir(d):
+            bad.append(("", f"找不到文件夹 {d}", f"folder not found: {d}"))
+            continue
+        c, problems, _w = yamlmod.check(d, variant)
+        chars += c
+        bad += problems
+    if bad:
+        sys.stderr.write("mod 有问题 / mod problems:\n" + "\n".join(f"  - {w + ': ' if w else ''}{zh}\n    {en}" for w, zh, en in bad) + "\n")
+        raise SystemExit(2)
+    if char not in chars and char not in ("Ironclad", "Silent", "Defect", "Necrobinder", "Regent"):
+        sys.stderr.write(f"mod 里没有角色「{char}」/ no character '{char}' in the mod(s); 有 / available: {', '.join(chars)}\n")
+        raise SystemExit(2)
+
+
 def main():
     from sts2sim import gamedata
     gamedata.require()   # 没有本机安装 / 缓存不匹配 → 打印说明并退出
@@ -198,7 +224,8 @@ def main():
     ap.add_argument("--elite-sims", type=int, default=0, help="mentor-*：精英战每步模拟次数（mentor-full-ev 默认 4000）")
     ap.add_argument("--width", type=int, default=6)
     ap.add_argument("--depth", type=int, default=1)
-    ap.add_argument("--variant", default=None, help="Claude娘 简化变体（cards_v35.VARIANTS 的键）")
+    ap.add_argument("--variant", default=None, help="变体：Claude娘 手写版是 cards_v35.VARIANTS 的键；YAML mod 是 mod.yaml 里 variants 的键（多个用 + 连接）")
+    ap.add_argument("--mod", action="append", default=[], help="YAML 数据 mod 文件夹（整局），可以给多个；例：--mod mods/claude_yaml --char Claude")
     ap.add_argument("--force", default="", help="强制加入起始牌组的牌，逗号分隔，'ID+' 为升级版（单卡 A/B 用）")
     ap.add_argument("--replace", default="", help="同时从起始牌组移除的牌，逗号分隔（例：CLAUDE_STRIKE）")
     ap.add_argument("--no-boss-aware", action="store_true", help="关闭首领感知（选牌/休息）")
@@ -210,6 +237,8 @@ def main():
     ap.add_argument("--seed", default="", help="指定真游戏种子（逗号分隔，可多个）；给了就只打这些局，忽略 --n/--start")
     ap.add_argument("--log-dir", default="", help="逐步决策日志目录（每局一个 JSONL）")
     a = ap.parse_args()
+    if a.mod:
+        _check_mods(a.mod, a.char, a.variant)
     if a.seed:
         jobs = [(a.char, a.asc, s) for s in game_seeds(a.seed)]
     else:
@@ -226,7 +255,7 @@ def main():
             akw["boss_sims"] = a.boss_sims
         if a.elite_sims:
             akw["elite_sims"] = a.elite_sims
-    with mp.Pool(a.procs, initializer=_init, initargs=({"name": a.agent, "kw": akw,
+    with mp.Pool(a.procs, initializer=_init, initargs=({"name": a.agent, "kw": akw, "mods": [os.path.abspath(m) for m in a.mod],
                                                                "variant": a.variant, "force": [x for x in a.force.split(",") if x],
                                                                "replace": [x for x in a.replace.split(",") if x], "log_dir": a.log_dir, "force_pick": [x for x in a.force_pick.split(",") if x], "style": a.style, "force_pick_first": a.force_pick_first, "timeout": a.timeout or (60 if a.agent == "heuristic" else 900)},)) as pool:
         res = pool.map(_one, jobs, chunksize=1)

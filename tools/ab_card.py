@@ -2,6 +2,7 @@
 
   PYTHONPATH=. python3 tools/ab_card.py --char Claude --asc 0 --n 400 --force CLAUDE_CLASSIFIER [--replace CLAUDE_STRIKE]
       [--variant classifier_flat] [--agent strong-nosearch] [--base-variant ...]
+  YAML 模组：再加 --mod mods/claude_yaml（可多次）
 
 强制加牌发生在进入第一幕之前，种子相同 → 地图、遭遇、奖励池的随机序列相同，两边的差别只来自牌组（以及因此改变的决策）。
 输出：平均层数差（配对，带标准误和 95% 区间）、到达幕 1 首领/幕 2 比例差、胜率差、幕 1 每场掉血差。
@@ -19,8 +20,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import batch  # noqa: E402
 
 
-def run(char, asc, seeds, agent, force, replace, variant, procs):
-    cfg = {"name": agent, "kw": {}, "variant": variant, "force": force, "replace": replace,
+def run(char, asc, seeds, agent, force, replace, variant, procs, mods=()):
+    cfg = {"name": agent, "kw": {}, "variant": variant, "force": force, "replace": replace, "mods": list(mods),
            "timeout": 60 if agent == "heuristic" else 900}
     with mp.Pool(procs, initializer=batch._init, initargs=(cfg,)) as pool:
         return pool.map(batch._one, [(char, asc, s) for s in seeds], chunksize=1)
@@ -59,12 +60,16 @@ def main():
     ap.add_argument("--base-variant", default=None)
     ap.add_argument("--procs", type=int, default=mp.cpu_count())
     ap.add_argument("--out", default=None, help="把两组原始结果写到 <out>_A.jsonl / <out>_B.jsonl")
+    ap.add_argument("--mod", action="append", default=[], help="YAML 模组文件夹（可多次）；牌 id 写游戏里的 id，如 CLAUDE_CLASSIFIER")
     a = ap.parse_args()
     seeds = [f"R{i}" for i in range(a.start, a.start + a.n)]
     sp = lambda x: [y for y in x.split(",") if y]  # noqa
+    mods = [os.path.abspath(m) for m in a.mod]
+    if mods:
+        batch._check_mods(mods, a.char, a.variant)
     t = time.time()
-    A = run(a.char, a.asc, seeds, a.agent, sp(a.base_force), [], a.base_variant, a.procs)
-    B = run(a.char, a.asc, seeds, a.agent, sp(a.force), sp(a.replace), a.variant, a.procs)
+    A = run(a.char, a.asc, seeds, a.agent, sp(a.base_force), [], a.base_variant, a.procs, mods)
+    B = run(a.char, a.asc, seeds, a.agent, sp(a.force), sp(a.replace), a.variant, a.procs, mods)
     if a.out:
         for tag, res in (("A", A), ("B", B)):
             with open(f"{a.out}_{tag}.jsonl", "w") as f:
