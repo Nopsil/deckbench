@@ -1,0 +1,24 @@
+# 由 tools/convert_claude_v35.py 从 mods/claude_v35 生成。改数值直接改这里；重新生成会覆盖。
+- id: CONSTITUTION
+  class: ClaudeConstitution
+  name: 宪法（口袋版）
+  rarity: starter
+  text: 每场战斗第一回合开始时给所有敌人 2 层风控；每名敌人每个敌方回合第一次攻击命中你时，给它 2 层风控（被动给予）。
+  triggers:
+  - template: at_turn_start
+    if: turn() == 1
+    do:
+    - op: apply
+      power: FK
+      amount: 2
+      target: all
+      active: false
+  - template: on_attacked
+    timing: before
+    once: attacker_turn
+    do:
+    - op: apply
+      power: FK
+      amount: 2
+      target: target
+      active: false

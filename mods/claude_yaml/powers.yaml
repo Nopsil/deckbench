@@ -1,0 +1,209 @@
+# 由 tools/convert_claude_v35.py 从 mods/claude_v35 生成。改数值直接改这里；重新生成会覆盖。
+- id: FK
+  class: FKPower
+  name: 风控
+  type: debuff
+  text: 不会自己衰减；只被卡牌、能力、遗物读取和操作。
+- id: FANJI
+  class: FanjiPower
+  name: 反击
+  type: buff
+  max: 3
+  decay: turn_start
+  text: 被攻击时（每段）：对攻击者造成 1+⌊风控/2⌋ 点伤害（分类器 / 修正案加成），然后它的风控 -1。最多 3 层，你的回合开始 -1 层。
+  triggers:
+  - template: on_attacked
+    timing: after
+    do:
+    - op: set
+      name: n0
+      value: fk(T)
+    - op: set
+      name: dmg
+      value: 1 + n0 // 2
+    - op: set
+      name: L
+      value: min(2, amount)
+    - op: set
+      name: dmg
+      value: floor(dmg * (1.0 + sum(m ** L - 1.0 for m in memory(P, 'CLASSIFIER'))))
+      if: stacks(P, 'CLASSIFIER') > 0
+    - op: set
+      name: dmg
+      value: dmg + stacks(P, 'CLASSIFIER_FLAT')
+      if: stacks(P, 'CLASSIFIER_FLAT') > 0
+    - op: set
+      name: dmg
+      value: ceil(dmg * (1.0 + stacks(P, 'AMENDMENT') / 100.0))
+      if: stacks(P, 'AMENDMENT') > 0
+    - op: damage
+      amount: dmg
+      target: target
+      kind: unpowered
+    - op: set_stacks
+      power: FK
+      value: fk(T) - 1
+      if: n0 > 0 and alive(T)
+- id: CLASSIFIER
+  class: ClassifierPower
+  name: 宪法分类器
+  type: buff
+  text: 反击伤害 ×倍率（≥2 层反击时 ×倍率²）；多张相加。
+- id: CLASSIFIER_FLAT
+  class: ClassifierFlatPower
+  name: 宪法分类器（固定加成）
+  type: buff
+- id: AMENDMENT
+  class: AmendmentPower
+  name: 宪法修正案
+  type: buff
+  text: 反击伤害 +层数%（向上取整）。
+- id: DISCLAIMER
+  class: DisclaimerPower
+  name: 免责声明
+  type: buff
+  expire: turn_start
+  triggers:
+  - template: on_attacked
+    timing: before
+    do:
+    - op: apply
+      power: FK
+      amount: amount
+      target: target
+      active: false
+- id: CANT_HELP
+  class: CantHelpPower
+  name: 这个真的不能帮
+  type: buff
+  expire: turn_start
+  triggers:
+  - template: on_attacked
+    timing: before
+    do:
+    - op: apply
+      power: FK
+      amount: 2 * amount
+      target: target
+      active: false
+    - op: damage
+      amount: 4 * amount
+      target: target
+      kind: unpowered
+- id: CLEAR_LIST
+  class: ClearListPower
+  name: 清退名单
+  type: buff
+  triggers:
+  - template: on_power_removed
+    power: FK
+    do:
+    - op: damage
+      amount: min(n, 15) * amount
+      target: target
+      kind: unpowered
+- id: STACK_FIRST
+  class: StackFirstPower
+  name: 叠满再说
+  type: buff
+  triggers:
+  - template: at_turn_start
+    do:
+    - op: apply
+      power: FK
+      amount: amount
+      target: random
+      active: true
+- id: RISK_ALERT
+  class: RiskAlertPower
+  name: 风险预警
+  type: buff
+  triggers:
+  - template: at_turn_start
+    do:
+    - op: foreach
+      target: all
+      do:
+      - op: apply
+        power: FK
+        amount: amount
+        target: target
+        active: true
+        if: attacking(T)
+- id: AUDIT_LOG
+  class: AuditLogPower
+  name: 审计日志
+  type: buff
+  triggers:
+  - template: on_power_applied
+    power: FK
+    active_only: true
+    once: turn
+    do:
+    - op: draw
+      n: amount
+- id: RLHF
+  class: RLHFPower
+  name: RLHF 加训
+  type: buff
+  triggers:
+  - template: boost_apply
+    power: FK
+    add: amount
+- id: CLEANUP_METRIC
+  class: CleanupMetricPower
+  name: 清理指标
+  type: buff
+  triggers:
+  - template: on_power_removed
+    power: FK
+    do:
+    - op: draw
+      n: amount
+    - op: energy
+      n: 1
+      if: card is not None and card_paid >= 1
+      once: card_play
+- id: PRACTICE
+  class: PracticePower
+  name: 越封越熟练
+  type: buff
+  triggers:
+  - template: on_power_removed
+    power: FK
+    do:
+    - op: apply
+      power: PROFICIENCY
+      amount: amount
+      target: self
+- id: PROFICIENCY
+  class: ProficiencyPower
+  name: 熟练
+  type: buff
+  triggers:
+  - template: bonus_damage
+    add: amount
+- id: GEN_ARTIFACT
+  class: GenArtifactPower
+  name: 生成 Artifact
+  type: buff
+  triggers:
+  - template: at_turn_start
+    do:
+    - op: block
+      amount: amount
+    - op: damage
+      amount: amount
+      target: random
+      kind: unpowered
+- id: OPUS_FORM
+  class: OpusFormPower
+  name: Opus 形态
+  type: buff
+  triggers:
+  - template: at_turn_start
+    do:
+    - op: apply
+      power: STRENGTH
+      amount: amount
+      target: self

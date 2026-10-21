@@ -1,0 +1,39 @@
+{
+ "stats": {
+  "design_cards": 86,
+  "converted_from_python_port": 69,
+  "token_cards": 1,
+  "new_yaml_cards": 12,
+  "needs_python": 5,
+  "distinct_play_impls": 65,
+  "variants_converted": [
+   "acct_1cost",
+   "acct_per2",
+   "hp80",
+   "nb_dmg5",
+   "nb_fk3",
+   "nb_fk4",
+   "new_cards",
+   "new_check",
+   "new_check2",
+   "two_verified",
+   "v35_orig",
+   "ver_cap16",
+   "ver_dmg8",
+   "ver_per3"
+  ],
+  "variants_skipped": [
+   "ver_keep",
+   "ver_clear3",
+   "classifier_flat"
+  ],
+  "yaml_total": 81
+ },
+ "needs_python": {
+  "MCP 工具调用": "从 3 张随机牌里选 1 张加入手牌并本回合 0 费：需要“发现”式选择界面和临时改费",
+  "长上下文": "回合结束时保留至多 N 张手牌：需要回合结束时让 AI 选牌并改写弃牌流程",
+  "数据留存政策": "回合开始清空格挡前保留部分格挡：需要改写游戏的清空格挡钩子",
+  "深度思考": "只能作为本回合第一张牌打出：需要“能不能打出”的条件钩子",
+  "Ctrl+Z": "把本回合最近打出的牌从弃牌堆/消耗堆拿回：需要出牌历史"
+ }
+}

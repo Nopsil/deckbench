@@ -1,0 +1,178 @@
+# 由 tools/convert_claude_v35.py 从 mods/claude_v35 生成。改数值直接改这里；重新生成会覆盖。
+name: claude_yaml
+title: Claude娘 v3.5.1（YAML 数据版）
+prefix: Claude
+characters:
+  Claude:
+    name: Claude娘
+    class: ClaudeChan
+    hp: 80
+    energy: 3
+    gold: 99
+    starting_deck:
+    - CLAUDE_STRIKE×4
+    - CLAUDE_DEFEND×4
+    - NOTEBOOK
+    - VERIFIED
+    relics:
+    - CONSTITUTION
+cards:
+- cards.yaml
+powers:
+- powers.yaml
+- powers_new.yaml
+relics:
+- relics.yaml
+helpers:
+  fk(x): stacks(x, 'FK')
+ai_values:
+  FK: 1.2
+ai_hooks: ai_hooks.py
+variants:
+  v35_orig:
+    hp: 75
+    cards:
+      NOTEBOOK:
+        vars:
+          Damage: 3
+        upgrade:
+          vars:
+            Damage: 5
+            FK: 3
+      VERIFIED:
+        vars:
+          Per: 2
+          Cap: 8
+        upgrade:
+          vars:
+            Per: 3
+            Cap: 12
+  ver_per3:
+    cards:
+      VERIFIED:
+        vars:
+          Per: 3
+          Cap: 12
+        upgrade:
+          vars:
+            Per: 4
+            Cap: 16
+  ver_cap16:
+    cards:
+      VERIFIED:
+        vars:
+          Cap: 16
+        upgrade:
+          vars:
+            Cap: 20
+  ver_dmg8:
+    cards:
+      VERIFIED:
+        vars:
+          Damage: 8
+        upgrade:
+          vars:
+            Damage: 10
+            Per: 4
+            Cap: 20
+  two_verified:
+    starting_deck:
+    - CLAUDE_STRIKE×3
+    - CLAUDE_DEFEND×4
+    - NOTEBOOK
+    - VERIFIED×2
+  nb_fk3:
+    cards:
+      NOTEBOOK:
+        vars:
+          FK: 3
+        upgrade:
+          vars:
+            Damage: 7
+            FK: 4
+  nb_fk4:
+    cards:
+      NOTEBOOK:
+        vars:
+          FK: 4
+        upgrade:
+          vars:
+            Damage: 7
+            FK: 5
+  nb_dmg5:
+    cards:
+      NOTEBOOK:
+        vars:
+          Damage: 5
+        upgrade:
+          vars:
+            Damage: 7
+            FK: 3
+  acct_1cost:
+    cards:
+      ACCOUNT_DISABLED:
+        cost: 1
+  acct_per2:
+    cards:
+      ACCOUNT_DISABLED:
+        vars:
+          Per: 2
+          Cap: 12
+        upgrade:
+          vars:
+            Damage: 11
+            Per: 3
+            Cap: 16
+  new_check:
+    cards:
+      FACT_CHECK:
+        name: 事实核查
+        type: Attack
+        rarity: Common
+        cost: 1
+        target: enemy
+        vars:
+          Damage: 6
+          Per: 1
+          Cap: 10
+        upgrade:
+          vars:
+            Damage: 9
+        effects:
+        - template: scaled_damage
+          base: Damage
+          power: FK
+          per: Per
+          cap: Cap
+        ai:
+          scaling: true
+          keep: true
+  new_check2:
+    cards:
+      FACT_CHECK2:
+        name: 事实核查·二
+        type: Attack
+        rarity: Common
+        cost: 1
+        target: enemy
+        vars:
+          Damage: 6
+          Per: 1
+          Cap: 10
+        upgrade:
+          vars:
+            Damage: 9
+        effects:
+        - template: scaled_damage
+          base: Damage
+          power: FK
+          per: Per
+          cap: Cap
+        ai:
+          scaling: true
+          keep: true
+  hp80:
+    hp: 80
+  new_cards:
+    add_cards:
+    - cards_new.yaml

@@ -1,0 +1,233 @@
+# 手写 Python 版没实现的牌，按设计文档 v3.5 的文字直接写成 YAML（--variant new_cards 打开）。
+- id: SLACKING
+  name: 摸鱼被抓
+  type: Skill
+  rarity: Uncommon
+  cost: 0
+  target: enemy
+  keywords:
+  - exhaust
+  vars:
+    FK: 2
+  upgrade:
+    vars:
+      FK: 3
+    add:
+    - retain
+  effects:
+  - op: apply
+    power: FK
+    amount: FK
+    target: target
+  - op: pick_from_pile
+    pile: discard
+    n: 1
+  note: 近似：从弃牌堆自动挑“最好”的一张（没有排除同名牌）
+- id: JOINT_LIABILITY
+  name: 连带责任
+  type: Skill
+  rarity: Uncommon
+  cost: 1
+  target: enemy
+  keywords:
+  - exhaust
+  vars:
+    Solo: 4
+  upgrade:
+    cost: 0
+  effects:
+  - op: set
+    name: x
+    value: fk(T)
+  - op: if
+    cond: n_enemies() <= 1
+    then:
+    - op: apply
+      power: FK
+      amount: Solo
+      target: target
+    else:
+    - op: foreach
+      target: others
+      do:
+      - op: apply
+        power: FK
+        amount: x
+        target: target
+        if: x > 0
+- id: PASS_THE_BUCK
+  name: 甩锅
+  type: Skill
+  rarity: Uncommon
+  cost: 0
+  target: enemy
+  vars:
+    Extra: 2
+  upgrade:
+    vars:
+      Extra: 3
+  effects:
+  - op: if
+    cond: len(others()) == 0
+    then:
+    - op: apply
+      power: FK
+      amount: Extra
+      target: target
+    else:
+    - op: set
+      name: x
+      value: fk(T)
+    - op: set_stacks
+      power: FK
+      value: 0
+    - op: foreach
+      target: random_other
+      do:
+      - op: set_stacks
+        power: FK
+        value: fk(T) + x
+      - op: apply
+        power: FK
+        amount: Extra
+        target: target
+- id: FK_COLLECTIVE
+  name: 风控连坐制
+  type: Power
+  rarity: Uncommon
+  cost: 2
+  target: self
+  vars:
+    FK: 3
+  upgrade:
+    cost: 1
+  effects:
+  - op: apply
+    power: FK
+    amount: FK
+    target: all
+  - op: apply
+    power: FK_COLLECTIVE
+    amount: 1
+    target: self
+- id: ASCII_SHIELD
+  name: 画个ASCII盾牌
+  type: Skill
+  rarity: Uncommon
+  cost: 1
+  target: self
+  vars:
+    Block: 8
+    Bonus: 4
+  upgrade:
+    vars:
+      Block: 11
+  effects:
+  - op: block
+    amount: Block
+  - op: block
+    amount: Bonus
+    if: hand_has('CODE_BLOCK')
+- id: SMALL_SCRIPT
+  name: 写个小脚本
+  type: Attack
+  rarity: Uncommon
+  cost: 1
+  target: enemy
+  vars:
+    Damage: 5
+  upgrade:
+    vars:
+      Damage: 7
+  effects:
+  - op: damage
+    amount: Damage
+  - op: add_card
+    card: CODE_BLOCK
+    n: 1
+    to: hand
+- id: CODE_START
+  name: Claude Code，启动！
+  type: Power
+  rarity: Uncommon
+  cost: 1
+  target: self
+  upgrade:
+    add:
+    - innate
+  effects:
+  - template: gain_power
+    power: CODE_START
+    amount: 1
+- id: AUTOMATION
+  name: 流程自动化
+  type: Skill
+  rarity: Rare
+  cost: 2
+  target: self
+  upgrade:
+    cost: 1
+  effects:
+  - template: gain_power
+    power: AUTOMATION
+    amount: 1
+- id: ONE_FOR_ALL
+  name: 一人违规全员连坐
+  type: Power
+  rarity: Rare
+  cost: 1
+  target: self
+  vars:
+    Amt: 1
+  upgrade:
+    vars:
+      Amt: 2
+  effects:
+  - template: gain_power
+    power: ONE_FOR_ALL
+    amount: Amt
+- id: GOLDEN_GATE
+  name: 金门大桥 Claude
+  type: Power
+  rarity: Rare
+  cost: 2
+  target: self
+  upgrade:
+    cost: 1
+  effects:
+  - template: gain_power
+    power: GOLDEN_GATE
+    amount: 1
+  note: 近似：每回合第一张攻击牌（不区分是不是手动打出）多打一次
+- id: REFACTOR
+  name: 重构整个项目
+  type: Skill
+  rarity: Rare
+  cost: 1
+  target: self
+  upgrade:
+    cost: 0
+  effects:
+  - op: exhaust_hand
+    save: k
+  - op: add_card
+    card: CODE_BLOCK
+    n: k
+    to: hand
+    upgraded: true
+- id: GOOD_IDEA
+  name: 好主意，我照做！
+  type: Skill
+  rarity: Rare
+  cost: 0
+  target: enemy
+  keywords:
+  - exhaust
+  upgrade:
+    add:
+    - retain
+  effects:
+  - op: apply
+    power: STRENGTH
+    amount: max(0, stacks(T, 'STRENGTH'))
+    target: self

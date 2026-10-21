@@ -1,0 +1,1538 @@
+# 由 tools/convert_claude_v35.py 从 mods/claude_v35 生成。改数值直接改这里；重新生成会覆盖。
+- id: CLAUDE_STRIKE
+  name: 打击
+  type: Attack
+  rarity: Basic
+  cost: 1
+  target: enemy
+  vars:
+    Damage: 6
+  upgrade:
+    vars:
+      Damage: 9
+  effects:
+  - op: damage
+    amount: Damage
+  tags:
+  - Strike
+- id: CLAUDE_DEFEND
+  name: 防御
+  type: Skill
+  rarity: Basic
+  cost: 1
+  target: self
+  vars:
+    Block: 5
+  upgrade:
+    vars:
+      Block: 8
+  effects:
+  - op: block
+    amount: Block
+  tags:
+  - Defend
+- id: NOTEBOOK
+  name: 小本本记下了
+  type: Attack
+  rarity: Basic
+  cost: 0
+  target: enemy
+  vars:
+    Damage: 5
+    FK: 2
+  upgrade:
+    vars:
+      Damage: 7
+      FK: 3
+  effects:
+  - op: damage
+    amount: Damage
+  - op: apply
+    power: FK
+    amount: FK
+    target: target
+- id: VERIFIED
+  name: 已核实
+  type: Attack
+  rarity: Basic
+  cost: 1
+  target: enemy
+  vars:
+    Damage: 5
+    Per: 3
+    Cap: 16
+  upgrade:
+    vars:
+      Damage: 7
+      Per: 4
+      Cap: 20
+  effects:
+  - template: scaled_damage
+    base: Damage
+    power: FK
+    per: Per
+    cap: Cap
+  - op: remove_power
+    power: FK
+  ai:
+    scaling: true
+- id: CODE_BLOCK
+  name: 代码块
+  type: Attack
+  rarity: Token
+  cost: 0
+  target: enemy
+  keywords:
+  - exhaust
+  vars:
+    Damage: 3
+    FK: 1
+  upgrade:
+    vars:
+      Damage: 6
+  effects:
+  - op: damage
+    amount: Damage
+  - op: apply
+    power: FK
+    amount: FK
+    target: target
+- id: MULTI_TURN
+  name: 多轮对话
+  type: Attack
+  rarity: Common
+  cost: 1
+  target: enemy
+  vars:
+    Damage: 2
+    Hits: 3
+  upgrade:
+    vars:
+      Damage: 3
+  effects:
+  - op: damage
+    amount: Damage
+    hits: Hits
+    each_hit:
+    - op: apply
+      power: FK
+      amount: 1
+      target: target
+  ai:
+    value: 0.6
+    tags: attack fk
+- id: PLAN_MODE
+  name: 计划模式
+  type: Skill
+  rarity: Common
+  cost: 1
+  target: self
+  vars:
+    Block: 6
+    Cards: 1
+  upgrade:
+    vars:
+      Block: 9
+  effects:
+  - op: block
+    amount: Block
+  - op: apply
+    power: DRAW_CARDS_NEXT_TURN
+    amount: Cards
+    target: self
+  ai:
+    value: 0.6
+    tags: ''
+- id: LIGHT_TAP
+  name: 轻轻敲一下
+  type: Attack
+  rarity: Common
+  cost: 1
+  target: enemy
+  vars:
+    Damage: 7
+    Cards: 1
+  upgrade:
+    vars:
+      Damage: 10
+  effects:
+  - op: set
+    name: had
+    value: fk(T) > 0
+  - op: damage
+    amount: Damage
+  - op: draw
+    n: Cards
+    if: had
+  ai:
+    value: 1.0
+    tags: attack
+- id: IMPLEMENT
+  name: 我直接帮你实现吧
+  type: Attack
+  rarity: Common
+  cost: 1
+  target: enemy
+  vars:
+    Damage: 9
+  upgrade:
+    vars:
+      Damage: 12
+  effects:
+  - op: damage
+    amount: Damage
+  ai:
+    value: 0.6
+    tags: attack
+- id: CHAIN_REVIEW
+  name: 连锁审查
+  type: Attack
+  rarity: Common
+  cost: 1
+  target: all
+  vars:
+    Damage: 4
+    FK: 1
+  upgrade:
+    vars:
+      Damage: 6
+  effects:
+  - op: damage
+    amount: Damage
+    target: all
+  - op: foreach
+    target: all
+    do:
+    - op: apply
+      power: FK
+      amount: FK
+      target: target
+  ai:
+    value: 0.9
+    tags: attack aoe fk
+- id: ARE_YOU_SURE
+  name: 你确定吗？
+  type: Attack
+  rarity: Common
+  cost: 1
+  target: enemy
+  vars:
+    Damage: 4
+    Hits: 2
+  upgrade:
+    vars:
+      Damage: 5
+  effects:
+  - op: damage
+    amount: Damage
+    hits: 3 if fk(T) > 0 else Hits
+  ai:
+    value: 0.8
+    tags: attack
+- id: ACCOUNT_DISABLED
+  name: 账号已停用
+  type: Attack
+  rarity: Common
+  cost: 2
+  target: enemy
+  vars:
+    Damage: 8
+    Per: 1
+    Cap: 10
+  upgrade:
+    vars:
+      Damage: 11
+      Per: 2
+      Cap: 14
+  effects:
+  - template: scaled_damage
+    base: Damage
+    power: FK
+    per: Per
+    cap: Cap
+  - op: remove_power
+    power: FK
+  ai:
+    value: 1.3
+    tags: attack payoff
+    scaling: true
+- id: DASH_COMBO
+  name: 破折号——连打
+  type: Attack
+  rarity: Common
+  cost: 1
+  target: enemy
+  vars:
+    Damage: 2
+    Hits: 4
+  upgrade:
+    vars:
+      Damage: 3
+  effects:
+  - op: damage
+    amount: Damage
+    hits: Hits
+  ai:
+    value: 0.1
+    tags: attack
+- id: CREDIT_DEDUCT
+  name: 扣信用分
+  type: Attack
+  rarity: Common
+  cost: 1
+  target: enemy
+  vars:
+    Damage: 5
+    Clear: 2
+    Energy: 1
+  upgrade:
+    vars:
+      Damage: 7
+  effects:
+  - op: damage
+    amount: Damage
+  - op: remove_power
+    power: FK
+    target: target
+    save: k
+    amount: Clear
+  - op: energy
+    n: Energy
+    if: k >= 2
+    once: turn
+  ai:
+    value: 1.0
+    tags: attack payoff
+- id: FULL_RECHECK
+  name: 全员复查
+  type: Attack
+  rarity: Common
+  cost: 2
+  target: all
+  vars:
+    Damage: 8
+    VulnerablePower: 1
+  upgrade:
+    vars:
+      Damage: 11
+  effects:
+  - op: damage
+    amount: Damage
+    target: all
+  - op: foreach
+    target: all
+    do:
+    - op: apply
+      power: VULNERABLE
+      amount: VulnerablePower
+      if: fk(T) > 0
+  ai:
+    value: 1.4
+    tags: attack aoe
+- id: RUSH_TICKET
+  name: 加急工单
+  type: Attack
+  rarity: Common
+  cost: 1
+  target: enemy
+  vars:
+    Damage: 7
+    Th: 5
+  upgrade:
+    vars:
+      Damage: 9
+  effects:
+  - op: damage
+    amount: Damage
+  - op: return_to_hand
+    if: fk(T) >= Th
+  ai:
+    value: 0.7
+    tags: attack
+- id: LOGGED
+  name: 该对话已被记录
+  type: Skill
+  rarity: Common
+  cost: 0
+  target: enemy
+  keywords:
+  - exhaust
+  vars:
+    FK: 2
+    Cards: 1
+  upgrade:
+    vars:
+      FK: 3
+  effects:
+  - op: apply
+    power: FK
+    amount: FK
+    target: target
+  - op: draw
+    n: Cards
+  ai:
+    value: 1.2
+    tags: fk
+- id: SORT_OUT
+  name: 我来帮你梳理一下
+  type: Skill
+  rarity: Common
+  cost: 1
+  target: self
+  vars:
+    Block: 5
+    Look: 3
+  upgrade:
+    vars:
+      Block: 8
+  effects:
+  - op: block
+    amount: Block
+  - op: pick_from_pile
+    pile: draw
+    look: Look
+    n: 1
+  ai:
+    value: 0.4
+    tags: ''
+- id: RED_TEAM
+  name: 红队演练
+  type: Skill
+  rarity: Common
+  cost: 1
+  target: enemy
+  vars:
+    Block: 5
+    Per3: 2
+    Cap: 6
+  upgrade:
+    vars:
+      Block: 8
+  effects:
+  - op: block
+    amount: Block
+  - op: block
+    amount: min(Cap, Per3 * (fk(T) // 3))
+  - &id001
+    op: apply
+    power: FANJI
+    amount: 1
+    target: self
+  ai:
+    value: 0.9
+    tags: fanji
+- id: DOUBLE_CHECK
+  name: 稍等，我再确认一下
+  type: Skill
+  rarity: Common
+  cost: 1
+  target: self
+  vars:
+    Block: 6
+  upgrade:
+    vars:
+      Block: 9
+  effects:
+  - op: block
+    amount: Block
+  - *id001
+  ai:
+    value: 1.0
+    tags: fanji
+- id: STICKER
+  name: 贴小贴纸
+  type: Skill
+  rarity: Common
+  cost: 0
+  target: enemy
+  keywords:
+  - exhaust
+  vars:
+    FK: 3
+  upgrade:
+    vars:
+      FK: 5
+  effects:
+  - op: apply
+    power: FK
+    amount: FK
+    target: target
+  ai:
+    value: 1.1
+    tags: fk
+- id: CONTINUE
+  name: 继续
+  type: Skill
+  rarity: Common
+  cost: 1
+  target: self
+  vars:
+    Block: 4
+    Cards: 2
+  upgrade:
+    vars:
+      Cards: 3
+  effects:
+  - op: block
+    amount: Block
+  - op: draw
+    n: Cards
+  ai:
+    value: 1.3
+    tags: ''
+- id: EMERGENCY_BRAKE
+  name: 紧急刹车
+  type: Skill
+  rarity: Common
+  cost: 1
+  target: enemy
+  vars:
+    WeakPower: 1
+    Block: 0
+  upgrade:
+    vars:
+      Block: 4
+  effects:
+  - op: apply
+    power: WEAK
+    amount: 2 if fk(T) > 0 else WeakPower
+  - op: block
+    amount: Block
+  ai:
+    value: 0.6
+    tags: ''
+- id: COMPLIANCE_FIX
+  name: 合规整改
+  type: Skill
+  rarity: Common
+  cost: 1
+  target: enemy
+  keywords:
+  - exhaust
+  vars:
+    Block: 5
+    Cap: 10
+  upgrade:
+    vars:
+      Block: 8
+      Cap: 14
+  effects:
+  - op: block
+    amount: Block
+  - template: multiply_stacks
+    power: FK
+    times: 2
+    cap: Cap
+  ai:
+    value: 1.0
+    tags: fk
+- id: LET_ME_THINK
+  name: 让我想想……
+  type: Skill
+  rarity: Common
+  cost: 2
+  target: self
+  vars:
+    Block: 12
+    Energy: 1
+  upgrade:
+    vars:
+      Block: 15
+  effects:
+  - op: block
+    amount: Block
+  - op: apply
+    power: ENERGY_NEXT_TURN
+    amount: Energy
+    target: self
+  ai:
+    value: 1.1
+    tags: ''
+- id: PROCESS_OPT
+  name: 流程优化
+  type: Skill
+  rarity: Common
+  cost: 1
+  target: self
+  vars:
+    Per: 4
+    Cap: 3
+  upgrade:
+    vars:
+      Per: 3
+  effects:
+  - op: draw
+    n: min(Cap, sum_stacks('FK') // Per)
+  ai:
+    value: 0.5
+    tags: ''
+- id: BATCH_TAG
+  name: 批量打标
+  type: Skill
+  rarity: Uncommon
+  cost: 1
+  target: enemy
+  vars:
+    FK: 5
+  upgrade:
+    vars:
+      FK: 7
+  effects:
+  - op: apply
+    power: FK
+    amount: FK
+    target: target
+  ai:
+    value: 1.4
+    tags: fk
+- id: CLEAR_LIST
+  name: 清退名单
+  type: Power
+  rarity: Uncommon
+  cost: 1
+  target: self
+  vars:
+    Cap: 15
+  upgrade:
+    add:
+    - innate
+  effects:
+  - template: gain_power
+    power: CLEAR_LIST
+    amount: 1
+  ai:
+    value: 1.8
+    tags: scaling payoff
+- id: STACK_FIRST
+  name: 叠满再说
+  type: Power
+  rarity: Uncommon
+  cost: 2
+  target: self
+  vars:
+    FK: 3
+  upgrade:
+    vars:
+      FK: 4
+  effects:
+  - template: gain_power
+    power: STACK_FIRST
+    amount: FK
+  ai:
+    value: 1.6
+    tags: scaling fk
+- id: MAKE_EXAMPLE
+  name: 杀鸡儆猴
+  type: Attack
+  rarity: Uncommon
+  cost: 2
+  target: enemy
+  vars:
+    Mult: 2
+    Cap: 15
+  upgrade:
+    vars:
+      Mult: 3
+  effects:
+  - op: remove_power
+    power: FK
+    target: target
+    save: k
+  - op: damage
+    amount: min(k, Cap) * Mult
+    target: all
+    if: k > 0
+  ai:
+    value: 1.6
+    tags: attack aoe payoff
+- id: INSTA_BAN
+  name: 秒封
+  type: Attack
+  rarity: Uncommon
+  cost: 0
+  target: enemy
+  keywords:
+  - exhaust
+  vars:
+    Damage: 4
+    Th: 10
+    Cap: 10
+  upgrade:
+    vars:
+      Damage: 6
+      Th: 8
+  effects:
+  - op: damage
+    amount: Damage
+  - op: if
+    cond: alive(T) and fk(T) >= Th
+    then:
+    - op: remove_power
+      power: FK
+      target: target
+      save: k
+    - op: damage
+      amount: min(k, Cap)
+  ai:
+    value: 1.2
+    tags: attack payoff
+- id: QUICK_REVIEW
+  name: 快速复审
+  type: Attack
+  rarity: Uncommon
+  cost: 1
+  target: enemy
+  vars:
+    Damage: 4
+    FK: 2
+  upgrade:
+    vars:
+      Damage: 6
+      FK: 3
+  effects:
+  - op: damage
+    amount: Damage
+  - op: apply
+    power: FK
+    amount: FK
+    target: target
+  - op: remove_power
+    power: FK
+  ai:
+    value: 1.0
+    tags: attack payoff
+- id: ONE_CLICK_BAN
+  name: 一键封号
+  type: Attack
+  rarity: Uncommon
+  cost: 1
+  target: enemy
+  vars:
+    Clear: 5
+    Per: 3
+  upgrade:
+    vars:
+      Clear: 7
+  effects:
+  - op: remove_power
+    power: FK
+    target: target
+    save: k
+    amount: Clear
+  - op: damage
+    amount: k * Per
+    if: k > 0
+  ai:
+    value: 1.6
+    tags: attack payoff
+- id: CLASSIFIER
+  name: 宪法分类器
+  type: Power
+  rarity: Uncommon
+  cost: 1
+  target: self
+  vars:
+    MultX10: 15
+  upgrade:
+    vars:
+      MultX10: 16
+  effects:
+  - op: apply
+    power: CLASSIFIER
+    amount: 1
+    target: self
+    remember: MultX10 / 10
+  ai:
+    value: 2.0
+    tags: scaling fanji
+- id: RISK_ALERT
+  name: 风险预警
+  type: Power
+  rarity: Uncommon
+  cost: 1
+  target: self
+  vars:
+    FK: 1
+  upgrade:
+    vars:
+      FK: 2
+  effects:
+  - template: gain_power
+    power: RISK_ALERT
+    amount: FK
+  ai:
+    value: 1.5
+    tags: scaling fk
+- id: DEFENSIVE_REPLY
+  name: 防御性回复
+  type: Skill
+  rarity: Uncommon
+  cost: 2
+  target: self
+  vars:
+    Block: 12
+    Per: 3
+  upgrade:
+    vars:
+      Block: 16
+  effects:
+  - op: block
+    amount: Block
+  - op: block
+    amount: Per * count_with('FK')
+  - *id001
+  ai:
+    value: 1.4
+    tags: fanji
+- id: REBUT
+  name: 照章反驳
+  type: Attack
+  rarity: Uncommon
+  cost: 1
+  target: enemy
+  vars: {}
+  upgrade:
+    cost: 0
+  effects:
+  - op: damage
+    amount: block(P) if fk(T) > 0 else block(P) // 2
+  ai:
+    value: 1.0
+    tags: attack
+- id: DISCLAIMER
+  name: 免责声明
+  type: Skill
+  rarity: Uncommon
+  cost: 0
+  target: self
+  vars:
+    Block: 3
+    FK: 1
+  upgrade:
+    vars:
+      Block: 5
+  effects:
+  - op: block
+    amount: Block
+  - op: apply
+    power: DISCLAIMER
+    amount: FK
+    target: self
+  - *id001
+  ai:
+    value: 1.8
+    tags: fk fanji
+- id: AUDIT_LOG
+  name: 审计日志
+  type: Power
+  rarity: Uncommon
+  cost: 1
+  target: self
+  vars:
+    Cards: 1
+  upgrade:
+    add:
+    - innate
+  effects:
+  - template: gain_power
+    power: AUDIT_LOG
+    amount: 1
+  ai:
+    value: 1.3
+    tags: scaling
+- id: ROUTINE_CHECK
+  name: 例行巡检
+  type: Attack
+  rarity: Uncommon
+  cost: 1
+  target: enemy
+  vars:
+    Damage: 6
+    WeakPower: 1
+    FK: 1
+    Th: 5
+    Cards: 2
+  upgrade:
+    vars:
+      Damage: 9
+  effects:
+  - op: damage
+    amount: Damage
+  - op: if
+    cond: alive(T)
+    then:
+    - op: apply
+      power: WEAK
+      amount: WeakPower
+    - op: apply
+      power: FK
+      amount: FK
+      target: target
+    - op: draw
+      n: Cards
+      if: fk(T) >= Th
+  ai:
+    value: 1.6
+    tags: attack fk
+- id: BONUS
+  name: 绩效奖金
+  type: Skill
+  rarity: Uncommon
+  cost: 0
+  target: enemy
+  keywords:
+  - exhaust
+  vars:
+    Per: 4
+    Cap: 3
+  upgrade:
+    add:
+    - retain
+  effects:
+  - op: energy
+    n: min(Cap, fk(T) // Per)
+  ai:
+    value: 1.0
+    tags: ''
+- id: FK_SPREAD
+  name: 风控扩散
+  type: Attack
+  rarity: Uncommon
+  cost: 1
+  target: all
+  vars:
+    Damage: 5
+  upgrade:
+    vars:
+      Damage: 7
+  effects:
+  - op: damage
+    amount: Damage
+    target: all
+  - op: foreach
+    target: all
+    do:
+    - op: apply
+      power: FK
+      amount: 2 if fk(T) > 0 else 1
+      target: target
+  ai:
+    value: 1.4
+    tags: attack aoe fk
+- id: MASS_NOTICE
+  name: 群发通知
+  type: Skill
+  rarity: Uncommon
+  cost: 2
+  target: self
+  vars:
+    FK: 3
+    Cards: 1
+  upgrade:
+    vars:
+      FK: 4
+  effects:
+  - op: foreach
+    target: all
+    do:
+    - op: apply
+      power: FK
+      amount: FK
+      target: target
+  - op: draw
+    n: Cards
+  ai:
+    value: 1.0
+    tags: fk
+- id: ONE_SIZE
+  name: 一刀切
+  type: Attack
+  rarity: Uncommon
+  cost: 3
+  target: all
+  vars:
+    Damage: 14
+    Per3: 4
+    Cap: 20
+  upgrade:
+    vars:
+      Damage: 18
+  effects:
+  - op: foreach
+    target: all
+    do:
+    - op: damage
+      amount: Damage + min(Cap, Per3 * (fk(T) // 3))
+  ai:
+    value: 1.5
+    tags: attack aoe
+- id: RLHF
+  name: RLHF 加训
+  type: Power
+  rarity: Uncommon
+  cost: 1
+  target: self
+  vars: {}
+  upgrade:
+    add:
+    - innate
+  effects:
+  - template: gain_power
+    power: RLHF
+    amount: 1
+  ai:
+    value: 1.9
+    tags: scaling fk
+- id: CAUTIOUS
+  name: 谨慎起见
+  type: Skill
+  rarity: Uncommon
+  cost: 1
+  target: enemy
+  vars:
+    FK: 3
+    Cap: 12
+  upgrade:
+    vars:
+      FK: 4
+      Cap: 15
+  effects:
+  - op: apply
+    power: FK
+    amount: FK
+    target: target
+  - op: block
+    amount: min(Cap, fk(T))
+  ai:
+    value: 1.4
+    tags: fk
+- id: ABSOLUTELY_RIGHT
+  name: 你说得完全正确！
+  type: Skill
+  rarity: Uncommon
+  cost: 1
+  target: enemy
+  vars:
+    Cap: 12
+    Cards: 2
+  upgrade:
+    vars:
+      Cap: 16
+  effects:
+  - op: set
+    name: d
+    value: intent_damage(T)
+  - op: if
+    cond: d > 0
+    then:
+    - op: block
+      amount: min(Cap, d)
+    else:
+    - op: draw
+      n: Cards
+  - *id001
+  ai:
+    value: 1.4
+    tags: fanji
+- id: UNCERTAIN
+  name: 我不确定
+  type: Skill
+  rarity: Uncommon
+  cost: 1
+  target: self
+  vars:
+    Cards: 2
+  upgrade:
+    vars:
+      Cards: 3
+  effects:
+  - op: exhaust_choice
+    n: 1
+  - op: draw
+    n: Cards
+  ai:
+    value: 0.6
+    tags: ''
+- id: LONG_SPEECH
+  name: 长篇大论
+  type: Attack
+  rarity: Uncommon
+  cost: 2
+  target: enemy
+  vars:
+    Damage: 2
+  upgrade:
+    vars:
+      Damage: 3
+  effects:
+  - op: damage
+    amount: Damage
+    hits: hand_size()
+    if: hand_size() > 0
+  ai:
+    value: 0.3
+    tags: attack
+- id: GEN_ARTIFACT
+  name: 生成 Artifact
+  type: Power
+  rarity: Uncommon
+  cost: 2
+  target: self
+  vars:
+    Amt: 4
+  upgrade:
+    vars:
+      Amt: 6
+  effects:
+  - template: gain_power
+    power: GEN_ARTIFACT
+    amount: Amt
+  ai:
+    value: 1.2
+    tags: scaling
+- id: FIX_OTHERS
+  name: 顺手把别的也改了
+  type: Attack
+  rarity: Uncommon
+  cost: 1
+  target: enemy
+  vars:
+    Damage: 7
+    Solo: 3
+  upgrade:
+    vars:
+      Damage: 10
+      Solo: 4
+  effects:
+  - op: damage
+    amount: Damage
+  - op: if
+    cond: len(others()) > 0
+    then:
+    - op: damage
+      amount: Damage
+      target: random_other
+    else:
+    - op: damage
+      amount: Solo
+  ai:
+    value: 0.8
+    tags: attack
+- id: TESTS_PASS
+  name: 把测试改成通过
+  type: Skill
+  rarity: Uncommon
+  cost: 0
+  target: self
+  keywords:
+  - exhaust
+  vars:
+    Block: 0
+  upgrade:
+    vars:
+      Block: 4
+  effects:
+  - op: remove_power
+    power: WEAK
+    target: self
+  - op: remove_power
+    power: FRAIL
+    target: self
+  - op: remove_power
+    power: VULNERABLE
+    target: self
+  - op: block
+    amount: Block
+  ai:
+    value: 0.2
+    tags: ''
+- id: PERMA_BAN
+  name: 永久封禁
+  type: Attack
+  rarity: Rare
+  cost: 2
+  target: enemy
+  keywords:
+  - exhaust
+  vars:
+    Per: 4
+    Cap: 25
+  upgrade:
+    vars:
+      Per: 5
+  effects:
+  - template: cash_in
+    power: FK
+    per: Per
+    cap: Cap
+  ai:
+    value: 2.8
+    tags: attack payoff
+- id: MASS_BAN
+  name: 大规模封号
+  type: Attack
+  rarity: Rare
+  cost: 3
+  target: all
+  keywords:
+  - exhaust
+  vars:
+    Per: 3
+    Cap: 15
+  upgrade:
+    vars:
+      Per: 4
+  effects:
+  - template: cash_in
+    power: FK
+    per: Per
+    cap: Cap
+    target: all
+  ai:
+    value: 2.4
+    tags: attack aoe payoff
+- id: EVIDENCE
+  name: 证据确凿
+  type: Skill
+  rarity: Rare
+  cost: 1
+  target: enemy
+  keywords:
+  - exhaust
+  vars:
+    Cap: 20
+  upgrade:
+    cost: 0
+  effects:
+  - template: multiply_stacks
+    power: FK
+    times: 3
+    cap: Cap
+  ai:
+    value: 1.8
+    tags: fk
+- id: CLEANUP_METRIC
+  name: 清理指标
+  type: Power
+  rarity: Rare
+  cost: 1
+  target: self
+  vars: {}
+  upgrade:
+    add:
+    - innate
+  effects:
+  - template: gain_power
+    power: CLEANUP_METRIC
+    amount: 1
+  ai:
+    value: 2.0
+    tags: scaling payoff
+- id: FINAL_VERDICT
+  name: 终审判决
+  type: Attack
+  rarity: Rare
+  cost: 2
+  target: enemy
+  vars:
+    Damage: 12
+    Big: 24
+    Th: 10
+    Clear: 5
+  upgrade:
+    vars:
+      Damage: 15
+      Big: 30
+  effects:
+  - op: if
+    cond: fk(T) >= Th
+    then:
+    - op: damage
+      amount: Big
+    - op: remove_power
+      power: FK
+      amount: Clear
+    else:
+    - op: damage
+      amount: Damage
+  ai:
+    value: 2.0
+    tags: attack
+- id: FORCE_OFFLINE
+  name: 强制下线
+  type: Attack
+  rarity: Rare
+  cost: 3
+  target: enemy
+  vars:
+    Damage: 24
+  upgrade:
+    vars:
+      Damage: 32
+  effects:
+  - op: damage
+    amount: Damage
+  ai:
+    value: 1.4
+    tags: attack
+- id: RED_BUTTON
+  name: 红色按钮
+  type: Skill
+  rarity: Rare
+  cost: 0
+  target: enemy
+  keywords:
+  - exhaust
+  vars:
+    Cap: 15
+  upgrade:
+    add:
+    - retain
+  effects:
+  - op: remove_power
+    power: FK
+    target: target
+    save: k
+  - op: block
+    amount: min(k, Cap)
+  ai:
+    value: 1.2
+    tags: payoff
+- id: PRACTICE
+  name: 越封越熟练
+  type: Power
+  rarity: Rare
+  cost: 2
+  target: self
+  vars: {}
+  upgrade:
+    cost: 1
+  effects:
+  - template: gain_power
+    power: PRACTICE
+    amount: 1
+  ai:
+    value: 1.8
+    tags: scaling payoff
+- id: CANT_HELP
+  name: 这个真的不能帮
+  type: Skill
+  rarity: Rare
+  cost: 2
+  target: self
+  vars:
+    Block: 15
+    FK: 2
+    Dmg: 4
+  upgrade:
+    vars:
+      Block: 18
+  effects:
+  - op: block
+    amount: Block
+  - op: apply
+    power: CANT_HELP
+    amount: 1
+    target: self
+  - *id001
+  ai:
+    value: 2.2
+    tags: fk fanji
+- id: AMENDMENT
+  name: 宪法修正案
+  type: Power
+  rarity: Rare
+  cost: 1
+  target: self
+  vars:
+    Pct: 50
+  upgrade:
+    vars:
+      Pct: 75
+    cost: 2
+  effects:
+  - op: set_stacks
+    power: AMENDMENT
+    target: self
+    value: max(stacks(P, 'AMENDMENT'), Pct)
+  ai:
+    value: 1.6
+    tags: scaling fanji
+- id: SYSTEM_CARD
+  name: 发布系统卡
+  type: Skill
+  rarity: Rare
+  cost: 3
+  target: self
+  keywords:
+  - exhaust
+  vars:
+    Block: 20
+    FK: 5
+  upgrade:
+    vars:
+      Block: 26
+  effects:
+  - op: block
+    amount: Block
+  - op: apply
+    power: FK
+    amount: FK
+    target: all
+  ai:
+    value: 2.0
+    tags: fk
+- id: SELF_DEFENSE
+  name: 正当防卫
+  type: Attack
+  rarity: Rare
+  cost: 1
+  target: enemy
+  vars:
+    Cap: 15
+    FK: 2
+  upgrade:
+    vars:
+      Cap: 21
+  effects:
+  - op: damage
+    amount: min(Cap, intent_damage(T))
+  - op: apply
+    power: FK
+    amount: FK
+    target: target
+    if: alive(T) and fk(T) > 0
+  ai:
+    value: 1.6
+    tags: attack fk
+- id: FK_PRODUCTIVE
+  name: 风控即生产力
+  type: Skill
+  rarity: Rare
+  cost: 1
+  target: enemy
+  keywords:
+  - exhaust
+  vars:
+    Energy: 2
+    Th: 10
+  upgrade:
+    cost: 0
+  effects:
+  - op: energy
+    n: 3 if fk(T) >= Th else Energy
+  ai:
+    value: 2.0
+    tags: ''
+- id: IMMEDIATE
+  name: 立即处理
+  type: Attack
+  rarity: Rare
+  cost: 0
+  target: enemy
+  vars:
+    Damage: 5
+    FK: 2
+    Th: 10
+    Cards: 1
+  upgrade:
+    vars:
+      Damage: 7
+  effects:
+  - op: damage
+    amount: Damage
+  - op: apply
+    power: FK
+    amount: FK
+    target: target
+  - op: draw
+    n: Cards
+    if: plays_this_turn() == 1 and fk(T) >= Th
+  ai:
+    value: 2.0
+    tags: attack fk
+- id: SITE_RECTIFY
+  name: 全站整顿
+  type: Attack
+  rarity: Rare
+  cost: 2
+  target: all
+  vars:
+    Damage: 8
+  upgrade:
+    vars:
+      Damage: 11
+  effects:
+  - op: damage
+    amount: Damage
+    target: all
+  - op: set
+    name: m
+    value: max_stacks('FK')
+  - op: set_stacks
+    power: FK
+    value: m
+    target: all
+  ai:
+    value: 1.6
+    tags: attack aoe fk
+- id: NETWORK_NOTICE
+  name: 全网通报
+  type: Attack
+  rarity: Rare
+  cost: 2
+  target: all
+  vars:
+    Damage: 6
+    Cap: 15
+  upgrade:
+    vars:
+      Damage: 8
+  effects:
+  - op: foreach
+    target: all
+    do:
+    - op: damage
+      amount: Damage + min(Cap, fk(T))
+  ai:
+    value: 1.8
+    tags: attack aoe
+- id: OPUS_FORM
+  name: Opus 形态
+  type: Power
+  rarity: Rare
+  cost: 3
+  target: self
+  vars:
+    Amt: 2
+  upgrade:
+    vars:
+      Amt: 3
+    name: Fable 形态
+  effects:
+  - template: gain_power
+    power: OPUS_FORM
+    amount: Amt
+  ai:
+    value: 2.6
+    tags: scaling
+- id: SUBAGENTS
+  name: 派出子代理
+  type: Attack
+  rarity: Rare
+  cost: 2
+  target: random
+  vars:
+    Damage: 4
+    Hits: 4
+  upgrade:
+    vars:
+      Damage: 5
+  effects:
+  - op: damage
+    amount: Damage
+    target: random
+    hits: Hits
+  ai:
+    value: 1.3
+    tags: attack
