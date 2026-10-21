@@ -1,7 +1,8 @@
 import { reactive } from 'vue'
+import { t, lang, joinList, intlLocale } from './i18n'
 
 async function req(method, url, body, isForm) {
-  const opt = { method, headers: {} }
+  const opt = { method, headers: { 'x-lang': lang.value } }
   if (body !== undefined) {
     if (isForm) opt.body = body
     else { opt.body = JSON.stringify(body); opt.headers['content-type'] = 'application/json' }
@@ -9,7 +10,7 @@ async function req(method, url, body, isForm) {
   const r = await fetch(url, opt)
   let data = null
   try { data = await r.json() } catch (e) { /* empty */ }
-  if (!r.ok) throw new Error((data && data.detail) || `请求失败（${r.status}）`)
+  if (!r.ok) throw new Error((data && data.detail) || t('api.requestFailed', { status: r.status }))
   return data
 }
 export const api = {
@@ -26,7 +27,7 @@ export const store = reactive({
   runs: [],
   async loadCatalog(refresh = false) {
     try {
-      this.catalog = await api.get('/api/catalog' + (refresh ? '?refresh=1' : ''))
+      this.catalog = await api.get('/api/catalog?lang=' + lang.value + (refresh ? '&refresh=1' : ''))
       this.catalogError = null
       this._ci = null
     } catch (e) { this.catalogError = e.message }
@@ -40,7 +41,10 @@ export const store = reactive({
     if (!c) return id
     return up ? (c.up_name || c.name + '+') : c.name
   },
-  encName(id) { return (this.catalog && this.catalog.encounters && this.catalog.encounters[id]) || id },
+  encName(id) {
+    if (id === '_unrecorded') return t('room._unrecorded')
+    return (this.catalog && this.catalog.encounters && this.catalog.encounters[id]) || id
+  },
   charName(id) {
     const c = this.catalog && this.catalog.characters.find((x) => x.id === id)
     return c ? c.name : id
@@ -66,16 +70,16 @@ export const fmt = {
   secs(s) {
     if (s === null || s === undefined) return '—'
     s = Math.round(s)
-    if (s < 60) return `${s} 秒`
+    if (s < 60) return t('fmt.secs', { s })
     const m = Math.floor(s / 60)
-    if (m < 60) return `${m} 分 ${s % 60} 秒`
-    return `${Math.floor(m / 60)} 小时 ${m % 60} 分`
+    if (m < 60) return t('fmt.minSecs', { m, s: s % 60 })
+    return t('fmt.hourMins', { h: Math.floor(m / 60), m: m % 60 })
   },
   time(iso) {
     if (!iso) return '—'
     const d = new Date(iso)
-    const p = (n) => String(n).padStart(2, '0')
-    return `${d.getMonth() + 1}月${d.getDate()}日 ${p(d.getHours())}:${p(d.getMinutes())}`
+    if (isNaN(d)) return '—'
+    return new Intl.DateTimeFormat(intlLocale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(d)
   },
 }
 
@@ -84,26 +88,22 @@ export function runTitle(m) {
   if (m.title) return m.title
   const p = m.params || {}
   if (m.kind === 'batch') {
-    let t = p.game_seed ? `${store.charName(p.char)} A${p.asc ?? 0} 种子 ${p.game_seed}` : `${store.charName(p.char)} A${p.asc ?? 0} × ${p.n}`
-    if (p.force && p.force.length) t += ` ＋${p.force.map((x) => store.cardName(x)).join('、')}`
-    if (p.replace && p.replace.length) t += ` －${p.replace.map((x) => store.cardName(x)).join('、')}`
-    if (p.variants && p.variants.length) t += ` [${p.variants.join('+')}]`
-    return t
+    let tt = p.game_seed ? t('title.batchSeed', { char: store.charName(p.char), asc: p.asc ?? 0, seed: p.game_seed })
+      : t('title.batchN', { char: store.charName(p.char), asc: p.asc ?? 0, n: p.n })
+    if (p.force && p.force.length) tt += ` ＋${joinList(p.force.map((x) => store.cardName(x)))}`
+    if (p.replace && p.replace.length) tt += ` －${joinList(p.replace.map((x) => store.cardName(x)))}`
+    if (p.variants && p.variants.length) tt += ` [${p.variants.join('+')}]`
+    return tt
   }
   if (p.preset) {
     const e = store.catalog && store.catalog.experiments.find((x) => x.id === p.preset)
-    return `${e ? e.title : '实验 ' + p.preset}（种子 ${p.seed}）`
+    return t('title.preset', { title: e ? e.title : t('title.presetId', { id: p.preset }), seed: p.seed })
   }
-  return `战斗实验（${(p.decks || []).length} 个卡组）`
+  return t('title.combat', { n: (p.decks || []).length })
 }
 
-export const STATUS = {
-  running: { text: '运行中', type: 'warning' },
-  done: { text: '已完成', type: 'success' },
-  failed: { text: '失败', type: 'error' },
-  cancelled: { text: '已取消', type: 'default' },
-  interrupted: { text: '已中断', type: 'default' },
-  queued: { text: '排队中', type: 'info' },
-}
+const STATUS_TYPE = { running: 'warning', done: 'success', failed: 'error', cancelled: 'default', interrupted: 'default', queued: 'info' }
+/** STATUS[x].text 每次读取都按当前语言翻译 */
+export const STATUS = Object.fromEntries(Object.entries(STATUS_TYPE).map(([k, type]) => [k, { type, get text() { return t('status.' + k) } }]))
 
 for (const k of ['cardName', 'encName', 'charName', 'agentName', 'loadCatalog', 'loadRuns']) store[k] = store[k].bind(store)

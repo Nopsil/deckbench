@@ -33,7 +33,7 @@ def scan_stdlib_imports(root):
 
 
 hidden = scan_stdlib_imports(SIM) + [
-    "gui.worker", "gui.server", "gui.backend", "gui.jobs", "gui.metrics", "gui.modpatch",
+    "gui.worker", "gui.server", "gui.backend", "gui.jobs", "gui.metrics", "gui.modpatch", "gui.i18n",
     "multiprocessing.pool", "multiprocessing.popen_spawn_win32", "importlib.util", "statistics", "csv", "zlib",
     "uvicorn.logging", "uvicorn.loops.auto", "uvicorn.protocols.http.auto", "uvicorn.protocols.http.h11_impl",
     "uvicorn.protocols.websockets.auto", "uvicorn.lifespan.on", "multipart", "python_multipart",
@@ -43,7 +43,8 @@ hidden = [h for h in hidden if h not in ("signal",)] + ["signal"]
 a = Analysis(
     [os.path.join(HERE, "launcher.py")],
     pathex=[HERE],
-    datas=[(os.path.join(HERE, "gui", "web", "dist"), "gui_web")],
+    datas=[(os.path.join(HERE, "gui", "web", "dist"), "gui_web"),
+           (os.path.join(HERE, "gui", "locales"), os.path.join("gui", "locales"))],   # 界面翻译表（gui/i18n.py 读）
     hiddenimports=hidden,
     excludes=["tkinter", "sts2sim", "claude_v35", "batch", "v34_data", "cs2py_core", "cs_patches", "parse_monster_ai", "helpers",
               "pytest", "playwright"],

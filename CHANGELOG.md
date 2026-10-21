@@ -1,5 +1,14 @@
 # 更新日志 / Changelog
 
+## 未发布（0.1.4） / Unreleased (0.1.4)
+
+- **界面多语言**：图形界面支持简体中文、English、日本語、한국어。第一次打开跟着系统语言走（中文 → 简体中文，日语 → 日本語，韩语 → 한국어，其他 → English），左下角随时切换，选择保存在数据目录的 `settings.json`。按钮、提示、报告图表、运行日志、错误信息都会翻译；卡牌、角色、遭遇的名字按所选语言从你自己的游戏安装读（游戏里没有该语言就依次回退英文、中文，最后显示 ID），仍然不随项目分发任何游戏文本。战斗实验的完整 report.md（旧版战斗模拟器生成）暂时只有中文。
+  *UI languages: the desktop app now speaks 简体中文, English, 日本語 and 한국어. It starts in your system language and can be switched from the bottom-left menu; the choice is saved in `settings.json` in the data folder. Buttons, hints, report charts, run logs and error messages are translated; card, character and encounter names are read in the same language from your own game install (falling back to English, then Chinese, then the ID), and still no game text is shipped. The legacy combat simulator's full report.md is Chinese only for now.*
+- 翻译表在 `gui/locales/<语言>.json`（前后端共用）；`tests/test_i18n.py` 检查每个键四种语言都有、占位符一致、代码里用到的键都存在。`sts2sim/gameloc.py` 支持任意语言代码（`DECKBENCH_GAME_LOC_JPN` / `_KOR` 等覆盖），新增 `languages()`。
+  *Translations live in `gui/locales/<lang>.json`, shared by the web UI and the Python backend; `tests/test_i18n.py` checks every key exists in every language with matching placeholders. `gameloc` accepts any language code and gains `languages()`.*
+- 说明页（四种语言）去掉了「界面只有中文」的提示，改为说明语言切换，界面按钮名直接用对应语言。
+  *READMEs: dropped the "interface is Chinese only" note and now describe the language switch, quoting on-screen labels in each README's own language.*
+
 ## 0.1.3 (2026-10)
 
 - **修复：宝箱遗物从来没有真正拿到手。** 真游戏是在界面里发放宝箱遗物的，模拟器没有那个界面，所以以前所有模拟（批量、图形界面）里选了宝箱遗物也不会进遗物栏。现在默认修好（批量、图形界面、MCP 都一样）。**之前版本测出的胜率和层数都是在没有宝箱遗物的情况下测的**，会偏低，和新版本的数字不能直接比较；本说明下面引用的 AI 对比数字也是修复前测的。只为复现旧数字时可设 `DECKBENCH_TREASURE_FIX=0`。

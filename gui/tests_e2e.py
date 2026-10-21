@@ -1,4 +1,4 @@
-"""端到端界面测试（开发用）：先启动 `python -m gui.app --serve --port 8765`，再运行本脚本。
+"""端到端界面测试（开发用）：先启动 `python -m gui.app --serve --port 8765`，再运行本脚本（会把界面语言设成简体中文）。
 用 Playwright 逐页操作并截图到 SHOTS 目录。"""
 import asyncio
 import json
@@ -45,8 +45,9 @@ async def main():
         pg = await ctx.new_page()
         pg.on("pageerror", lambda e: errors.append(str(e)))
         pg.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
+        api("/api/settings", {"lang": "zhs"})   # 下面按中文界面文字定位
         await pg.goto(BASE + "/#/new")
-        await pg.evaluate("""localStorage.setItem('nt.form', JSON.stringify({b: {char: 'Claude', asc: 0, n: 60, start: 0, procs: 2,
+        await pg.evaluate("""localStorage.setItem('ui.lang', 'zhs'); localStorage.setItem('nt.form', JSON.stringify({b: {char: 'Claude', asc: 0, n: 60, start: 0, procs: 2,
             agent: 'heuristic', variants: [], force: [], replace: []}})); localStorage.setItem('nt.kind', 'batch')""")
         await pg.reload()
         await pg.wait_for_selector("text=角色与难度", timeout=120000)

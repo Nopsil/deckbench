@@ -5,7 +5,7 @@
 **A deck test bench: without opening the game, an AI plays hundreds or thousands of runs and tells you the win rate, how far you get, what kills you, and whether a card is actually strong.**
 An unofficial balance-testing tool for Slay the Spire 2 mod authors and players.
 
-> **Note:** the app's interface is currently in Chinese only. On this page, on-screen labels are quoted in Chinese with an English translation next to them, so you can find them in the app.
+> **Languages:** the app is available in English, 简体中文, 日本語 and 한국어. It starts in your system's language, and you can switch at any time from the language menu at the bottom left (your choice is remembered). Card, character and enemy names follow the same language and are read from your own game install.
 
 > **⚠️ Disclaimer**
 > - **Unofficial**: fan-made; not affiliated with, endorsed or sponsored by Mega Crit.
@@ -37,6 +37,7 @@ An unofficial balance-testing tool for Slay the Spire 2 mod authors and players.
 - **Single-card A/B**: same seeds, one group with a card added and one without — see directly how much that one card changes the win rate and floors reached.
 - **Test your own mod**: a sample mod is built in (Claude娘, original content), and you can upload your own YAML mod for combat tests.
 - **A desktop app, all on your PC**: pick settings with a few clicks, run with one button, live progress, chart reports and history. Nothing goes online and nothing is uploaded.
+- **Four languages**: English, 简体中文, 日本語 and 한국어, switchable in the app; game names (cards, characters, enemies) come from your own install in the same language.
 
 ## Getting started (Windows)
 
@@ -98,13 +99,13 @@ Linux/macOS: see [docs/DEVELOPER.md](docs/DEVELOPER.md).
 
 ## Which AI to pick
 
-- **「通用 AI（推荐，模组角色也能用）」 ("General AI — recommended, works with mod characters too")**: the one to use in most cases. Card picks, rest sites and shops are handled by a small network that only looks at generic numbers (cost, damage, block, rarity…) and doesn't know specific card names, so **it works with your own mod characters too**. It's as fast as the learned AI (1–2 seconds per run) and works on Windows. In our tests it gets 1–4 floors further on average than the learned AI.
-- **「学习版 AI」 ("Learned AI")**: the previous recommendation, same speed; useful for comparison.
-- **The two 「spire-mentor 整局 AI」 ("spire-mentor full-run AI") options**: the strongest, but you have to build the third-party spire-mentor yourself, and they only support the 5 base-game characters. See [docs/DEVELOPER.md](docs/DEVELOPER.md).
+- **General AI (recommended, works with mod characters)**: the one to use in most cases. Card picks, rest sites and shops are handled by a small network that only looks at generic numbers (cost, damage, block, rarity…) and doesn't know specific card names, so **it works with your own mod characters too**. It's as fast as the learned AI (1–2 seconds per run) and works on Windows. In our tests it gets 1–4 floors further on average than the learned AI.
+- **Learned AI**: the previous recommendation, same speed; useful for comparison.
+- **The two spire-mentor full-run AI options**: the strongest, but you have to build the third-party spire-mentor yourself, and they only support the 5 base-game characters. See [docs/DEVELOPER.md](docs/DEVELOPER.md).
 
 ## Play a real game seed
 
-In 「新建测试 → 整局批量」 ("New test → Full runs"), fill in 「指定游戏种子」 ("Game seed") with the seed shown in the game (for example `7F3K9Q2ZB8MA`). The AI then plays just that one run and records every decision, which you can look through on the results page.
+In **New test → Full runs**, fill in **Game seed** with the seed shown in the game (for example `7F3K9Q2ZB8MA`). The AI then plays just that one run and records every decision, which you can look through on the results page.
 Lowercase letters, and the letters O and I, are converted to uppercase and the digits 0 and 1 automatically, just like the game does. Command line: `python tools/batch.py --char Silent --seed 7F3K9Q2ZB8MA --log-dir steps`.
 
 ## Let an AI assistant play step by step (MCP)
@@ -130,8 +131,8 @@ Make sure the game is installed in Steam, then point to the game folder (`...\st
 The generated data is bound to your game files as they were; once the files change, the old data is no longer used. The app regenerates it automatically on the next launch (again 1–2 minutes), or you can run it by hand:
 `.venv\Scripts\python -m sts2sim.gamedata setup`
 
-**Why are 「强 AI（带搜索）」 ("Strong AI, with search") and 「学习版 AI（带搜索）」 ("Learned AI, with search") missing on Windows?**
-The search-based AIs need the system's fork feature, which Windows doesn't have, so the app hides them automatically. On Windows, use **「通用 AI（推荐，模组角色也能用）」 (General AI)**, which doesn't need search.
+**Why are "Strong AI (with search)" and "Learned AI (with search)" missing on Windows?**
+The search-based AIs need the system's fork feature, which Windows doesn't have, so the app hides them automatically. On Windows, use **General AI (recommended, works with mod characters)**, which doesn't need search.
 
 **Why do I need my own copy of the game?**
 We can't and won't distribute any of the game's content. DeckBench only reads your own game on your PC to simulate its rules, so it can't work without a legit copy.

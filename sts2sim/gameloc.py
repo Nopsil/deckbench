@@ -1,13 +1,13 @@
-"""运行时从玩家本机的游戏安装读官方本地化文本（英文 eng / 中文 zhs），只在内存里用，不写进仓库、不打包。
+"""运行时从玩家本机的游戏安装读官方本地化文本（eng / zhs / jpn / kor 等，看安装里有哪些），只在内存里用，不写进仓库、不打包。
 
 文本来源（按顺序）：
-  DECKBENCH_GAME_LOC_ENG / DECKBENCH_GAME_LOC_ZHS   直接指向含 events.json 等表的目录（可选）
+  DECKBENCH_GAME_LOC_ENG / _ZHS / _JPN / _KOR       直接指向含 events.json 等表的目录（可选）
   DECKBENCH_GAME_PCK                                 游戏的 .pck 文件（可选）
   否则：已生成数据所绑定的那份安装（gamedata 的 manifest）或自动检测到的安装里的 .pck
 .pck 是 Godot 资源包（未加密的 v2/v3 格式）；我们只读 localization/<语言>/<表>.json 这几项。
 找不到时返回 None，调用方会回退（中文名回退成 ID，事件 PPO 回退到我们自己的策略）。
 
-Official localization (eng/zhs) read at runtime from the player's own install, kept in memory only; never committed or shipped.
+Official localization (eng/zhs/jpn/kor…) read at runtime from the player's own install, kept in memory only; never committed or shipped.
 """
 import hashlib
 import json
@@ -16,7 +16,8 @@ import struct
 
 _TABLES = {}      # (lang, table) -> dict | None
 _INDEX = {}       # pck path -> {(lang, table): (offset, size, md5)}
-_LANG_ENV = {"eng": "DECKBENCH_GAME_LOC_ENG", "zhs": "DECKBENCH_GAME_LOC_ZHS"}
+_LANG_ENV = {"eng": "DECKBENCH_GAME_LOC_ENG", "zhs": "DECKBENCH_GAME_LOC_ZHS",
+             "jpn": "DECKBENCH_GAME_LOC_JPN", "kor": "DECKBENCH_GAME_LOC_KOR"}
 
 
 def read_pck_index(path):
@@ -80,7 +81,7 @@ def table(name, lang="eng"):
     if k in _TABLES:
         return _TABLES[k]
     t = None
-    d = os.environ.get(_LANG_ENV.get(lang, ""), "")
+    d = os.environ.get(_LANG_ENV.get(lang, "DECKBENCH_GAME_LOC_" + lang.upper()), "")
     try:
         if d:
             with open(os.path.join(d, name + ".json"), encoding="utf-8") as f:
@@ -105,3 +106,16 @@ def table(name, lang="eng"):
 
 def available(lang="eng"):
     return table("events", lang) is not None
+
+
+def languages():
+    """安装里有本地化表的语言代码集合（读 .pck 索引；读不到返回空集合）。"""
+    try:
+        p = find_pck()
+        if not p:
+            return set()
+        if p not in _INDEX:
+            _INDEX[p] = read_pck_index(p)
+        return {lang for lang, _t in _INDEX[p]}
+    except Exception:  # noqa
+        return set()

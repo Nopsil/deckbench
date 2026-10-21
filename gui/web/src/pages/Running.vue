@@ -2,12 +2,12 @@
   <div class="page">
     <template v-if="!id">
       <div class="panel empty">
-        <div class="big">现在没有正在运行的测试</div>
-        <div>去「新建测试」开始一次，或者在下面打开最近的测试。</div>
-        <n-button type="primary" style="margin-top:18px" @click="$router.push('/new')">新建测试</n-button>
+        <div class="big">{{ t('run.none') }}</div>
+        <div>{{ t('run.noneHint') }}</div>
+        <n-button type="primary" style="margin-top:18px" @click="$router.push('/new')">{{ t('nav.new') }}</n-button>
       </div>
       <div v-if="store.runs.length" class="panel">
-        <h3>最近的测试</h3>
+        <h3>{{ t('run.recent') }}</h3>
         <div v-for="r in store.runs.slice(0, 6)" :key="r.id" class="recent" @click="$router.push('/run/' + r.id)">
           <n-tag size="small" :type="STATUS[r.status]?.type" :bordered="false">{{ STATUS[r.status]?.text || r.status }}</n-tag>
           <span class="rt">{{ runTitle(r) }}</span><span class="faint">{{ fmt.time(r.created) }}</span>
@@ -25,13 +25,13 @@
             <div class="row" style="flex-wrap:wrap;gap:6px"><span v-for="t in paramChips" :key="t" class="chip">{{ t }}</span></div>
           </div>
           <div class="row">
-            <n-popconfirm v-if="status === 'running'" @positive-click="cancel">
-              <template #trigger><n-button secondary type="error"><template #icon><n-icon :component="PlayerStop" /></template>取消运行</n-button></template>
-              确定取消？已跑完的部分不会保存结果。
+            <n-popconfirm v-if="status === 'running'" :positive-text="t('common.ok')" :negative-text="t('common.cancel')" @positive-click="cancel">
+              <template #trigger><n-button secondary type="error"><template #icon><n-icon :component="PlayerStop" /></template>{{ t('run.cancel') }}</n-button></template>
+              {{ t('run.cancelQ') }}
             </n-popconfirm>
             <template v-else>
-              <n-button secondary @click="rerun"><template #icon><n-icon :component="Refresh" /></template>再跑一次</n-button>
-              <n-button v-if="status === 'done'" type="primary" @click="$router.push('/report/' + id)"><template #icon><n-icon :component="ChartBar" /></template>查看报告</n-button>
+              <n-button secondary @click="rerun"><template #icon><n-icon :component="Refresh" /></template>{{ t('common.rerun') }}</n-button>
+              <n-button v-if="status === 'done'" type="primary" @click="$router.push('/report/' + id)"><template #icon><n-icon :component="ChartBar" /></template>{{ t('run.viewReport') }}</n-button>
             </template>
           </div>
         </div>
@@ -40,20 +40,20 @@
           <div class="pv">{{ Math.floor(pct * 100) }}%</div>
         </div>
         <div class="grid g4" style="margin-top:18px">
-          <stat :label="meta.kind === 'batch' ? '已完成局数' : '已完成场数'" :value="`${prog.done} / ${prog.total || '—'}`" />
-          <stat label="用时" :value="fmt.secs(elapsed)" />
-          <stat label="速度" :value="speed ? speed.toFixed(2) + (meta.kind === 'batch' ? ' 局/秒' : ' 场/秒') : '—'" />
-          <stat label="预计剩余" :value="status === 'running' ? (eta !== null ? fmt.secs(eta) : '估算中…') : '—'" :hl="status === 'running'" />
+          <stat :label="meta.kind === 'batch' ? t('run.doneRuns') : t('run.doneFights')" :value="`${prog.done} / ${prog.total || '—'}`" />
+          <stat :label="t('common.elapsed')" :value="fmt.secs(elapsed)" />
+          <stat :label="t('run.speed')" :value="speed ? (meta.kind === 'batch' ? t('run.runsPerSec', { n: speed.toFixed(2) }) : t('run.fightsPerSec', { n: speed.toFixed(2) })) : '—'" />
+          <stat :label="t('run.eta')" :value="status === 'running' ? (eta !== null ? fmt.secs(eta) : t('run.estimating')) : '—'" :hl="status === 'running'" />
         </div>
       </div>
       <div class="panel">
-        <div class="row between" style="margin-bottom:10px"><h3 style="margin:0">实时日志</h3>
-          <n-checkbox v-model:checked="follow" size="small"><span class="muted" style="font-size:12.5px">自动滚动</span></n-checkbox></div>
+        <div class="row between" style="margin-bottom:10px"><h3 style="margin:0">{{ t('run.log') }}</h3>
+          <n-checkbox v-model:checked="follow" size="small"><span class="muted" style="font-size:12.5px">{{ t('run.autoScroll') }}</span></n-checkbox></div>
         <div ref="logEl" class="log mono">
           <div v-for="(l, i) in lines" :key="i" :class="lineCls(l)">{{ l }}</div>
-          <div v-if="!lines.length" class="faint">等待输出…</div>
+          <div v-if="!lines.length" class="faint">{{ t('run.waiting') }}</div>
         </div>
-        <div v-if="status === 'failed'" class="hint" style="color:#E06C6C">运行失败，日志末尾是错误信息。</div>
+        <div v-if="status === 'failed'" class="hint" style="color:#E06C6C">{{ t('run.failedHint') }}</div>
       </div>
     </template>
     <div v-else class="panel empty"><n-spin /></div>
@@ -67,6 +67,7 @@ import { NButton, NCheckbox, NIcon, NPopconfirm, NSpin, NTag, useMessage } from 
 import { PlayerStop, Refresh, ChartBar } from '@vicons/tabler'
 import Stat from '../components/Stat.vue'
 import { api, store, fmt, runTitle, STATUS } from '../api'
+import { t, MESSAGES } from '../i18n'
 
 const route = useRoute()
 const router = useRouter()
@@ -97,15 +98,20 @@ const eta = computed(() => {
 const paramChips = computed(() => {
   const p = meta.value?.params || {}
   if (meta.value?.kind === 'batch') {
-    const t = ['整局批量', store.charName(p.char), 'A' + p.asc, p.n + ' 局', store.agentName('batch', p.agent), '并行 ' + p.procs]
-    if (p.variants?.length) t.push('变体 ' + p.variants.join('+'))
-    return t
+    const x = [t('kind.batch'), store.charName(p.char), 'A' + p.asc, t('chip.nRuns', { n: p.n }), store.agentName('batch', p.agent), t('chip.parallel', { n: p.procs })]
+    if (p.variants?.length) x.push(t('chip.variant', { v: p.variants.join('+') }))
+    return x
   }
-  return ['战斗实验', p.preset ? '预设 ' + p.preset : (p.decks || []).length + ' 个卡组', '每格 ' + p.fights + ' 场', store.agentName('combat', p.agent), '种子 ' + p.seed]
+  return [t('kind.combat'), p.preset ? t('chip.preset', { id: p.preset }) : t('nt.nDecks', { n: (p.decks || []).length }), t('chip.perCell', { n: p.fights }), store.agentName('combat', p.agent), t('chip.seed', { s: p.seed })]
 })
+// 日志行按所有语言的「胜利/完成」「出错/失败」词着色（日志是开始运行时的语言，界面语言之后可能换过）
+const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const words = (keys) => new RegExp(Object.values(MESSAGES).flatMap((m) => keys.map((k) => m[k]).filter(Boolean)).map(esc).join('|') || '$^')
+const OK_RE = words(['log.win', 'log.doneWord'])
+const BAD_RE = words(['log.error', 'log.failWord'])
 function lineCls(l) {
-  if (/胜利|完成/.test(l)) return 'ok'
-  if (/出错|Error|Traceback|失败/.test(l)) return 'bad'
+  if (OK_RE.test(l)) return 'ok'
+  if (/Error|Traceback/.test(l) || BAD_RE.test(l)) return 'bad'
   if (/^\[/.test(l)) return ''
   return 'info'
 }
@@ -133,13 +139,13 @@ async function connect() {
       meta.value = d.meta
       close()
       store.loadRuns()
-      if (d.status === 'done') msg.success('运行完成')
+      if (d.status === 'done') msg.success(t('run.finished'))
     }
   }
   es.onerror = () => { /* 浏览器会自动重连 */ }
 }
 function close() { if (es) { es.close(); es = null } }
-async function cancel() { try { await api.post(`/api/runs/${id.value}/cancel`); msg.info('已发送取消') } catch (e) { msg.error(e.message) } }
+async function cancel() { try { await api.post(`/api/runs/${id.value}/cancel`); msg.info(t('run.cancelSent')) } catch (e) { msg.error(e.message) } }
 async function rerun() { try { const m = await api.post(`/api/runs/${id.value}/rerun`); store.loadRuns(); router.push('/run/' + m.id) } catch (e) { msg.error(e.message) } }
 watch(id, connect)
 onMounted(() => { connect(); tick = setInterval(() => (now.value = Date.now() / 1000), 1000) })

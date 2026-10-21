@@ -37,6 +37,7 @@
 - **单卡 A/B**：同样的种子，一组加某张卡、一组不加，直接看这张卡让胜率和层数变了多少。
 - **测你自己的 mod**：内置示例 mod（Claude娘，原创内容），也可以上传自己写的 YAML mod 跑战斗测试。
 - **图形界面，全在本机**：点选参数、一键运行、实时进度、图表报告、历史记录，不联网也不上传任何东西。
+- **四种界面语言**：简体中文、English、日本語、한국어。第一次打开跟着系统语言走，左下角随时可以切换（会记住你的选择）；卡牌、角色、敌人的名字也跟着切换，从你自己的游戏安装里读。
 
 *Win rate and floors reached for full runs at any ascension; death causes; same-seed single-card A/B tests; test your own mods; a local desktop app with charts and history (nothing is uploaded).*
 
@@ -113,7 +114,7 @@ $env:DECKBENCH_GAME_DIR = "D:\SteamLibrary\steamapps\common\Slay the Spire 2"
 在「新建测试 → 整局批量」里填 **「指定游戏种子」**（游戏里显示的那串，例如 `7F3K9Q2ZB8MA`），AI 就只打这一局，并记录每一步怎么选的，在结果页可以看。
 小写、字母 O 和 I 会按游戏规则自动换成大写、数字 0 和 1。命令行：`python tools/batch.py --char Silent --seed 7F3K9Q2ZB8MA --log-dir steps`。
 
-*Type a seed from the game into "指定游戏种子" in New Test → full runs: the AI plays just that run and records every decision. Lowercase, O and I are normalized like the game does. CLI: `--seed` and `--log-dir`.*
+*Type a seed from the game into "Game seed" in New test → Full runs: the AI plays just that run and records every decision. Lowercase, O and I are normalized like the game does. CLI: `--seed` and `--log-dir`.*
 
 ## 让 AI 助手一步一步打（MCP） / Let an AI assistant play (MCP)
 

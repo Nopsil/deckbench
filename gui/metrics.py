@@ -59,8 +59,8 @@ def batch_summary(res):
             by_enc[str(dr[2])] += 1
             by_room[ROOM_ZH.get(dr[1], str(dr[1]))] += 1
         else:
-            by_enc["（未记录）"] += 1
-            by_room["（未记录）"] += 1
+            by_enc["_unrecorded"] += 1     # 界面按语言显示「未记录」
+            by_room["_unrecorded"] += 1
     out["death_by_encounter"] = [{"name": k, "count": v} for k, v in by_enc.most_common(15)]
     out["death_by_room"] = [{"name": k, "count": v} for k, v in by_room.most_common()]
     picks = collections.Counter(p for r in ok for p in r.get("picked", []))
@@ -94,20 +94,22 @@ def paired(a, b, key):
     return {"diff": mb - ma, "ci95": 1.96 * se, "n": min(len(xa), len(xb)), "paired": False}
 
 
-AB_KEYS = [("floor", "平均层数", lambda r: r["floor"], False),
-           ("boss1", "到达幕 1 首领", lambda r: float(_boss1(r)), True),
-           ("act2", "到达幕 2", lambda r: float(r["act"] >= 1), True),
-           ("act3", "到达幕 3", lambda r: float(r["act"] >= 2), True),
-           ("win", "胜率", lambda r: float(bool(r["victory"])), True)]
+# 指标名：界面按 key 翻译（metric.<key>）；name 只是给脚本看的当前语言文字
+AB_KEYS = [("floor", lambda r: r["floor"], False),
+           ("boss1", lambda r: float(_boss1(r)), True),
+           ("act2", lambda r: float(r["act"] >= 1), True),
+           ("act3", lambda r: float(r["act"] >= 2), True),
+           ("win", lambda r: float(bool(r["victory"])), True)]
 
 
 def batch_ab(a, b):
     sa, sb = batch_summary(a), batch_summary(b)
     rows = []
-    for k, name, key, pct in AB_KEYS:
+    from . import i18n
+    for k, key, pct in AB_KEYS:
         p = paired(a, b, key)
         sk = "avg_floor" if k == "floor" else k
-        row = {"key": k, "name": name, "pct": pct, "a": sa.get(sk), "b": sb.get(sk)}
+        row = {"key": k, "name": i18n.t(f"metric.{k}"), "pct": pct, "a": sa.get(sk), "b": sb.get(sk)}
         if p:
             row.update(p)
             row["significant"] = p["ci95"] > 0 and abs(p["diff"]) > p["ci95"]

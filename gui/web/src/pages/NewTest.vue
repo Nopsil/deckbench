@@ -1,57 +1,57 @@
 <template>
   <div class="page">
     <div v-if="!cat" class="panel empty">
-      <n-spin v-if="!store.catalogError" /><div class="big" style="margin-top:12px">{{ store.catalogError ? '载入失败：' + store.catalogError : '正在载入卡牌和角色数据…' }}</div>
+      <n-spin v-if="!store.catalogError" /><div class="big" style="margin-top:12px">{{ store.catalogError ? t('nt.loadFailed', { err: store.catalogError }) : t('nt.loading') }}</div>
     </div>
     <div v-else class="layout">
       <div class="form">
         <div class="modes">
           <button class="mode" :class="{ on: kind === 'batch' }" @click="kind = 'batch'">
             <n-icon :component="Route" size="22" />
-            <div><div class="mt">整局批量</div><div class="ms">从第 1 层打到通关，统计层数、首领到达率、胜率</div></div>
+            <div><div class="mt">{{ t('kind.batch') }}</div><div class="ms">{{ t('nt.batchDesc') }}</div></div>
           </button>
           <button class="mode" :class="{ on: kind === 'combat' }" @click="kind = 'combat'">
             <n-icon :component="Swords" size="22" />
-            <div><div class="mt">战斗实验</div><div class="ms">固定卡组打普通/精英/首领，统计单场胜率与掉血</div></div>
+            <div><div class="mt">{{ t('kind.combat') }}</div><div class="ms">{{ t('nt.combatDesc') }}</div></div>
           </button>
         </div>
 
         <template v-if="kind === 'batch'">
           <div class="panel">
-            <h3>角色与难度</h3>
+            <h3>{{ t('nt.charAsc') }}</h3>
             <div class="chars">
               <button v-for="c in cat.characters" :key="c.id" class="char" :class="{ on: b.char === c.id }" @click="setChar(c.id)">
-                <span class="av" :style="{ background: charColor(c.id) }">{{ c.name.slice(0, 1) }}</span>
+                <span class="av" :style="{ background: charColor(c.id) }">{{ Array.from(c.name)[0] }}</span>
                 <span class="cn">{{ c.name }}</span>
                 <span class="ci mono">{{ c.id }}</span>
               </button>
             </div>
-            <div class="label" style="margin-top:20px">进阶等级 <b class="accent">A{{ b.asc }}</b></div>
+            <div class="label" style="margin-top:20px">{{ t('nt.ascension') }} <b class="accent">A{{ b.asc }}</b></div>
             <n-slider v-model:value="b.asc" :min="0" :max="10" :step="1" :marks="{ 0: 'A0', 5: 'A5', 10: 'A10' }" />
           </div>
 
           <div class="panel">
-            <h3>规模</h3>
+            <h3>{{ t('nt.scale') }}</h3>
             <div class="grid" style="grid-template-columns: 1.25fr 1fr 1fr">
               <div>
-                <div class="label">局数</div>
+                <div class="label">{{ t('nt.runs') }}</div>
                 <n-input-number v-model:value="b.n" :min="1" :max="5000" style="width:100%" />
                 <div class="quick"><button v-for="q in [20, 100, 400, 1000]" :key="q" :class="{ on: b.n === q }" @click="b.n = q">{{ q }}</button></div>
               </div>
               <div>
-                <div class="label">起始种子</div>
+                <div class="label">{{ t('nt.startSeed') }}</div>
                 <n-input-number v-model:value="b.start" :min="0" style="width:100%"><template #prefix><span class="faint">R</span></template></n-input-number>
-                <div class="hint">种子 R{{ b.start }} … R{{ b.start + b.n - 1 }}；A/B 两组用同一批种子才能配对。</div>
+                <div class="hint">{{ t('nt.seedRange', { a: 'R' + b.start, b: 'R' + (b.start + b.n - 1) }) }}</div>
               </div>
               <div>
-                <div class="label">并行进程 <b class="accent">{{ b.procs }}</b><span class="faint"> / {{ cat.cpu }} 核</span></div>
+                <div class="label">{{ t('nt.procs') }} <b class="accent">{{ b.procs }}</b><span class="faint"> {{ t('nt.cores', { n: cat.cpu }) }}</span></div>
                 <n-slider v-model:value="b.procs" :min="1" :max="cat.cpu" :step="1" />
               </div>
             </div>
             <div style="margin-top:16px">
-              <div class="label">指定游戏种子 <span class="faint">（可选）</span></div>
-              <n-input v-model:value="b.gameSeed" clearable placeholder="例：7F3K9Q2ZB8MA（游戏里的种子）；留空 = 按上面的局数和起始种子批量" style="max-width:420px" />
-              <div v-if="gameSeedCanon" class="hint">只打这一局：种子 <b class="mono">{{ gameSeedCanon }}</b>（已按游戏规则转大写、O→0、I→1），并记录逐步决策日志。局数和起始种子此时不起作用。</div>
+              <div class="label">{{ t('nt.gameSeed') }} <span class="faint">{{ t('nt.optional') }}</span></div>
+              <n-input v-model:value="b.gameSeed" clearable :placeholder="t('nt.gameSeedPh')" :title="t('nt.gameSeedPh')" style="max-width:640px" />
+              <div v-if="gameSeedCanon" class="hint">{{ t('nt.gameSeedHint1') }} <b class="mono">{{ gameSeedCanon }}</b> {{ t('nt.gameSeedHint2') }}</div>
             </div>
           </div>
 
@@ -67,21 +67,21 @@
           </div>
 
           <div v-if="b.char === 'Claude'" class="panel">
-            <h3>Claude娘 变体 <span class="faint" style="font-weight:400;font-size:12.5px">（可多选，按顺序叠加；不选 = 当前设计 v3.5.1）</span></h3>
-            <n-select v-model:value="b.variants" multiple filterable :options="variantOptions" :render-label="variantLabel" placeholder="不使用变体" />
+            <h3>{{ t('nt.variants', { char: store.charName('Claude') }) }} <span class="faint" style="font-weight:400;font-size:12.5px">{{ t('nt.variantsHint') }}</span></h3>
+            <n-select v-model:value="b.variants" multiple filterable :options="variantOptions" :render-label="variantLabel" :placeholder="t('nt.noVariant')" />
           </div>
 
           <div class="panel">
-            <h3>起始牌组调整 <span class="faint" style="font-weight:400;font-size:12.5px">（单卡 A/B 用：在进入第一幕前改牌组，地图和遭遇序列不变）</span></h3>
+            <h3>{{ t('nt.deckAdjust') }} <span class="faint" style="font-weight:400;font-size:12.5px">{{ t('nt.deckAdjustHint') }}</span></h3>
             <div class="grid g2">
               <div>
-                <div class="label">强制加入</div>
-                <card-picker v-model="b.force" :pool="b.char" empty-text="不加牌。点「+」可改成升级版。" />
+                <div class="label">{{ t('nt.forceAdd') }}</div>
+                <card-picker v-model="b.force" :pool="b.char" :empty-text="t('nt.forceEmpty')" />
               </div>
               <div>
-                <div class="label">移除（各移除 1 张）</div>
-                <card-picker v-model="b.replace" :ids="starterIds" :allow-upgrade="false" placeholder="从起始牌组里选…" empty-text="不移除。只能选起始牌组里的牌。" />
-                <div class="hint">起始牌组：{{ starterText }}</div>
+                <div class="label">{{ t('nt.remove') }}</div>
+                <card-picker v-model="b.replace" :ids="starterIds" :allow-upgrade="false" :placeholder="t('nt.removePh')" :empty-text="t('nt.removeEmpty')" />
+                <div class="hint">{{ t('nt.starterDeck') }}{{ starterText }}</div>
               </div>
             </div>
           </div>
@@ -89,39 +89,39 @@
 
         <template v-else>
           <div class="panel">
-            <h3>实验来源</h3>
+            <h3>{{ t('nt.source') }}</h3>
             <n-radio-group v-model:value="c.source">
-              <n-radio-button value="preset">预设实验</n-radio-button>
-              <n-radio-button value="custom">自定义</n-radio-button>
+              <n-radio-button value="preset">{{ t('nt.preset') }}</n-radio-button>
+              <n-radio-button value="custom">{{ t('nt.custom') }}</n-radio-button>
             </n-radio-group>
             <div v-if="c.source === 'preset'" style="margin-top:14px">
               <n-select v-model:value="c.preset" :options="presetOptions" @update:value="applyPreset" />
               <div v-if="preset" class="pinfo">
-                <span class="chip">{{ preset.decks.length }} 个卡组</span>
-                <span class="chip">房间：{{ preset.rooms.join('、') }}</span>
-                <span class="chip">mod：{{ preset.mods.join('、') }}</span>
-                <span v-if="preset.n_extra" class="chip">循环探针 {{ preset.n_extra }} 组</span>
-                <span class="chip">默认每格 {{ preset.fights }} 场</span>
+                <span class="chip">{{ t('nt.nDecks', { n: preset.decks.length }) }}</span>
+                <span class="chip">{{ t('nt.roomsChip') }}{{ joinList(preset.rooms.map((r) => tr('room.', r))) }}</span>
+                <span class="chip">mod: {{ joinList(preset.mods) }}</span>
+                <span v-if="preset.n_extra" class="chip">{{ t('nt.loopProbe', { n: preset.n_extra }) }}</span>
+                <span class="chip">{{ t('nt.defaultFights', { n: preset.fights }) }}</span>
               </div>
             </div>
           </div>
 
           <div v-if="c.source === 'custom'" class="panel">
-            <h3>Mod 与卡组</h3>
+            <h3>{{ t('nt.modDecks') }}</h3>
             <div class="label">Mod</div>
             <n-checkbox-group v-model:value="c.mods" @update:value="onMods">
               <div class="mods">
                 <n-checkbox v-for="m in cat.mods" :key="m.id" :value="m.id">
                   <span>{{ m.title }}</span> <span class="faint mono" style="font-size:11.5px">{{ m.id }}</span>
-                  <n-tag v-if="m.user" size="tiny" type="primary" :bordered="false" style="margin-left:6px">上传</n-tag>
+                  <n-tag v-if="m.user" size="tiny" type="primary" :bordered="false" style="margin-left:6px">{{ t('nt.uploaded') }}</n-tag>
                 </n-checkbox>
               </div>
             </n-checkbox-group>
-            <div class="label" style="margin-top:16px">卡组 <span class="faint">（已选 {{ c.decks.length }}）</span></div>
-            <div v-if="!deckGroups.length" class="hint">先选 mod。</div>
+            <div class="label" style="margin-top:16px">{{ t('nt.decks') }} <span class="faint">{{ t('nt.selectedN', { n: c.decks.length }) }}</span></div>
+            <div v-if="!deckGroups.length" class="hint">{{ t('nt.pickModFirst') }}</div>
             <div v-for="g in deckGroups" :key="g.mod" class="dg">
               <div class="row between"><div class="dgt">{{ g.title }}</div>
-                <div class="row"><n-button text size="tiny" @click="selDecks(g, 'start')">只选起始</n-button><n-button text size="tiny" @click="selDecks(g, 'all')">全选</n-button><n-button text size="tiny" @click="selDecks(g, 'none')">清空</n-button></div></div>
+                <div class="row"><n-button text size="tiny" @click="selDecks(g, 'start')">{{ t('nt.onlyStarter') }}</n-button><n-button text size="tiny" @click="selDecks(g, 'all')">{{ t('nt.selectAll') }}</n-button><n-button text size="tiny" @click="selDecks(g, 'none')">{{ t('nt.clear') }}</n-button></div></div>
               <n-checkbox-group v-model:value="c.decks">
                 <div class="decks">
                   <n-checkbox v-for="d in g.decks" :key="d.id" :value="d.id" :label="d.name" />
@@ -129,33 +129,33 @@
               </n-checkbox-group>
             </div>
             <div class="grid g2" style="margin-top:16px">
-              <div><div class="label">房间</div>
-                <n-checkbox-group v-model:value="c.rooms"><div class="row"><n-checkbox v-for="r in cat.rooms" :key="r" :value="r" :label="r" /></div></n-checkbox-group></div>
-              <div><div class="label">每场回合上限</div><n-input-number v-model:value="c.max_turns" :min="1" :max="200" /></div>
+              <div><div class="label">{{ t('nt.rooms') }}</div>
+                <n-checkbox-group v-model:value="c.rooms"><div class="row"><n-checkbox v-for="r in cat.rooms" :key="r" :value="r" :label="tr('room.', r)" /></div></n-checkbox-group></div>
+              <div><div class="label">{{ t('nt.maxTurns') }}</div><n-input-number v-model:value="c.max_turns" :min="1" :max="200" /></div>
             </div>
           </div>
 
           <div class="panel">
-            <h3>规模与 AI</h3>
+            <h3>{{ t('nt.scaleAi') }}</h3>
             <div class="grid g4">
-              <div><div class="label">每格场数</div><n-input-number v-model:value="c.fights" :min="1" :max="5000" /></div>
-              <div><div class="label">种子</div><n-input-number v-model:value="c.seed" :min="0" /></div>
+              <div><div class="label">{{ t('nt.fightsPerCell') }}</div><n-input-number v-model:value="c.fights" :min="1" :max="5000" /></div>
+              <div><div class="label">{{ t('nt.seed') }}</div><n-input-number v-model:value="c.seed" :min="0" /></div>
               <div><div class="label">AI</div><n-select v-model:value="c.agent" :options="cat.agents_combat.map(a => ({ label: a.name, value: a.id }))" /></div>
-              <div><div class="label">并行 <b class="accent">{{ c.procs }}</b></div><n-slider v-model:value="c.procs" :min="1" :max="cat.cpu" /></div>
+              <div><div class="label">{{ t('nt.parallel') }} <b class="accent">{{ c.procs }}</b></div><n-slider v-model:value="c.procs" :min="1" :max="cat.cpu" /></div>
             </div>
           </div>
 
           <div class="panel">
-            <div class="row between"><h3 style="margin:0">上传 mod</h3>
+            <div class="row between"><h3 style="margin:0;white-space:nowrap">{{ t('nt.uploadMod') }}</h3>
               <n-upload :custom-request="upload" :show-file-list="false" accept=".zip">
-                <n-button size="small" secondary :loading="uploading">选择 zip…</n-button>
+                <n-button size="small" secondary :loading="uploading">{{ t('nt.chooseZip') }}</n-button>
               </n-upload></div>
-            <div class="hint" style="margin-top:8px">zip 里放 <span class="mono">mod.yaml</span> + 卡表/卡组 YAML（+ 可选 hooks.py），格式同仓库 README「给新 mod 写内容」。上传后会用模拟器试加载一遍，通过才会加入上面的 mod 列表。只用于战斗实验；整局批量目前只支持内置的 Claude娘 v3.5。hooks.py 是会被执行的 Python 代码，只上传你信任的 mod。</div>
+            <div class="hint" style="margin-top:8px">{{ t('nt.uploadHint') }}</div>
             <div v-if="userMods.length" class="umods">
               <div v-for="m in userMods" :key="m.id" class="umod">
                 <n-icon :component="Package" size="18" class="accent" />
-                <div style="flex:1"><div style="font-weight:600">{{ m.title }}</div><div class="faint" style="font-size:12px">{{ m.id }} · {{ m.decks.length }} 个卡组{{ m.deps.length ? ' · 依赖 ' + m.deps.join('、') : '' }}</div></div>
-                <n-popconfirm @positive-click="delMod(m.id)"><template #trigger><n-button text size="small">删除</n-button></template>删除这个上传的 mod？</n-popconfirm>
+                <div style="flex:1"><div style="font-weight:600">{{ m.title }}</div><div class="faint" style="font-size:12px">{{ m.id }} · {{ t('nt.nDecks', { n: m.decks.length }) }}{{ m.deps.length ? ' · ' + t('nt.deps', { deps: joinList(m.deps) }) : '' }}</div></div>
+                <n-popconfirm :positive-text="t('common.ok')" :negative-text="t('common.cancel')" @positive-click="delMod(m.id)"><template #trigger><n-button text size="small">{{ t('common.delete') }}</n-button></template>{{ t('nt.delModQ') }}</n-popconfirm>
               </div>
             </div>
           </div>
@@ -164,32 +164,32 @@
 
       <div class="aside">
         <div class="panel sticky">
-          <div class="sec-title">本次测试</div>
+          <div class="sec-title">{{ t('nt.thisTest') }}</div>
           <n-input v-model:value="title" :placeholder="autoTitle" />
           <div class="sum">
             <template v-if="kind === 'batch'">
-              <div><span>模式</span><b>整局批量</b></div>
-              <div><span>角色</span><b>{{ store.charName(b.char) }}</b></div>
-              <div><span>进阶</span><b>A{{ b.asc }}</b></div>
-              <div><span>局数</span><b>{{ b.n }}</b></div>
+              <div><span>{{ t('nt.mode') }}</span><b>{{ t('kind.batch') }}</b></div>
+              <div><span>{{ t('nt.char') }}</span><b>{{ store.charName(b.char) }}</b></div>
+              <div><span>{{ t('nt.asc') }}</span><b>A{{ b.asc }}</b></div>
+              <div><span>{{ t('nt.runs') }}</span><b>{{ b.n }}</b></div>
               <div><span>AI</span><b>{{ store.agentName('batch', b.agent) }}</b></div>
-              <div v-if="b.char === 'Claude'"><span>变体</span><b>{{ b.variants.length ? b.variants.join(' + ') : '无' }}</b></div>
-              <div><span>加入</span><b>{{ b.force.length ? b.force.map(store.cardName).join('、') : '—' }}</b></div>
-              <div><span>移除</span><b>{{ b.replace.length ? b.replace.map(store.cardName).join('、') : '—' }}</b></div>
+              <div v-if="b.char === 'Claude'"><span>{{ t('nt.variant') }}</span><b>{{ b.variants.length ? b.variants.join(' + ') : t('common.none') }}</b></div>
+              <div><span>{{ t('nt.add') }}</span><b>{{ b.force.length ? joinList(b.force.map(store.cardName)) : '—' }}</b></div>
+              <div><span>{{ t('nt.removeShort') }}</span><b>{{ b.replace.length ? joinList(b.replace.map(store.cardName)) : '—' }}</b></div>
             </template>
             <template v-else>
-              <div><span>模式</span><b>战斗实验</b></div>
-              <div><span>来源</span><b>{{ c.source === 'preset' ? (preset && preset.title) : '自定义' }}</b></div>
-              <div v-if="c.source === 'custom'"><span>卡组</span><b>{{ c.decks.length }} 个</b></div>
-              <div><span>每格</span><b>{{ c.fights }} 场</b></div>
+              <div><span>{{ t('nt.mode') }}</span><b>{{ t('kind.combat') }}</b></div>
+              <div><span>{{ t('nt.sourceShort') }}</span><b>{{ c.source === 'preset' ? (preset && preset.title) : t('nt.custom') }}</b></div>
+              <div v-if="c.source === 'custom'"><span>{{ t('nt.decks') }}</span><b>{{ c.decks.length }}</b></div>
+              <div><span>{{ t('nt.perCell') }}</span><b>{{ t('nt.nFights', { n: c.fights }) }}</b></div>
               <div><span>AI</span><b>{{ store.agentName('combat', c.agent) }}</b></div>
-              <div v-if="c.source === 'custom'"><span>预计总场数</span><b>{{ combatTotal }}</b></div>
+              <div v-if="c.source === 'custom'"><span>{{ t('nt.totalFights') }}</span><b>{{ combatTotal }}</b></div>
             </template>
           </div>
           <n-button type="primary" size="large" block :loading="starting" :disabled="!canStart" @click="start">
-            <template #icon><n-icon :component="PlayerPlay" /></template>开始运行
+            <template #icon><n-icon :component="PlayerPlay" /></template>{{ t('nt.start') }}
           </n-button>
-          <div class="hint" style="text-align:center">运行后会显示实时速度和预计剩余时间</div>
+          <div class="hint" style="text-align:center">{{ t('nt.startHint') }}</div>
         </div>
       </div>
     </div>
@@ -203,6 +203,7 @@ import { NButton, NCheckbox, NCheckboxGroup, NIcon, NInput, NInputNumber, NPopco
 import { Route, Bolt as Swords, PlayerPlay, Package } from '@vicons/tabler'
 import CardPicker from '../components/CardPicker.vue'
 import { api, store, runTitle } from '../api'
+import { t, tr, joinList } from '../i18n'
 
 const router = useRouter()
 const msg = useMessage()
@@ -235,13 +236,13 @@ const starterText = computed(() => {
   const l = cat.value?.starters?.[b.char] || []
   const cnt = {}
   for (const x of l) cnt[x] = (cnt[x] || 0) + 1
-  return Object.entries(cnt).map(([k, n]) => store.cardName(k) + (n > 1 ? '×' + n : '')).join('、')
+  return joinList(Object.entries(cnt).map(([k, n]) => store.cardName(k) + (n > 1 ? '×' + n : '')))
 })
 const variantOptions = computed(() => (cat.value?.variants || []).map((v) => ({ label: v.id, value: v.id, v })))
 const variantLabel = (o) => h('div', { style: 'display:flex;gap:10px;align-items:baseline' }, [
   h('span', { class: 'mono', style: 'font-weight:600' }, o.v.id), h('span', { style: 'color:#8A857E;font-size:12.5px' }, o.v.desc || o.v.detail)])
 
-const presetOptions = computed(() => (cat.value?.experiments || []).map((e) => ({ label: `${e.title}（${e.id}）`, value: e.id })))
+const presetOptions = computed(() => (cat.value?.experiments || []).map((e) => ({ label: `${e.title} (${e.id})`, value: e.id })))
 const preset = computed(() => (cat.value?.experiments || []).find((e) => e.id === c.preset))
 function applyPreset() { if (preset.value) { c.fights = preset.value.fights; c.seed = preset.value.seed; c.agent = preset.value.agent } }
 const userMods = computed(() => (cat.value?.mods || []).filter((m) => m.user))
@@ -266,7 +267,7 @@ const combatTotal = computed(() => {
   for (const g of deckGroups.value) for (const d of g.decks) if (c.decks.includes(d.id)) n += (d.acts || [1]).length * c.rooms.length * c.fights
   return n
 })
-const autoTitle = computed(() => (kind.value === 'batch' ? runTitle({ kind: 'batch', params: { ...b } }) : (c.source === 'preset' ? (preset.value?.title || '') : '自定义战斗实验')))
+const autoTitle = computed(() => (kind.value === 'batch' ? runTitle({ kind: 'batch', params: { ...b } }) : (c.source === 'preset' ? (preset.value?.title || '') : t('nt.customCombat'))))
 const gameSeedCanon = computed(() => (b.gameSeed || '').toUpperCase().replace(/O/g, '0').replace(/I/g, '1').trim())
 const canStart = computed(() => kind.value === 'batch' ? b.n > 0 : (c.source === 'preset' ? !!c.preset : c.decks.length > 0 && c.rooms.length > 0))
 
@@ -288,7 +289,7 @@ async function upload({ file, onFinish, onError }) {
   fd.append('file', file.file)
   try {
     const r = await api.upload('/api/mods/upload', fd)
-    msg.success(`已加入 mod「${r.title}」：${r.decks} 个卡组可用` + (r.deps.length ? `（需要和 ${r.deps.join('、')} 一起加载）` : ''))
+    msg.success(t('nt.modAdded', { title: r.title, n: r.decks }) + (r.deps.length ? t('nt.modDeps', { deps: joinList(r.deps) }) : ''))
     await store.loadCatalog()
     kind.value = 'combat'; c.source = 'custom'
     onMods([...c.mods, r.name])
@@ -296,7 +297,7 @@ async function upload({ file, onFinish, onError }) {
   } catch (e) { msg.error(e.message, { duration: 8000 }); onError() } finally { uploading.value = false }
 }
 async function delMod(id) {
-  try { await api.del('/api/mods/' + id); c.mods = c.mods.filter((x) => x !== id); await store.loadCatalog(); msg.success('已删除') } catch (e) { msg.error(e.message) }
+  try { await api.del('/api/mods/' + id); c.mods = c.mods.filter((x) => x !== id); await store.loadCatalog(); msg.success(t('common.deleted')) } catch (e) { msg.error(e.message) }
 }
 </script>
 
@@ -309,32 +310,32 @@ async function delMod(id) {
 .mode.on { border-color: rgba(217,119,87,.6); background: linear-gradient(150deg, rgba(217,119,87,.15), #1E1E22 65%); color: #F0A486; box-shadow: 0 0 0 3px rgba(217,119,87,.08); }
 .mt { font-weight: 700; font-size: 15.5px; color: #EDE9E3; }
 .ms { font-size: 12.5px; margin-top: 5px; color: #8A857E; line-height: 1.5; }
-.chars { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+.chars { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
 .char { all: unset; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 6px 12px; border-radius: 12px; border: 1px solid #2E2E34; background: #1A1A1E; transition: all .16s; }
 .char:hover { border-color: #3C3C43; transform: translateY(-1px); }
 .char.on { border-color: #D97757; background: rgba(217,119,87,.1); }
 .av { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: #17171A; font-weight: 800; font-size: 16px; }
-.cn { font-size: 13.5px; font-weight: 600; }
+.cn { font-size: 13.5px; font-weight: 600; text-align: center; overflow-wrap: anywhere; }
 .ci { font-size: 10.5px; color: #6E6A64; }
 .accent { color: #F0A486; }
 .quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .quick button { all: unset; cursor: pointer; padding: 2px 8px; border-radius: 7px; font-size: 12.5px; background: #25252A; color: #A9A49C; border: 1px solid #2E2E34; }
 .quick button:hover { color: #EDE9E3; }
 .quick button.on { background: rgba(217,119,87,.16); color: #F0A486; border-color: rgba(217,119,87,.4); }
-.agents { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.agents { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 .agent { all: unset; cursor: pointer; padding: 12px 14px; border-radius: 11px; border: 1px solid #2E2E34; background: #1A1A1E; transition: all .16s; }
 .agent:hover { border-color: #3C3C43; }
 .agent.off { opacity: .45; cursor: not-allowed; }
 .agent.off:hover { border-color: #2E2E34; }
-.ah { font-size: 11px; color: #B88A5A; margin-top: 6px; line-height: 1.4; }
+.ah { font-size: 11px; color: #B88A5A; margin-top: 6px; line-height: 1.4; overflow-wrap: anywhere; }
 .agent.on { border-color: #D97757; background: rgba(217,119,87,.1); }
-.an { font-weight: 650; font-size: 13.5px; }
-.ad { font-size: 12px; color: #8A857E; margin-top: 4px; line-height: 1.45; }
+.an { font-weight: 650; font-size: 13.5px; overflow-wrap: anywhere; }
+.ad { font-size: 12px; color: #8A857E; margin-top: 4px; line-height: 1.45; overflow-wrap: anywhere; }
 .pinfo { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .mods { display: flex; flex-wrap: wrap; gap: 10px 22px; }
 .dg { margin-top: 10px; padding: 12px 14px; border-radius: 11px; background: #1A1A1E; border: 1px solid #2A2A2F; }
 .dgt { font-weight: 600; font-size: 13px; color: #CFCAC2; margin-bottom: 8px; }
-.decks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 14px; }
+.decks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 14px; }
 .sum { margin: 16px 0 18px; display: flex; flex-direction: column; gap: 9px; }
 .sum > div { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
 .sum span { color: #8A857E; flex: none; }

@@ -11,23 +11,14 @@ import sys
 
 import yaml
 
-from . import metrics, paths
+from . import i18n, metrics, paths
 
-AGENTS_BATCH = [
-    {"id": "heuristic", "name": "启发式（快）", "desc": "贪心逐动作模拟，最快；整局默认"},
-    {"id": "modai", "name": "通用 AI（推荐，模组角色也能用）", "desc": "选牌/休息/商店用一个只看通用数值（费用、伤害、格挡…）的小网络，出牌同学习版；任何角色都能用，速度同学习版，Windows 可用"},
-    {"id": "modai-boss", "name": "通用 AI（首领战搜索）", "desc": "通用 AI + 首领战整场推演；慢 20–40 倍，仅 Linux/macOS"},
-    {"id": "learned", "name": "学习版 AI", "desc": "强 AI + 自我对局学到的参数（CMA-ES），不搜索、速度同强 AI，Windows 可用"},
-    {"id": "learned-search", "name": "学习版 AI（带搜索）", "desc": "学习版参数 + 精英/首领前瞻搜索；最强也最慢，仅 Linux/macOS"},
-    {"id": "learned-boss", "name": "学习版 AI（只在首领战搜索）", "desc": "学习版参数，首领战用整场推演搜索；比全程搜索快，仅 Linux/macOS"},
-    {"id": "strong-nosearch", "name": "强 AI（不搜索）", "desc": "首领感知的选牌/休息，单卡 A/B 常用（旧基线）"},
-    {"id": "strong", "name": "强 AI（带搜索）", "desc": "最强也最慢"},
-    {"id": "search", "name": "束搜索", "desc": "宽 6 深 1 的搜索 AI"},
-]
+# AI 列表：名字和说明在 gui/locales/<lang>.json 的 agent.<id>.name / .desc（随界面语言）
+AGENTS_BATCH = ["heuristic", "modai", "modai-boss", "learned", "learned-search", "learned-boss", "strong-nosearch", "strong", "search"]
 if os.name == "nt":
-    # 「搜索」类 AI 用 os.fork() 给游戏状态拍快照，Windows 没有 fork，只能用不搜索的两种
-    AGENTS_BATCH = [a for a in AGENTS_BATCH if a["id"] in ("heuristic", "modai", "learned", "strong-nosearch")]
-MENTOR_HINT = "需要自己构建外部的 spire-mentor，并设置 DECKBENCH_MENTOR_SITE / DECKBENCH_MENTOR_PY 后重启（见 docs/DEVELOPER.md）"
+    # 「搜索」类 AI 用 os.fork() 给游戏状态拍快照，Windows 没有 fork，只能用不搜索的几种
+    AGENTS_BATCH = [a for a in AGENTS_BATCH if a in ("heuristic", "modai", "learned", "strong-nosearch")]
+MENTOR_AGENTS = ["mentor-full", "mentor-full-ev"]
 
 
 def mentor_configured():
@@ -36,24 +27,40 @@ def mentor_configured():
     return bool(site and py and os.path.isdir(os.path.join(site, "sts2_rs")) and os.path.isdir(os.path.join(py, "sts2_hint")))
 
 
-def agents_batch():
+def _agent(prefix, aid, lang):
+    return {"id": aid, "name": i18n.t(f"{prefix}.{aid}.name", lang), "desc": i18n.t(f"{prefix}.{aid}.desc", lang)}
+
+
+def agents_batch(lang=None):
     ok = mentor_configured()
-    return AGENTS_BATCH + [{
-        "id": "mentor-full", "name": "spire-mentor 整局 AI（外部）",
-        "desc": "战斗用 spire-mentor 的 MCTS，选牌/路线/商店/休息用它的 PPO 网络；只支持 5 个原版角色（模组角色回退学习版 AI）；约 30–50 秒/局",
-        "available": ok, "hint": "" if ok else MENTOR_HINT}, {
-        "id": "mentor-full-ev", "name": "spire-mentor 整局 AI＋事件（外部，A10 最强）",
-        "desc": "在上一项基础上，普通事件和锻造/删牌/变形/附魔也交给 PPO（事件英文文本运行时从你的游戏安装读），首领/精英战 4000 次模拟；约 50–130 秒/局",
-        "available": ok, "hint": "" if ok else MENTOR_HINT}]
+    out = [_agent("agent", a, lang) for a in AGENTS_BATCH]
+    for a in MENTOR_AGENTS:
+        out.append({**_agent("agent", a, lang), "available": ok, "hint": "" if ok else i18n.t("agent.mentorHint", lang)})
+    return out
 
 
-AGENTS_COMBAT = [
-    {"id": "heuristic", "name": "启发式（快）", "desc": "贪心，不规划下回合"},
-    {"id": "beam", "name": "束搜索", "desc": "宽 4 深 4，能找到需要铺引擎的组合，慢"},
-]
+AGENTS_COMBAT = ["heuristic", "beam"]
+
+
+def agents_combat(lang=None):
+    return [_agent("agentc", a, lang) for a in AGENTS_COMBAT]
+
+
+# 简体中文回退名（游戏文本读不到时用；其他语言回退到英文 ID）
 CHAR_ZH = {"Ironclad": "铁甲战士", "Silent": "静默猎手", "Defect": "故障机器人", "Necrobinder": "亡灵契约师",
            "Regent": "储君", "Claude": "Claude娘"}
-ROOMS = ["普通", "精英", "首领", "弱怪"]
+ROOMS = ["普通", "精英", "首领", "弱怪"]   # 房间 ID（战斗实验 YAML 里就是这些字）；界面显示用 room.<ID> 翻译
+
+
+def char_name(cid, lang=None):
+    """角色名：我们自己的 mod 角色用翻译表；原版角色从你的游戏安装按所选语言读（characters 表），读不到再回退。"""
+    lang = lang or i18n.current()
+    if i18n.has(f"char.{cid}", lang):
+        return i18n.t(f"char.{cid}", lang)
+    v = i18n.game_text("characters", str(cid).upper(), lang)
+    if v:
+        return v
+    return CHAR_ZH.get(cid, cid) if lang == "zhs" else cid
 
 
 class SimBackend:
@@ -61,10 +68,10 @@ class SimBackend:
     id = "base"
     name = "未命名后端"
 
-    def capabilities(self):
+    def capabilities(self, lang=None):
         raise NotImplementedError
 
-    def catalog(self, refresh=False):
+    def catalog(self, refresh=False, lang=None):
         raise NotImplementedError
 
     def build_command(self, kind, params, run_dir):
@@ -107,21 +114,29 @@ class LocalPythonBackend(SimBackend):
     def __init__(self):
         self._catalog = None
 
-    def capabilities(self):
+    def capabilities(self, lang=None):
         return {"batch": True, "combat": True, "yaml_mods": True, "dll_mods": False,
-                "engine": "本机转译引擎（整局，版本取自你的安装）+ YAML 战斗模拟器"}
+                "engine": i18n.t("backend.engine", lang)}
 
     # ---------------- 目录：角色、AI、变体、卡牌、实验预设、mod
+    CARDS_CACHE_VERSION = 2   # 2：卡牌带 rarity_id/type_id/own_name，名字按界面语言在 catalog() 里填
+
     def _cards(self, refresh=False):
         cache = os.path.join(paths.CACHE_DIR, "cards.json")
         src = os.path.join(paths.SIM_ROOT, "mods", "claude_v35", "cards_v35.py")
         if not refresh and os.path.exists(cache) and os.path.getmtime(cache) >= os.path.getmtime(src):
-            return json.load(open(cache, encoding="utf-8"))
+            try:
+                d = json.load(open(cache, encoding="utf-8"))
+                if d.get("version") == self.CARDS_CACHE_VERSION:
+                    return d
+            except ValueError:
+                pass
         p = subprocess.run(worker_argv("cards"), env=worker_env(), cwd=paths.SIM_ROOT, capture_output=True,
                            text=True, encoding="utf-8", timeout=300, **_no_window())
         if p.returncode != 0:
-            raise RuntimeError("读取卡牌列表失败：\n" + p.stderr[-2000:])
+            raise RuntimeError(i18n.t("backend.cardsFailed") + "\n" + p.stderr[-2000:])
         d = json.loads(p.stdout.strip().splitlines()[-1])
+        d["version"] = self.CARDS_CACHE_VERSION
         os.makedirs(paths.CACHE_DIR, exist_ok=True)
         json.dump(d, open(cache, "w", encoding="utf-8"), ensure_ascii=False)
         return d
@@ -156,34 +171,86 @@ class LocalPythonBackend(SimBackend):
                             "n_card_files": len(meta.get("cards", []) or []), "hooks": bool(meta.get("hooks"))})
         return out
 
-    def experiments(self):
+    def experiments(self, lang=None):
         out = []
         for f in sorted(glob.glob(os.path.join(paths.SIM_ROOT, "experiments", "*.yaml"))):
             try:
                 e = yaml.safe_load(open(f, encoding="utf-8")) or {}
             except Exception:
                 continue
-            out.append({"id": os.path.basename(f)[:-5], "name": e.get("name"), "title": e.get("title") or e.get("name"),
+            eid = os.path.basename(f)[:-5]
+            title = i18n.t(f"preset.{eid}", lang) if i18n.has(f"preset.{eid}", lang) else (e.get("title") or e.get("name"))
+            out.append({"id": eid, "name": e.get("name"), "title": title,
                         "mods": e.get("mods", []), "decks": e.get("decks", []), "rooms": e.get("rooms", ["普通", "精英", "首领"]),
                         "fights": e.get("fights", 100), "max_turns": e.get("max_turns", 30), "agent": e.get("agent", "heuristic"),
                         "seed": e.get("seed", 1), "n_extra": len(e.get("extra") or [])})
         return out
 
-    def encounter_names(self):
-        f = os.path.join(__import__("sts2sim.gamedata").gamedata.codex_dir(), "zhs_encounters.json")
+    def encounter_names(self, lang=None):
+        """遭遇/事件 ID → 名字（死因图用）：按所选语言从你的游戏安装读，缺的回退英文、中文；
+        再缺就用 spire-codex 导出（如果你导出过）；都没有界面显示 ID。"""
+        lang = lang or i18n.current()
+        out = {}
         try:
-            return {e["id"]: e["name"] for e in json.load(open(f, encoding="utf-8"))}
-        except Exception:
-            return {}
+            from sts2sim import gameloc
+            for g in reversed(i18n.game_langs(lang)):        # 先放回退语言，再用所选语言覆盖
+                for tb in ("events", "encounters"):
+                    for k, v in (gameloc.table(tb, g) or {}).items():
+                        if k.endswith(".title") and isinstance(v, str) and v.strip():
+                            out[k[:-6]] = v
+        except Exception:  # noqa
+            pass
+        codex = __import__("sts2sim.gamedata").gamedata.codex_dir()
+        for pre in (["zhs", "eng"] if lang == "zhs" else ["eng", "zhs"]):
+            try:
+                for e in json.load(open(os.path.join(codex, f"{pre}_encounters.json"), encoding="utf-8")):
+                    out.setdefault(e["id"], e["name"])
+            except Exception:  # noqa
+                pass
+        return out
 
-    def catalog(self, refresh=False):
+    def card_names(self, ids, lang=None):
+        """卡牌 ID → 名字：按所选语言从你的游戏安装读（cards 表），缺了回退英文、中文；简体中文再回退 spire-codex 导出。"""
+        lang = lang or i18n.current()
+        out = {}
+        try:
+            from sts2sim import gameloc
+            tables = [gameloc.table("cards", g) or {} for g in i18n.game_langs(lang)]
+        except Exception:  # noqa
+            tables = []
+        for cid in ids:
+            for tb in tables:
+                v = tb.get(f"{cid}.title")
+                if isinstance(v, str) and v.strip():
+                    out[cid] = v
+                    break
+        return out
+
+    def catalog(self, refresh=False, lang=None):
+        lang = lang if lang in i18n.LANGS else i18n.current()
         c = self._cards(refresh)
-        chars = [{"id": k, "name": CHAR_ZH.get(k, k)} for k in c.get("characters", [])]
-        return {"backend": {"id": self.id, "name": self.name, **self.capabilities()},
-                "characters": chars, "agents_batch": agents_batch(), "agents_combat": AGENTS_COMBAT,
-                "variants": c["variants"], "cards": c["cards"], "starters": c["starters"], "rooms": ROOMS,
-                "experiments": self.experiments(), "mods": self.mods(), "cpu": os.cpu_count() or 1,
-                "encounters": self.encounter_names()}
+        chars = [{"id": k, "name": char_name(k, lang)} for k in c.get("characters", [])]
+        names = self.card_names([x["id"] for x in c["cards"] if not x.get("own_name")], lang)
+        cards = []
+        for x in c["cards"]:
+            x = dict(x)
+            if not x.get("own_name"):
+                # 没读到游戏文本：简体中文用 spire-codex 导出的名字（worker 已填），其他语言显示 ID
+                x["name"] = names.get(x["id"]) or (x.get("name_codex") if lang == "zhs" else None) or x["id"]
+            pool = x.get("pool", "")
+            x["pool_name"] = char_name(pool, lang) if pool in c.get("characters", []) else i18n.tr("pool.", pool, lang)
+            x["rarity"] = i18n.tr("rarity.", x.get("rarity_id", ""), lang)
+            x["type"] = i18n.tr("ctype.", x.get("type_id", ""), lang)
+            cards.append(x)
+        # 变体说明：有翻译用翻译；简体中文用源码注释；其他语言没有翻译时显示参数本身（和语言无关）
+        variants = [dict(v, desc=i18n.t(f"variant.{v['id']}", lang)) if i18n.has(f"variant.{v['id']}", lang)
+                    else (v if lang == "zhs" else dict(v, desc="")) for v in c["variants"]]
+        return {"backend": {"id": self.id, "name": i18n.t("backend.name", lang), **self.capabilities(lang)},
+                "lang": lang, "game_langs": sorted(_game_langs()),
+                "characters": chars, "agents_batch": agents_batch(lang), "agents_combat": agents_combat(lang),
+                "variants": variants, "cards": cards, "starters": c["starters"], "rooms": ROOMS,
+                "experiments": self.experiments(lang), "mods": self.mods(), "cpu": os.cpu_count() or 1,
+                "encounters": self.encounter_names(lang)}
 
     # ---------------- 运行
     def build_command(self, kind, params, run_dir):
@@ -209,7 +276,7 @@ class LocalPythonBackend(SimBackend):
                 exp.pop("extra", None)
                 exp.pop("summary_md", None)
             exp["name"] = exp.get("name") or "gui_" + os.path.basename(run_dir)
-            exp["title"] = p.get("title") or exp.get("title") or "自定义战斗实验"
+            exp["title"] = p.get("title") or exp.get("title") or i18n.t("nt.customCombat")
             exp["seed"] = int(p.get("seed", exp.get("seed", 1)))
             exp["fights"] = int(p.get("fights", exp.get("fights", 50)))
             exp["agent"] = p.get("agent") or exp.get("agent", "heuristic")
@@ -243,6 +310,14 @@ class LocalPythonBackend(SimBackend):
         if p.returncode != 0:
             return {"ok": False, "error": (p.stderr or p.stdout)[-3000:]}
         return json.loads(p.stdout.strip().splitlines()[-1])
+
+
+def _game_langs():
+    try:
+        from sts2sim import gameloc
+        return gameloc.languages()
+    except Exception:  # noqa
+        return set()
 
 
 BACKENDS = {"local-python": LocalPythonBackend}

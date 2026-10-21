@@ -3,6 +3,9 @@
 html, body, #app { margin: 0; height: 100%; background: #131315; }
 body { font-family: "Inter", "HarmonyOS Sans SC", "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", system-ui, sans-serif;
   color: #EDE9E3; -webkit-font-smoothing: antialiased; font-feature-settings: "tnum" 1; }
+html:lang(en) body { font-family: "Inter", "Segoe UI", system-ui, "Microsoft YaHei UI", "Noto Sans CJK SC", sans-serif; }
+html:lang(ja) body { font-family: "Inter", "Yu Gothic UI", "Meiryo UI", "Meiryo", "Hiragino Sans", "Noto Sans CJK JP", "Noto Sans JP", system-ui, sans-serif; }
+html:lang(ko) body { font-family: "Inter", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans CJK KR", "Noto Sans KR", system-ui, sans-serif; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: #2E2E34; border-radius: 10px; border: 2px solid #131315; }
 ::-webkit-scrollbar-thumb:hover { background: #3A3A41; }

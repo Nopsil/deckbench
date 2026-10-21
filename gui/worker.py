@@ -17,7 +17,7 @@ import time
 if __package__ in (None, ""):
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from gui import paths  # noqa: E402
+from gui import i18n, paths  # noqa: E402
 
 paths.setup_sys_path()
 
@@ -69,18 +69,24 @@ def cmd_batch(a):
     cfg = {"name": a.agent, "kw": akw, "variant": a.variant or None,
            "force": [x for x in a.force.split(",") if x], "replace": [x for x in a.replace.split(",") if x],
            "timeout": a.timeout or (60 if a.agent == "heuristic" else 900), "log_dir": a.log_dir or None}
-    seeds = f"种子 {jobs[0][2]}" if a.game_seed else f"种子 R{a.start}…R{a.start + a.n - 1}"
-    print(f"整局批量：{a.char} A{a.asc}，{len(jobs)} 局（{seeds}），AI {a.agent}，"
-          f"变体 {a.variant or '无'}，加入 {cfg['force'] or '无'}，移除 {cfg['replace'] or '无'}，并行 {a.procs}", flush=True)
+    T = i18n.t
+    none = T("common.none")
+    seeds = T("log.seed", s=jobs[0][2]) if a.game_seed else T("log.seedRange", a=f"R{a.start}", b=f"R{a.start + a.n - 1}")
+    print(T("log.batchStart", char=a.char, asc=a.asc, n=len(jobs), seeds=seeds, agent=a.agent, variant=a.variant or none,
+            force=i18n.join(cfg["force"]) or none, replace=i18n.join(cfg["replace"]) or none, procs=a.procs), flush=True)
     emit("PROGRESS", {"done": 0, "total": len(jobs)})
     t = time.time()
     res = []
     with mp.Pool(a.procs, initializer=_batch_init, initargs=(cfg,)) as pool:
         for r in pool.imap_unordered(_one_safe, jobs, chunksize=1):
             res.append(r)
-            tag = "胜利" if r.get("victory") else ("出错" if r.get("error") else f"止步第 {r.get('floor')} 层")
+            tag = T("log.win") if r.get("victory") else (T("log.error") if r.get("error") else T("log.diedAt", floor=r.get("floor")))
             dr = r.get("death_room")
-            print(f"[{len(res)}/{len(jobs)}] {r['seed']}：{tag}" + (f"（{dr[1]} {dr[2]}）" if dr and not r.get("victory") else ""), flush=True)
+            where = ""
+            if dr and not r.get("victory"):
+                enc = i18n.game_text("events" if dr[1] == "Event" else "encounters", str(dr[2])) or str(dr[2])
+                where = f" ({i18n.tr('room.', dr[1])} {enc})"
+            print(f"[{len(res)}/{len(jobs)}] {r['seed']}: {tag}{where}", flush=True)
             emit("PROGRESS", {"done": len(res), "total": len(jobs)})
     order = {s: i for i, (_, _, s) in enumerate(jobs)}
     res.sort(key=lambda r: order.get(r["seed"], 0))
@@ -90,7 +96,7 @@ def cmd_batch(a):
             f.write(json.dumps(r, default=str, ensure_ascii=False) + "\n")
     wins = sum(bool(r.get("victory")) for r in res)
     errs = sum(1 for r in res if r.get("error"))
-    print(f"完成：{wins}/{len(res)} 胜，出错 {errs}，用时 {dt:.1f} 秒", flush=True)
+    print(T("log.batchDone", wins=wins, n=len(res), errs=errs, secs=f"{dt:.1f}"), flush=True)
     emit("DONE", {"secs": dt, "out": a.out})
 
 
@@ -120,7 +126,8 @@ def cmd_combat(a):
     M = R.get_modset(exp["mods"])
     tasks = R.plan(exp, M, a.fights)
     jobs = a.jobs or os.cpu_count() or 1
-    print(f"战斗实验：{exp.get('title') or exp['name']}，{len(tasks)} 场，AI {exp.get('agent', 'heuristic')}，并行 {jobs}", flush=True)
+    T = i18n.t
+    print(T("log.combatStart", title=exp.get("title") or exp["name"], n=len(tasks), agent=exp.get("agent", "heuristic"), procs=jobs), flush=True)
     emit("PROGRESS", {"done": 0, "total": len(tasks)})
     t0 = time.time()
     results = []
@@ -132,7 +139,7 @@ def cmd_combat(a):
             if len(results) - last >= max(1, len(tasks) // 50) or len(results) == len(tasks):
                 last = len(results)
                 emit("PROGRESS", {"done": len(results), "total": len(tasks)})
-                print(f"[{len(results)}/{len(tasks)}] 已完成", flush=True)
+                print(f"[{len(results)}/{len(tasks)}] " + T("log.progressDone"), flush=True)
         approx = pool.map(R._collect_approx, range(jobs * 4))
     allapprox = {}
     for x in approx:
@@ -147,19 +154,14 @@ def cmd_combat(a):
             r.pop("log", None)
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
     json.dump(meta, open(os.path.join(a.out, "meta.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-    print("生成报告…", flush=True)
+    print(T("log.makingReport"), flush=True)
     make_report(a.out, M)
-    print(f"完成 {len(tasks)} 场，用时 {wall:.1f} 秒", flush=True)
+    print(T("log.combatDone", n=len(tasks), secs=f"{wall:.1f}"), flush=True)
     emit("DONE", {"secs": wall, "out": a.out})
 
 
 # ---------------------------------------------------------------- 卡牌列表
-POOL_NAMES = {"Ironclad": "铁甲战士", "Silent": "静默猎手", "Defect": "故障机器人", "Necrobinder": "亡灵契约师",
-              "Regent": "储君", "Claude": "Claude娘", "Colorless": "无色", "Event": "事件", "Curse": "诅咒",
-              "Token": "衍生", "Status": "状态", "Quest": "任务", "Deprecated": "废弃"}
-RARITY = {"Basic": "基础", "Common": "普通", "Uncommon": "罕见", "Rare": "稀有", "Ancient": "远古", "Event": "事件",
-          "Curse": "诅咒", "Status": "状态", "Token": "衍生", "Quest": "任务"}
-TYPE = {"Attack": "攻击", "Skill": "技能", "Power": "能力", "Status": "状态", "Curse": "诅咒", "Quest": "任务"}
+# 卡池/稀有度/类型只输出英文 ID（rarity_id / type_id / pool），显示用的文字由界面按所选语言翻译（gui/locales）
 
 
 def cmd_cards(a):
@@ -182,13 +184,15 @@ def cmd_cards(a):
     for c in G._iter(G.ModelDb.AllCards):
         cid = c.Id.Entry
         pool = type(c.Pool).__name__.replace("CardPool", "")
-        name = getattr(c, "ClaudeName", None) or (zh.get(cid) or {}).get("name") or cid
+        own = getattr(c, "ClaudeName", None)    # 我们自己 mod 的卡（名字是 mod 内容，不随语言变）
+        codex = (zh.get(cid) or {}).get("name")
+        name = own or codex or cid
         up_name = None
         spec = getattr(type(c), "_claude_spec", None)
         if spec and spec.get("up_name"):
             up_name = spec["up_name"]
-        out.append({"id": cid, "name": str(name), "up_name": up_name, "pool": pool, "pool_zh": POOL_NAMES.get(pool, pool),
-                    "rarity": RARITY.get(str(c.Rarity), str(c.Rarity)), "type": TYPE.get(str(c.Type), str(c.Type)),
+        out.append({"id": cid, "name": str(name), "own_name": bool(own), "name_codex": codex, "up_name": up_name, "pool": pool,
+                    "rarity_id": str(c.Rarity), "type_id": str(c.Type),
                     "desc": (zh.get(cid) or {}).get("description")})
     vdesc = {}
     try:
@@ -205,7 +209,7 @@ def cmd_cards(a):
     except Exception:
         pass
     vdesc.setdefault("v35_orig", "")
-    vdesc["v35_orig"] = "v3.5 原值（v3.5.1 之前的默认：小本本 3 伤，已核实每层 +2 上限 +8，初始生命 75）"
+    vdesc["v35_orig"] = ""     # 说明在 gui/locales 的 variant.v35_orig（随界面语言）
     vlist = [{"id": k, "desc": vdesc.get(k) or "", "detail": repr(v)[:300]} for k, v in VARIANTS.items()]
     print(json.dumps({"cards": out, "variants": vlist, "starters": starters, "characters": list(CHARACTERS)},
                      ensure_ascii=False))

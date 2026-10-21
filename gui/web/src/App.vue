@@ -1,5 +1,5 @@
 <template>
-  <n-config-provider :theme="darkTheme" :theme-overrides="themeOverrides" :locale="zhCN" :date-locale="dateZhCN">
+  <n-config-provider :theme="darkTheme" :theme-overrides="themeOv" :locale="nLocale.ui" :date-locale="nLocale.date">
     <n-message-provider>
       <n-dialog-provider>
         <div class="shell">
@@ -10,17 +10,21 @@
               </div>
               <div>
                 <div class="bt">DeckBench</div>
-                <div class="bs">非官方 mod 平衡测试 · unofficial</div>
+                <div class="bs">{{ t('app.tagline') }}</div>
               </div>
             </div>
             <nav>
               <router-link v-for="it in nav" :key="it.to" :to="it.to" class="nav" :class="{ on: isOn(it) }">
                 <n-icon :component="it.icon" size="19" />
-                <span>{{ it.text }}</span>
+                <span>{{ t(it.text) }}</span>
                 <span v-if="it.to === '/run' && runningCount" class="badge">{{ runningCount }}</span>
               </router-link>
             </nav>
             <div class="foot">
+              <div class="lang">
+                <n-icon :component="World" size="16" class="lang-ic" />
+                <n-select :value="lang" :options="langOptions" size="small" :consistent-menu-width="false" :aria-label="t('app.language')" @update:value="changeLang" />
+              </div>
               <div v-if="store.catalog" class="eng">
                 <div class="dot"></div>
                 <div>
@@ -28,22 +32,22 @@
                   <div class="es">{{ store.catalog.backend.engine }}</div>
                 </div>
               </div>
-              <div v-else-if="store.catalogError" class="eng err">后端出错：{{ store.catalogError }}</div>
-              <div v-else class="eng"><n-spin size="small" /> <span class="es">正在载入模拟器数据…</span></div>
+              <div v-else-if="store.catalogError" class="eng err">{{ t('app.backendError', { err: store.catalogError }) }}</div>
+              <div v-else class="eng"><n-spin size="small" /> <span class="es">{{ t('app.loadingSim') }}</span></div>
               <div v-if="appVersion" class="ver">DeckBench v{{ appVersion }}</div>
             </div>
           </aside>
           <main class="main">
             <header class="top page">
               <div>
-                <h1>{{ route.meta.title }}</h1>
-                <div class="sub">{{ route.meta.sub }}</div>
+                <h1>{{ route.meta.key ? t('page.' + route.meta.key + '.title') : '' }}</h1>
+                <div class="sub">{{ route.meta.key ? t('page.' + route.meta.key + '.sub') : '' }}</div>
               </div>
               <div id="top-actions"></div>
             </header>
             <router-view v-slot="{ Component }">
               <transition name="fade" mode="out-in">
-                <component :is="Component" :key="route.fullPath" />
+                <component :is="Component" :key="route.fullPath + '|' + lang" />
               </transition>
             </router-view>
           </main>
@@ -56,19 +60,29 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { NConfigProvider, NMessageProvider, NDialogProvider, NIcon, NSpin, darkTheme, zhCN, dateZhCN } from 'naive-ui'
-import { CirclePlus, PlayerPlay, ChartBar, Scale, History } from '@vicons/tabler'
-import { themeOverrides } from './theme'
+import { NConfigProvider, NMessageProvider, NDialogProvider, NIcon, NSelect, NSpin, darkTheme, zhCN, dateZhCN, enUS, dateEnUS, jaJP, dateJaJP, koKR, dateKoKR } from 'naive-ui'
+import { CirclePlus, PlayerPlay, ChartBar, Scale, History, World } from '@vicons/tabler'
+import { themeFor } from './theme'
 import { store } from './api'
+import { t, lang, LANGS, setLang } from './i18n'
 
 const route = useRoute()
 const nav = [
-  { to: '/new', text: '新建测试', icon: CirclePlus },
-  { to: '/run', text: '运行中', icon: PlayerPlay },
-  { to: '/report', text: '报告', icon: ChartBar },
-  { to: '/ab', text: '单卡 A/B', icon: Scale },
-  { to: '/history', text: '历史记录', icon: History },
+  { to: '/new', text: 'nav.new', icon: CirclePlus },
+  { to: '/run', text: 'nav.run', icon: PlayerPlay },
+  { to: '/report', text: 'nav.report', icon: ChartBar },
+  { to: '/ab', text: 'nav.ab', icon: Scale },
+  { to: '/history', text: 'nav.history', icon: History },
 ]
+const NAIVE = { zhs: { ui: zhCN, date: dateZhCN }, en: { ui: enUS, date: dateEnUS }, ja: { ui: jaJP, date: dateJaJP }, ko: { ui: koKR, date: dateKoKR } }
+const nLocale = computed(() => NAIVE[lang.value] || NAIVE.zhs)
+const themeOv = computed(() => themeFor(lang.value))
+const langOptions = LANGS.map((x) => ({ label: x.label, value: x.id }))
+async function changeLang(l) {
+  if (l === lang.value) return
+  await setLang(l)
+  store.loadCatalog()   // 卡牌/角色/遭遇名按新语言从你的游戏安装重新读
+}
 const isOn = (it) => route.path === it.to || route.path.startsWith(it.to + '/')
 const runningCount = computed(() => store.runs.filter((r) => r.status === 'running').length)
 let timer
@@ -99,6 +113,8 @@ nav { display: flex; flex-direction: column; gap: 3px; }
 .nav.on::before { content: ''; position: absolute; left: -14px; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; background: #D97757; }
 .badge { margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: #D97757; color: #1B1B1E; font-size: 12px; font-weight: 700; display: grid; place-items: center; }
 .foot { margin-top: auto; }
+.lang { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding: 0 2px; }
+.lang-ic { color: #77736C; flex: none; }
 .eng { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: 12px; background: #1E1E22; border: 1px solid #2A2A2F; }
 .ver { margin-top: 10px; padding: 0 4px; font-size: 11px; color: #77736C; letter-spacing: .02em; }
 .eng.err { color: #E06C6C; font-size: 12px; }

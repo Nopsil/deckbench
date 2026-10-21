@@ -16,19 +16,35 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import paths
+from . import i18n, paths
 from .backend import get_backend
 from .jobs import JobManager
 
 backend = get_backend()
 jobs = JobManager(backend)
 app = FastAPI(title="DeckBench GUI")
+T = i18n.t
+
+
+@app.middleware("http")
+async def lang_middleware(request, call_next):
+    """前端每个请求带 x-lang（当前界面语言），错误信息等按它翻译。"""
+    tok = i18n.set_request_lang(request.headers.get("x-lang"))
+    try:
+        return await call_next(request)
+    finally:
+        i18n._REQ_LANG.reset(tok)
 
 
 class StartReq(BaseModel):
     kind: str
     params: dict
     title: str | None = None
+    lang: str | None = None
+
+
+class SettingsReq(BaseModel):
+    lang: str
 
 
 class TitleReq(BaseModel):
@@ -38,14 +54,14 @@ class TitleReq(BaseModel):
 def _need(rid):
     m = jobs.get(rid)
     if not m:
-        raise HTTPException(404, "找不到这次测试")
+        raise HTTPException(404, T("err.runNotFound"))
     return m
 
 
 @app.get("/api/catalog")
-def catalog(refresh: bool = False):
+def catalog(refresh: bool = False, lang: str | None = None):
     try:
-        return backend.catalog(refresh)
+        return backend.catalog(refresh, lang=lang if lang in i18n.LANGS else None)
     except Exception as e:  # noqa
         raise HTTPException(500, str(e))
 
@@ -58,11 +74,11 @@ def runs():
 @app.post("/api/runs")
 def start(req: StartReq):
     if req.kind not in ("batch", "combat"):
-        raise HTTPException(400, "未知类型")
+        raise HTTPException(400, T("err.unknownKind"))
     p = req.params
     if req.kind == "combat" and not p.get("preset") and not p.get("decks"):
-        raise HTTPException(400, "至少选一个卡组")
-    return jobs.start(req.kind, p, req.title)
+        raise HTTPException(400, T("err.needDeck"))
+    return jobs.start(req.kind, p, req.title, lang=req.lang or i18n.current())
 
 
 @app.get("/api/runs/{rid}")
@@ -96,14 +112,14 @@ def cancel(rid: str):
 def rerun(rid: str):
     m = _need(rid)
     t = m.get("title") or ""
-    return jobs.start(m["kind"], m["params"], (t + "（重跑）") if t else None)
+    return jobs.start(m["kind"], m["params"], (t + T("err.rerunSuffix")) if t else None, lang=i18n.current())
 
 
 @app.get("/api/runs/{rid}/summary")
 def summary(rid: str):
     m = _need(rid)
     if m.get("status") != "done":
-        raise HTTPException(409, "这次测试还没有完成")
+        raise HTTPException(409, T("err.notDone"))
     return {"meta": m, "summary": backend.summarize(m["kind"], jobs.run_dir(rid))}
 
 
@@ -112,7 +128,7 @@ def report(rid: str):
     _need(rid)
     f = os.path.join(jobs.run_dir(rid), "out", "report.md")
     if not os.path.exists(f):
-        raise HTTPException(404, "这次测试没有生成 report.md")
+        raise HTTPException(404, T("err.noReport"))
     return {"markdown": open(f, encoding="utf-8").read()}
 
 
@@ -182,9 +198,9 @@ async def stream(rid: str, since: int = 0):
 def ab(a: str, b: str):
     ma, mb = _need(a), _need(b)
     if ma["kind"] != mb["kind"]:
-        raise HTTPException(400, "两次测试类型不同（整局批量 vs 战斗实验），不能对比")
+        raise HTTPException(400, T("err.abKind"))
     if ma.get("status") != "done" or mb.get("status") != "done":
-        raise HTTPException(400, "两次测试都要已完成")
+        raise HTTPException(400, T("err.abNotDone"))
     return {"kind": ma["kind"], "a": ma, "b": mb, "result": backend.ab(ma["kind"], jobs.run_dir(a), jobs.run_dir(b))}
 
 
@@ -196,44 +212,44 @@ NAME_RE = re.compile(r"^[A-Za-z0-9_]{1,40}$")
 async def upload_mod(file: UploadFile = File(...)):
     data = await file.read()
     if len(data) > 50 * 1024 * 1024:
-        raise HTTPException(400, "文件太大（上限 50 MB）")
+        raise HTTPException(400, T("err.tooBig"))
     try:
         zf = zipfile.ZipFile(io.BytesIO(data))
     except zipfile.BadZipFile:
-        raise HTTPException(400, "不是有效的 zip 文件")
+        raise HTTPException(400, T("err.badZip"))
     names = [n for n in zf.namelist() if not n.endswith("/")]
     for n in names:
         if n.startswith("/") or ".." in n.replace("\\", "/").split("/"):
-            raise HTTPException(400, f"zip 里有不安全的路径：{n}")
+            raise HTTPException(400, T("err.unsafePath", path=n))
     ymls = sorted((n for n in names if n.replace("\\", "/").split("/")[-1] == "mod.yaml"), key=lambda n: n.count("/"))
     if not ymls:
-        raise HTTPException(400, "zip 里找不到 mod.yaml（格式见 README「给新 mod 写内容」）")
+        raise HTTPException(400, T("err.noModYaml"))
     prefix = ymls[0][: -len("mod.yaml")]
     try:
         meta = yaml.safe_load(zf.read(ymls[0]).decode("utf-8")) or {}
     except Exception as e:  # noqa
-        raise HTTPException(400, f"mod.yaml 解析失败：{e}")
+        raise HTTPException(400, T("err.modYamlParse", err=e))
     name = str(meta.get("name") or "").strip()
     if not NAME_RE.match(name):
-        raise HTTPException(400, "mod.yaml 的 name 只能用英文字母、数字、下划线（1–40 个字符）")
+        raise HTTPException(400, T("err.modName"))
     if os.path.isdir(os.path.join(paths.SIM_ROOT, "mods", name)):
-        raise HTTPException(400, f"「{name}」和内置 mod 重名，请改 name")
+        raise HTTPException(400, T("err.modNameTaken", name=name))
     problems = []
     for key in ("cards", "decks", "potions"):
         for f in meta.get(key, []) or []:
             if prefix + f not in names:
-                problems.append(f"{key} 里列出的 {f} 不在 zip 里")
+                problems.append(T("err.listedMissing", key=key, file=f))
             else:
                 try:
                     yaml.safe_load(zf.read(prefix + f).decode("utf-8"))
                 except Exception as e:  # noqa
-                    problems.append(f"{f} 不是有效的 YAML：{e}")
+                    problems.append(T("err.badYaml", file=f, err=e))
     if meta.get("hooks") and prefix + meta["hooks"] not in names:
-        problems.append(f"hooks 文件 {meta['hooks']} 不在 zip 里")
+        problems.append(T("err.hooksMissing", file=meta["hooks"]))
     if not meta.get("decks"):
-        problems.append("没有 decks：战斗实验需要至少一个卡组")
+        problems.append(T("err.noDecks"))
     if problems:
-        raise HTTPException(400, "；".join(problems))
+        raise HTTPException(400, T("sep.problems").join(problems))
     tmp = tempfile.mkdtemp(prefix="mod_", dir=paths.CACHE_DIR)
     try:
         for n in names:
@@ -262,7 +278,7 @@ async def upload_mod(file: UploadFile = File(...)):
             shutil.rmtree(dst, ignore_errors=True)
             if backup:
                 os.replace(backup, dst)
-            raise HTTPException(400, "模拟器加载失败：\n" + res.get("error", ""))
+            raise HTTPException(400, T("err.modLoadFailed") + "\n" + res.get("error", ""))
         if backup:
             shutil.rmtree(backup, ignore_errors=True)
         json.dump({"deps": deps, "uploaded_name": file.filename}, open(os.path.join(dst, "gui_meta.json"), "w", encoding="utf-8"),
@@ -278,7 +294,7 @@ def delete_mod(name: str):
         raise HTTPException(400)
     d = os.path.join(paths.USER_MODS_DIR, name)
     if not os.path.isdir(d):
-        raise HTTPException(404, "只能删除自己上传的 mod")
+        raise HTTPException(404, T("err.onlyUserMods"))
     shutil.rmtree(d)
     return {"ok": True}
 
@@ -318,6 +334,21 @@ def _sim_version():
         return "?"
 
 
+@app.get("/api/settings")
+def get_settings():
+    """界面语言：lang = 保存的选择（没选过为 null）；os_lang = 系统语言（第一次启动用它定默认语言）。"""
+    return {"lang": i18n.saved_lang(), "os_lang": i18n.os_lang(), "langs": list(i18n.LANGS)}
+
+
+@app.post("/api/settings")
+def post_settings(req: SettingsReq):
+    if req.lang not in i18n.LANGS:
+        raise HTTPException(400, T("err.badLang"))
+    paths.ensure_dirs()
+    i18n.save_settings(lang=req.lang)
+    return {"ok": True, "lang": req.lang}
+
+
 @app.get("/api/version")
 def version():
     return {"name": "DeckBench", "version": _sim_version()}
@@ -340,4 +371,4 @@ if os.path.isdir(paths.WEB_DIST):
 else:
     @app.get("/")
     def nodist():
-        return JSONResponse({"error": "前端还没构建：cd gui/web && npm install && npm run build"})
+        return JSONResponse({"error": "web UI not built / 前端还没构建: cd gui/web && npm install && npm run build"})

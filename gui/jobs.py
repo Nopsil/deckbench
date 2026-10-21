@@ -9,7 +9,7 @@ import subprocess
 import threading
 import time
 
-from . import paths
+from . import i18n, paths
 
 PROG = re.compile(r"^@@PROGRESS (.*)$")
 DONE = re.compile(r"^@@DONE (.*)$")
@@ -44,7 +44,7 @@ class JobManager:
         for m in self.list():
             if m.get("status") in ("running", "queued"):
                 m["status"] = "interrupted"
-                m["error"] = "界面关闭时仍在运行，已中断"
+                m["error"] = i18n.t("jobs.interrupted")
                 with open(os.path.join(paths.RUNS_DIR, m["id"], "meta.json"), "w", encoding="utf-8") as f:
                     json.dump(m, f, ensure_ascii=False, indent=1)
 
@@ -90,7 +90,7 @@ class JobManager:
         import shutil
         j = self.jobs.get(rid)
         if j and j.meta["status"] == "running":
-            raise RuntimeError("正在运行，先取消")
+            raise RuntimeError(i18n.t("jobs.cancelFirst"))
         d = self.run_dir(rid)
         if d:
             shutil.rmtree(d)
@@ -108,7 +108,7 @@ class JobManager:
         return m
 
     # ---------------- 运行
-    def start(self, kind, params, title=None):
+    def start(self, kind, params, title=None, lang=None):
         rid = _dt.datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + secrets.token_hex(2)
         d = os.path.join(paths.RUNS_DIR, rid)
         os.makedirs(d)
@@ -117,6 +117,10 @@ class JobManager:
                 "progress": {"done": 0, "total": int(params.get("n") or 0)}}
         j = Job(meta, d)
         argv, env, cwd = self.backend.build_command(kind, params, d)
+        lang = lang if lang in i18n.LANGS else i18n.current()
+        env = dict(env)
+        env["DECKBENCH_LANG"] = lang      # 工作进程的日志用开始运行时的界面语言
+        meta["lang"] = lang
         meta["argv"] = argv
         j.save()
         self.jobs[rid] = j
@@ -153,14 +157,15 @@ class JobManager:
         except Exception as e:  # noqa
             rc = -1
             with j.lock:
-                j.lines.append(f"启动失败：{e}")
-            logf.write(f"启动失败：{e}\n")
+                j.lines.append(i18n.t("jobs.startFailed", j.meta.get("lang"), err=e))
+            logf.write(i18n.t("jobs.startFailed", j.meta.get("lang"), err=e) + "\n")
         logf.close()
         j.meta["finished"] = _now()
         j.meta["secs"] = time.time() - j.meta["started_ts"]
         if j.cancelled:
             j.meta["status"] = "cancelled"
-            msg = f"已取消（完成 {j.meta.get('progress', {}).get('done', 0)} / {j.meta.get('progress', {}).get('total', '?')}，未保存结果）"
+            msg = i18n.t("jobs.cancelled", j.meta.get("lang"), done=j.meta.get("progress", {}).get("done", 0),
+                         total=j.meta.get("progress", {}).get("total", "?"))
             with j.lock:
                 j.lines.append(msg)
             with open(os.path.join(j.dir, "run.log"), "a", encoding="utf-8") as f:
