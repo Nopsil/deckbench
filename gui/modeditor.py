@@ -47,7 +47,7 @@ def schema():
 
 
 def _is_fullrun(meta):
-    return bool(meta.get("characters")) and any(isinstance(v, dict) and ("hp" in v or "starting_deck" in v)
+    return bool(meta.get("characters")) and any(isinstance(v, dict) and v.get("starting_deck")
                                                 for v in (meta.get("characters") or {}).values())
 
 

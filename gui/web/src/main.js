@@ -8,6 +8,7 @@ import Running from './pages/Running.vue'
 import Report from './pages/Report.vue'
 import AB from './pages/AB.vue'
 import History from './pages/History.vue'
+import ModEditor from './pages/ModEditor.vue'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -18,6 +19,7 @@ const router = createRouter({
     { path: '/report/:id?', component: Report, meta: { key: 'report' } },
     { path: '/ab', component: AB, meta: { key: 'ab' } },
     { path: '/history', component: History, meta: { key: 'history' } },
+    { path: '/mods', component: ModEditor, meta: { key: 'mods' } },
   ],
 })
 function clientLog(level, msg) {
