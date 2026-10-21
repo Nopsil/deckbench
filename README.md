@@ -1,3 +1,5 @@
+**简体中文** | [English](README.en.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
+
 # DeckBench · 牌组测试台
 
 **牌组测试台：不进游戏，让 AI 自动打几百上千局，告诉你胜率、能打到第几层、死在哪、某张卡强不强。**
