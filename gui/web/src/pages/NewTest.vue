@@ -64,6 +64,11 @@
                 <div v-if="a.hint" class="ah">{{ a.hint }}</div>
               </button>
             </div>
+            <div v-if="cat.styles && cat.styles.length" class="style-row">
+              <div class="label">{{ t('nt.style') }} <span class="faint">{{ t('nt.styleHint') }}</span></div>
+              <n-select v-model:value="b.style" :options="styleOptions" :render-label="styleLabel" style="max-width:420px" />
+              <div v-if="styleBad" class="hint warn">{{ t('nt.styleNeedAgent', { agents: styleBad }) }}</div>
+            </div>
           </div>
 
           <div v-if="b.char === 'Claude'" class="panel">
@@ -173,6 +178,7 @@
               <div><span>{{ t('nt.asc') }}</span><b>A{{ b.asc }}</b></div>
               <div><span>{{ t('nt.runs') }}</span><b>{{ b.n }}</b></div>
               <div><span>AI</span><b>{{ store.agentName('batch', b.agent) }}</b></div>
+              <div><span>{{ t('nt.style') }}</span><b>{{ store.styleName(b.style) }}</b></div>
               <div v-if="b.char === 'Claude'"><span>{{ t('nt.variant') }}</span><b>{{ b.variants.length ? b.variants.join(' + ') : t('common.none') }}</b></div>
               <div><span>{{ t('nt.add') }}</span><b>{{ b.force.length ? joinList(b.force.map(store.cardName)) : '—' }}</b></div>
               <div><span>{{ t('nt.removeShort') }}</span><b>{{ b.replace.length ? joinList(b.replace.map(store.cardName)) : '—' }}</b></div>
@@ -214,7 +220,7 @@ const title = ref('')
 const starting = ref(false)
 const uploading = ref(false)
 const saved = JSON.parse(localStorage.getItem('nt.form') || '{}')
-const b = reactive({ char: 'Ironclad', asc: 0, n: 100, start: 0, procs: 4, agent: 'heuristic', variants: [], force: [], replace: [], gameSeed: '', ...(saved.b || {}) })
+const b = reactive({ char: 'Ironclad', asc: 0, n: 100, start: 0, procs: 4, agent: 'heuristic', style: 'standard', variants: [], force: [], replace: [], gameSeed: '', ...(saved.b || {}) })
 const c = reactive({ source: 'preset', preset: 'quick', mods: ['vanilla'], decks: [], rooms: ['普通', '精英', '首领'], max_turns: 30, fights: 20, seed: 1, agent: 'heuristic', procs: 4, ...(saved.c || {}) })
 watch([b, c, kind], () => {
   localStorage.setItem('nt.form', JSON.stringify({ b, c }))
@@ -269,13 +275,21 @@ const combatTotal = computed(() => {
 })
 const autoTitle = computed(() => (kind.value === 'batch' ? runTitle({ kind: 'batch', params: { ...b } }) : (c.source === 'preset' ? (preset.value?.title || '') : t('nt.customCombat'))))
 const gameSeedCanon = computed(() => (b.gameSeed || '').toUpperCase().replace(/O/g, '0').replace(/I/g, '1').trim())
-const canStart = computed(() => kind.value === 'batch' ? b.n > 0 : (c.source === 'preset' ? !!c.preset : c.decks.length > 0 && c.rooms.length > 0))
+// 打法风格：和当前 AI 不兼容的选项灰掉；已选的风格和 AI 不兼容时提示并禁止开始
+const styleOk = (st, agent) => !st || !st.agents || st.agents.some((p) => String(agent || '').startsWith(p))
+const styleOptions = computed(() => ((cat.value && cat.value.styles) || []).map((st) => ({ value: st.id, label: st.name, desc: st.desc, disabled: !styleOk(st, b.agent) })))
+const styleLabel = (o) => h('div', { title: o.desc }, [h('div', null, o.label), h('div', { class: 'faint', style: 'font-size:12px;white-space:normal' }, o.desc)])
+const styleBad = computed(() => {
+  const st = ((cat.value && cat.value.styles) || []).find((x) => x.id === b.style)
+  return st && !styleOk(st, b.agent) ? joinList(st.agents) : ''
+})
+const canStart = computed(() => kind.value === 'batch' ? b.n > 0 && !styleBad.value : (c.source === 'preset' ? !!c.preset : c.decks.length > 0 && c.rooms.length > 0))
 
 async function start() {
   starting.value = true
   try {
     let params
-    if (kind.value === 'batch') params = { char: b.char, asc: b.asc, n: gameSeedCanon.value ? 1 : b.n, start: b.start, procs: b.procs, agent: b.agent, variants: b.char === 'Claude' ? b.variants : [], force: b.force, replace: b.replace, ...(gameSeedCanon.value ? { game_seed: gameSeedCanon.value } : {}) }
+    if (kind.value === 'batch') params = { char: b.char, asc: b.asc, n: gameSeedCanon.value ? 1 : b.n, start: b.start, procs: b.procs, agent: b.agent, style: b.style || 'standard', variants: b.char === 'Claude' ? b.variants : [], force: b.force, replace: b.replace, ...(gameSeedCanon.value ? { game_seed: gameSeedCanon.value } : {}) }
     else if (c.source === 'preset') params = { preset: c.preset, fights: c.fights, seed: c.seed, agent: c.agent, procs: c.procs }
     else params = { mods: c.mods, decks: c.decks, rooms: c.rooms, max_turns: c.max_turns, fights: c.fights, seed: c.seed, agent: c.agent, procs: c.procs }
     const m = await api.post('/api/runs', { kind: kind.value, params, title: title.value || autoTitle.value })
@@ -322,6 +336,8 @@ async function delMod(id) {
 .quick button { all: unset; cursor: pointer; padding: 2px 8px; border-radius: 7px; font-size: 12.5px; background: #25252A; color: #A9A49C; border: 1px solid #2E2E34; }
 .quick button:hover { color: #EDE9E3; }
 .quick button.on { background: rgba(217,119,87,.16); color: #F0A486; border-color: rgba(217,119,87,.4); }
+.style-row { margin-top: 16px; }
+.hint.warn { color: #E0A86C; }
 .agents { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 .agent { all: unset; cursor: pointer; padding: 12px 14px; border-radius: 11px; border: 1px solid #2E2E34; background: #1A1A1E; transition: all .16s; }
 .agent:hover { border-color: #3C3C43; }

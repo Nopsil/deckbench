@@ -40,7 +40,7 @@ def _one_safe(args):
     A = batch.AGENT
     hooks = [batch.force_cards_hook(A["force"], A.get("replace", ()))] if A.get("force") or A.get("replace") else []
     try:
-        ag = batch.wrap_log(batch.make_agent(A["name"], seed, **A["kw"]), char, asc, seed)
+        ag = batch.wrap_log(batch.build_agent(seed), char, asc, seed)
         r = play_run(char, asc, seed, agent=ag, setup_hooks=hooks)
         d = r.to_dict()
     except Exception:
@@ -49,6 +49,7 @@ def _one_safe(args):
     d["seed"] = seed
     d["char"] = char
     d["asc"] = asc
+    d["style"] = A.get("style") or "standard"
     return d
 
 
@@ -56,6 +57,11 @@ def _batch_init(cfg):
     paths.setup_sys_path()
     import batch
     batch._init(cfg)
+
+
+def _style_list():
+    from sts2sim.engine import style as ST
+    return ST.list_styles(i18n.current())
 
 
 def cmd_batch(a):
@@ -70,7 +76,7 @@ def cmd_batch(a):
     cfg = {"name": a.agent, "kw": akw, "variant": a.variant or None,
            "force": [x for x in a.force.split(",") if x], "replace": [x for x in a.replace.split(",") if x],
            "timeout": a.timeout or (60 if a.agent == "heuristic" else 900), "log_dir": a.log_dir or None,
-           "mods": [os.path.abspath(m) for m in a.mod]}
+           "mods": [os.path.abspath(m) for m in a.mod], "style": batch.check_style(a.style, a.agent)}
     if cfg["mods"]:
         batch._check_mods(cfg["mods"], a.char, cfg["variant"])   # 格式有错：大白话报错并退出（不开子进程）
     T = i18n.t
@@ -78,6 +84,8 @@ def cmd_batch(a):
     seeds = T("log.seed", s=jobs[0][2]) if a.game_seed else T("log.seedRange", a=f"R{a.start}", b=f"R{a.start + a.n - 1}")
     print(T("log.batchStart", char=a.char, asc=a.asc, n=len(jobs), seeds=seeds, agent=a.agent, variant=a.variant or none,
             force=i18n.join(cfg["force"]) or none, replace=i18n.join(cfg["replace"]) or none, procs=a.procs), flush=True)
+    sty = next((s["name"] for s in _style_list() if s["id"] == cfg["style"]), cfg["style"])
+    print(T("log.style", style=sty), flush=True)
     emit("PROGRESS", {"done": 0, "total": len(jobs)})
     t = time.time()
     res = []
@@ -284,6 +292,7 @@ def main(argv=None):
     b.add_argument("--game-seed", default="", help="真游戏种子（逗号分隔）；给了就忽略 --n/--start")
     b.add_argument("--log-dir", default="", help="逐步决策日志目录（每局一个 JSONL）")
     b.add_argument("--mod", action="append", default=[], help="YAML 数据 mod 文件夹（整局），可多次")
+    b.add_argument("--style", default="standard", help="打法风格（sts2sim/engine/style.py 的 STYLES）：standard / juggler")
     c = sub.add_parser("combat")
     c.add_argument("experiment")
     c.add_argument("--fights", type=int)

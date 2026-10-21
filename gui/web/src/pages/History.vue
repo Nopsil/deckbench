@@ -55,7 +55,8 @@ const cols = [
   { type: 'selection', multiple: true, width: 44 },
   { title: () => t('hist.colTest'), key: 'title', render: (r) => h('div', { class: 'tt', onClick: () => open(r) }, [
     h('div', { class: 'tn' }, runTitle(r)),
-    h('div', { class: 'ts' }, [h('span', { class: 'k ' + r.kind }, r.kind === 'batch' ? t('kind.batch') : t('kind.combat')), ' ', fmt.time(r.created), r.secs ? ` · ${fmt.secs(r.secs)}` : ''])]) },
+    h('div', { class: 'ts' }, [h('span', { class: 'k ' + r.kind }, r.kind === 'batch' ? t('kind.batch') : t('kind.combat')), ' ', fmt.time(r.created), r.secs ? ` · ${fmt.secs(r.secs)}` : '',
+      r.kind === 'batch' ? ` · ${t('chip.style', { style: store.styleName(r.params && r.params.style) })}` : ''])]) },
   { title: () => t('hist.colStatus'), key: 'status', width: 110, render: (r) => h(NTag, { size: 'small', bordered: false, type: STATUS[r.status]?.type }, { default: () => STATUS[r.status]?.text || r.status }) },
   { title: () => t('hist.colResult'), key: 'headline', width: 320, render: headline },
   { title: '', key: 'act', width: 170, render: (r) => h('div', { class: 'row', style: 'justify-content:flex-end' }, [

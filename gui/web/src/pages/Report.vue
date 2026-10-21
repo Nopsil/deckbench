@@ -89,6 +89,7 @@ const chips = computed(() => {
   if (meta.value?.kind === 'batch') {
     const x = [t('kind.batch'), store.charName(p.char), 'A' + p.asc, t('chip.nRuns', { n: p.n }), store.agentName('batch', p.agent),
       p.game_seed ? t('chip.seed', { s: p.game_seed }) : t('chip.seedFrom', { s: 'R' + (p.start || 0) })]
+    x.push(t('chip.style', { style: store.styleName(p.style) }))
     if (p.variants?.length) x.push(t('chip.variant', { v: p.variants.join('+') }))
     if (p.force?.length) x.push(t('chip.add', { cards: joinList(p.force.map((c) => store.cardName(c))) }))
     if (p.replace?.length) x.push(t('chip.remove', { cards: joinList(p.replace.map((c) => store.cardName(c))) }))

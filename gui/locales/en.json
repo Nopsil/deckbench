@@ -640,5 +640,12 @@
  "me.legacyNote": "This is an old-format mod (decks for the combat simulator only). Add a character to test it in full runs.",
  "me.p.never": "never",
  "me.p.atStart": "At the owner's turn start",
- "me.p.atEnd": "At the owner's turn end"
+ "me.p.atEnd": "At the owner's turn end",
+ "nt.style": "Play style",
+ "nt.styleHint": "A rule layer on top of the AI; compare styles on the same seeds",
+ "nt.styleNeedAgent": "This style needs a {agents} AI",
+ "chip.style": "Style {style}",
+ "log.style": "Play style: {style}",
+ "style.unknown": "Unknown play style: {id}",
+ "style.incompatible": "Play style \"{style}\" does not work with AI \"{agent}\"; pick a learned, general or strong AI"
 }

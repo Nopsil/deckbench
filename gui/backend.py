@@ -39,6 +39,25 @@ def agents_batch(lang=None):
     return out
 
 
+def styles(lang=None):
+    """打法风格（sts2sim/engine/style.py 的 STYLES；只读注册表，不启动游戏）：[{id, name, desc, agents}]。"""
+    from sts2sim.engine import style as ST
+    return ST.list_styles(lang or i18n.current())
+
+
+def check_style(style_id, agent):
+    """界面传来的 style：空 → standard；未知或和 AI 不兼容 → ValueError（界面显示原因）。"""
+    from sts2sim.engine import style as ST
+    try:
+        sid = ST.resolve(style_id)
+    except ValueError:
+        raise ValueError(i18n.t("style.unknown", id=str(style_id)))
+    if not ST.compatible(sid, agent):
+        name = next((s["name"] for s in styles() if s["id"] == sid), sid)
+        raise ValueError(i18n.t("style.incompatible", style=name, agent=agent))
+    return sid
+
+
 AGENTS_COMBAT = ["heuristic", "beam"]
 
 
@@ -247,7 +266,7 @@ class LocalPythonBackend(SimBackend):
                     else (v if lang == "zhs" else dict(v, desc="")) for v in c["variants"]]
         return {"backend": {"id": self.id, "name": i18n.t("backend.name", lang), **self.capabilities(lang)},
                 "lang": lang, "game_langs": sorted(_game_langs()),
-                "characters": chars, "agents_batch": agents_batch(lang), "agents_combat": agents_combat(lang),
+                "characters": chars, "agents_batch": agents_batch(lang), "agents_combat": agents_combat(lang), "styles": styles(lang),
                 "variants": variants, "cards": cards, "starters": c["starters"], "rooms": ROOMS,
                 "experiments": self.experiments(lang), "mods": self.mods(), "cpu": os.cpu_count() or 1,
                 "encounters": self.encounter_names(lang)}
@@ -257,11 +276,12 @@ class LocalPythonBackend(SimBackend):
         p = params
         if kind == "batch":
             out = os.path.join(run_dir, "runs.jsonl")
+            sid = check_style(p.get("style"), p.get("agent", "heuristic"))
             argv = worker_argv("batch", "--char", str(p.get("char", "Claude")), "--asc", str(int(p.get("asc", 0))),
                                "--n", str(int(p.get("n", 20))), "--start", str(int(p.get("start", 0))),
                                "--procs", str(int(p.get("procs") or os.cpu_count() or 1)), "--agent", p.get("agent", "heuristic"),
                                "--variant", "+".join(p.get("variants") or []), "--force", ",".join(p.get("force") or []),
-                               "--replace", ",".join(p.get("replace") or []), "--out", out)
+                               "--replace", ",".join(p.get("replace") or []), "--style", sid, "--out", out)
             if p.get("mod"):         # YAML 数据 mod（模组编辑器的「试跑」）：整局引擎直接加载
                 argv += ["--mod", mod_dir(p["mod"])]
             if p.get("game_seed"):   # 指定真游戏种子：只打这一局，并写逐步决策日志到 <run_dir>/steps/

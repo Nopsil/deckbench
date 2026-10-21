@@ -49,6 +49,11 @@ export const store = reactive({
     const c = this.catalog && this.catalog.characters.find((x) => x.id === id)
     return c ? c.name : id
   },
+  styleName(id) {
+    const l = this.catalog && this.catalog.styles
+    const st = l && l.find((x) => x.id === (id || 'standard'))
+    return st ? st.name : (id || 'standard')
+  },
   agentName(kind, id) {
     const l = this.catalog && (kind === 'batch' ? this.catalog.agents_batch : this.catalog.agents_combat)
     const a = l && l.find((x) => x.id === id)
@@ -106,4 +111,4 @@ const STATUS_TYPE = { running: 'warning', done: 'success', failed: 'error', canc
 /** STATUS[x].text 每次读取都按当前语言翻译 */
 export const STATUS = Object.fromEntries(Object.entries(STATUS_TYPE).map(([k, type]) => [k, { type, get text() { return t('status.' + k) } }]))
 
-for (const k of ['cardName', 'encName', 'charName', 'agentName', 'loadCatalog', 'loadRuns']) store[k] = store[k].bind(store)
+for (const k of ['cardName', 'encName', 'charName', 'agentName', 'styleName', 'loadCatalog', 'loadRuns']) store[k] = store[k].bind(store)

@@ -640,5 +640,12 @@
  "me.legacyNote": "旧形式のMOD（戦闘実験用デッキのみ）です。フルランで試すにはキャラクターを追加してください。",
  "me.p.never": "しない",
  "me.p.atStart": "持ち主のターン開始時",
- "me.p.atEnd": "持ち主のターン終了時"
+ "me.p.atEnd": "持ち主のターン終了時",
+ "nt.style": "プレイスタイル",
+ "nt.styleHint": "AI の上に重ねるルール。同じシードでスタイルを比較できます",
+ "nt.styleNeedAgent": "このスタイルには {agents} 系の AI が必要です",
+ "chip.style": "スタイル {style}",
+ "log.style": "プレイスタイル：{style}",
+ "style.unknown": "不明なプレイスタイル：{id}",
+ "style.incompatible": "プレイスタイル「{style}」は AI「{agent}」では使えません。学習版・汎用・強 AI を選んでください"
 }

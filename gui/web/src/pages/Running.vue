@@ -99,6 +99,7 @@ const paramChips = computed(() => {
   const p = meta.value?.params || {}
   if (meta.value?.kind === 'batch') {
     const x = [t('kind.batch'), store.charName(p.char), 'A' + p.asc, t('chip.nRuns', { n: p.n }), store.agentName('batch', p.agent), t('chip.parallel', { n: p.procs })]
+    x.push(t('chip.style', { style: store.styleName(p.style) }))
     if (p.variants?.length) x.push(t('chip.variant', { v: p.variants.join('+') }))
     return x
   }

@@ -68,6 +68,13 @@ def catalog(refresh: bool = False, lang: str | None = None):
         raise HTTPException(500, str(e))
 
 
+@app.get("/api/styles")
+def styles(lang: str | None = None):
+    """打法风格列表（id、名字、说明、能叠在哪些 AI 上）。"""
+    from .backend import styles as _styles
+    return _styles(lang if lang in i18n.LANGS else None)
+
+
 @app.get("/api/runs")
 def runs():
     return jobs.list()
