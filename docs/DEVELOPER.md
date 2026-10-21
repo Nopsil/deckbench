@@ -98,6 +98,8 @@ PYTHONPATH=. .venv/bin/python tools/batch.py --char Claude --asc 10 --n 100 --ag
 | `--boss-search` | 关 | `strong-nosearch` 下只在首领战开搜索 |
 | `--timeout` | heuristic 60，其余 900 | 每局秒数上限 |
 
+宝箱遗物：0.1.3 起真正进遗物栏（以前的版本没有，所以旧的胜率/层数偏低）；`DECKBENCH_TREASURE_FIX=0` 恢复旧行为，只用于复现旧数字。
+
 带搜索的 AI（`strong`、`search`、`learned-search`、`learned-boss`、`planner-search`、`modai-boss`）用 `os.fork()` 给游戏状态拍快照，只能在 Linux/macOS 上用。
 
 其他工具：`tools/ab_card.py`（同种子单卡 A/B：`--force`、`--replace`、`--variant`、`--base-variant`…）、`tools/boss_bench.py`（首领战基准）、

@@ -22,11 +22,13 @@ async def scenario(session, tag):
     t = await call("new_run", seed="qianwenniang", character="Ironclad", ascension=10, persona="qianwen")
     print(t[:900])
     assert "Q1ANWENN1ANG" in t, "种子不对"
-    t = await call("act", option_index=0, reason="第一个Neow选项，赌一把！")
+    t = await call("act", option="ARCANE_SCROLL", reason="第一个Neow选项，赌一把！")  # 按 ID 选（不靠选项号）
     print(t[:300])
     assert not t.startswith("❌"), t[:300]
     t = await call("act", option_index=99, reason="故意填错")
     assert t.startswith("❌"), "非法选项应报错"
+    t = await call("act", option="NO_SUCH_OPTION_XYZ", reason="故意填错")
+    assert t.startswith("❌"), "匹配不到的文字应报错"
     t = await call("get_map")
     print(t[:400])
     t = await call("act", option_index=0, reason="走最左边")
@@ -49,6 +51,8 @@ async def scenario(session, tag):
     t = await call("new_run", seed="R1", character="Ironclad", ascension=0, persona="lirixuan")
     t = await call("auto", steps=400, until="screen:shop")
     assert "❌" not in t and "fatal" not in t.lower(), t[-500:]
+    if "本局结束" in t:
+        assert "遗物（" in t and "牌组（" in t, "结局应列出全部遗物和牌组"
     print(f"[{tag}] lirixuan auto ->", t[:160].replace("\n", " | "))
     print(f"[{tag}] OK: {len(rows)} 行日志，{exp['decisions']} 个决策")
 

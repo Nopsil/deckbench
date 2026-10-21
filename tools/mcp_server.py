@@ -12,6 +12,7 @@
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -185,7 +186,74 @@ def _state_text(s):
     if e.get("type") == "fatal":
         return f"run_id={s.id} 引擎出错：{e.get('error')}"
     return (f"run_id={s.id} 本局结束：{'胜利！' if e.get('victory') else '失败'} 第{e.get('floor')}层 HP {e.get('hp')}/{e.get('max_hp')}"
-            + (f" 死于 {e.get('death_room')}" if e.get('death_room') else "") + (f"\n引擎错误：{e['error'][:500]}" if e.get("error") else ""))
+            + (f" 死于 {e.get('death_room')}" if e.get('death_room') else "")
+            + _end_lists(e) + (f"\n引擎错误：{e['error'][:500]}" if e.get("error") else ""))
+
+
+def _end_lists(e):
+    from collections import Counter
+
+    def nm(i):
+        base = i.rstrip("+")
+        z = _zh_title(base)
+        return (z[0] if z else base) + ("+" if i.endswith("+") else "")
+    rel = e.get("relics") or []
+    deck = Counter(e.get("deck") or [])
+    out = f"\n遗物（{len(rel)}）：" + ("、".join(nm(r) for r in rel) or "无")
+    out += f"\n牌组（{sum(deck.values())}）：" + "、".join(f"{nm(k)}×{v}" if v > 1 else nm(k) for k, v in sorted(deck.items(), key=lambda x: (-x[1], x[0])))
+    return out
+
+
+
+# ---------------------------------------------------------------- 按文字/ID 选选项
+def _zh_title(ident):
+    """卡牌/遗物/药水/能力/怪物 ID → 中文名（运行时从玩家本机的游戏安装读，sts2sim/gameloc.py；不入库）。"""
+    from sts2sim import gameloc
+    out = []
+    for tb in ("cards", "relics", "potions", "powers", "monsters"):
+        t = gameloc.table(tb, "zhs") or {}
+        v = t.get(f"{ident}.title") or t.get(f"{ident}.name")
+        if isinstance(v, str):
+            out.append(v)
+    return out
+
+
+def _in_order(k, x):
+    """「STRIKE → #1」这类：按空白切开后各段依次出现在选项里。"""
+    pos = 0
+    for tok in k.split():
+        j = x.find(tok, pos)
+        if j < 0:
+            return False
+        pos = j + len(tok)
+    return True
+
+
+def match_option(text, labels, enabled=None):
+    """返回 (下标, None) 或 (None, 错误)。顺序：纯数字=选项号；完全相同；以它开头；包含（大小写不敏感，支持 ID → 中文名）。"""
+    t = text.strip()
+    en = set(range(len(labels))) if enabled is None else set(enabled)
+    if re.fullmatch(r"\d+", t):
+        i = int(t)
+        return (i, None) if i in en else (None, f"选项 {i} 不可选")
+    keys = [t]
+    up = t.upper()
+    plus = up.endswith("+")
+    if re.fullmatch(r"[A-Z0-9_]+\+?", up):
+        keys += [z + ("+" if plus else "") for z in _zh_title(up.rstrip("+"))]
+    lab = [(i, str(labels[i])) for i in sorted(en) if i < len(labels)]
+
+    def strip_idx(x):          # 战斗选项「打出 h0 <牌名>(1费) → #0 X」去掉 h0 便于按牌名匹配
+        return re.sub(r"\bh\d+\s*", "", x)
+    for k in keys:
+        kl = k.lower()
+        for test in (lambda x: x.lower() == kl, lambda x: x.lower().startswith(kl),
+                     lambda x: strip_idx(x).lower().startswith("打出 " + kl), lambda x: kl in x.lower(),
+                     lambda x: kl in strip_idx(x).lower(), lambda x: _in_order(kl, x.lower())):
+            hit = [i for i, x in lab if test(x)]
+            if hit:
+                return hit[0], None
+    return None, f"没有和「{t}」匹配的可选项（可用选项号，或选项里的文字/牌名/ID）"
 
 
 # ---------------------------------------------------------------- MCP 工具
@@ -225,11 +293,21 @@ def build(host="127.0.0.1", port=8765, host_check=True):
             return _state_text(_get(run_id or None))
 
     @mcp.tool()
-    def act(option_index: int = -1, reason: str = "", indices: list[int] | None = None, run_id: str = "") -> str:
-        """做一个决定：option_index = 选项号（多选界面用 indices=[…]）；reason = 简短中文理由（写进日志）。返回结果和下一个决策。"""
+    def act(option_index: int = -1, reason: str = "", indices: list[int] | None = None, run_id: str = "",
+            option: str = "") -> str:
+        """做一个决定：option_index = 选项号（多选界面用 indices=[…]）；或 option = 选项文字/牌名/ID（比选项号稳定，
+        例 option="JUGGLING"、option="STRIKE_IRONCLAD → #1"、option="跳过"；多个匹配取第一个可选项）。
+        reason = 简短中文理由（写进日志）。返回结果和下一个决策。"""
         with LOCK:
             s = _get(run_id or None)
             choice = indices if indices is not None else option_index
+            if option and indices is None:
+                if s.pending is None:
+                    return _state_text(s)
+                idx, msg = match_option(option, s.pending.get("options") or [], s.pending.get("enabled"))
+                if idx is None:
+                    return f"❌ {msg}\n" + _state_text(s)
+                choice = idx
             acks, err = s.reply({"choice": choice, "reason": reason})
             if err:
                 return f"❌ {err}\n" + _state_text(s)

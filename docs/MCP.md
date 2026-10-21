@@ -21,7 +21,7 @@ python tools/mcp_server.py --http --port 8765   # streamable-HTTP → http://127
 |---|---|
 | `new_run(seed, character, ascension, persona)` | 种子按游戏规则规范化（大写、O→0、I→1）；persona 可选：`qianwen`、`lirixuan`（JUGGLING 流铁甲风格，`auto` 代打也用这个风格），或任意一段风格描述 |
 | `get_state()` | 楼层/生命/金币/遗物/药水/牌组 + 当前界面 + 战斗（能量、手牌、敌人生命/意图/能力）+ 带编号的合法选项 |
-| `act(option_index, reason, indices)` | 执行一个选项；多选界面用 `indices`；非法选项返回错误并保持原状 |
+| `act(option_index, reason, indices, option)` | 执行一个选项；多选界面用 `indices`；`option` 可以写选项文字或 ID（如 `JUGGLING`、`跳过`），比选项号稳定；非法选项返回错误并保持原状 |
 | `auto(steps, until)` | 交给内置 AI 代打；`until`：`combat_end` / `floor` / `screen:<名字>` |
 | `get_map()` / `get_deck()` | 文字地图（含当前位置）/ 牌组 |
 | `undo(steps)` / `restore(step)` | 回退几步 / 回到第 step 个决策之前 |
@@ -29,6 +29,6 @@ python tools/mcp_server.py --http --port 8765   # streamable-HTTP → http://127
 | `list_runs()` / `open_run(run_id)` | 列出 / 重新打开以前的局 |
 
 同一种子 + 同一串选择 = 同一局，所以撤销/恢复是「重开 + 重放」；服务器重启后也能 `open_run` 接着打。
-奖励里的金币/药水/遗物默认全拿，不算决策。`auto` 用的 AI 内部随机状态不随撤销回滚，撤销后再 `auto` 可能走出不同的路线。
+奖励里的金币/药水/遗物默认全拿，不算决策；宝箱遗物会真正进遗物栏（0.1.3 修复）。一局结束时列出全部遗物和牌组。`auto` 用的 AI 内部随机状态不随撤销回滚，撤销后再 `auto` 可能走出不同的路线。
 
 测试：`python tools/mcp_e2e.py`（stdio）或 `python tools/mcp_e2e.py --http-url http://127.0.0.1:8765/mcp`。

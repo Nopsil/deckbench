@@ -3,6 +3,7 @@
 房间本身的逻辑（遭遇生成、奖励、事件选项效果、休息处选项、商店库存/价格、宝箱遗物）全部是转译的游戏代码；
 这里只负责“玩家点了什么”，决策委托给 agent。
 """
+import os
 import zlib
 import time
 
@@ -249,8 +250,13 @@ class RunDriver:
         sync = self.mgr.TreasureRoomRelicSynchronizer
         relics = sync.CurrentRelics
         if relics is not None and len(list(relics)) > 0:
-            i = self.agent.treasure_relic(list(relics), self)
+            rl = list(relics)
+            i = self.agent.treasure_relic(rl, self)
             sync.PickRelicLocally(i)
+            # 真游戏里宝箱遗物是在 UI 节点（NTreasureRoomRelicCollection）的 RelicsAwarded 回调里发放的：RelicCmd.Obtain(relic.ToMutable(), player)；
+            # 无头模拟没有这个节点，这里补上（单机 = 只有自己投票，拿到所选那件）。默认开启；DECKBENCH_TREASURE_FIX=0 = 旧行为（宝箱遗物不入手，只用于复现旧数字）
+            if i is not None and 0 <= int(i) < len(rl) and os.environ.get("DECKBENCH_TREASURE_FIX", "1") != "0":
+                G.RelicCmd.Obtain(rl[int(i)].ToMutable(), self.player)
 
 
 def play_run(character, ascension=10, seed="SEED", agent=None, **kw):

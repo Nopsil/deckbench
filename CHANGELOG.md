@@ -2,6 +2,10 @@
 
 ## 0.1.3 (2026-10)
 
+- **修复：宝箱遗物从来没有真正拿到手。** 真游戏是在界面里发放宝箱遗物的，模拟器没有那个界面，所以以前所有模拟（批量、图形界面）里选了宝箱遗物也不会进遗物栏。现在默认修好（批量、图形界面、MCP 都一样）。**之前版本测出的胜率和层数都是在没有宝箱遗物的情况下测的**，会偏低，和新版本的数字不能直接比较；本说明下面引用的 AI 对比数字也是修复前测的。只为复现旧数字时可设 `DECKBENCH_TREASURE_FIX=0`。
+  *Fix: treasure-room relics were never actually obtained. The game grants them through a UI element the simulator lacked, so in every earlier simulation (batch, GUI) the chosen chest relic never reached the relic bar. Now fixed and on by default everywhere (batch, GUI, MCP). **Win rates and floors measured with earlier versions were measured without chest relics** and are not directly comparable; the AI comparison numbers quoted below were also measured before the fix. Set `DECKBENCH_TREASURE_FIX=0` only to reproduce old numbers.*
+- MCP：`act` 可以用 `option=` 按选项文字/ID 选（例 `option="JUGGLING"`、`option="跳过"`），比选项号稳定；一局结束时列出全部遗物和牌组。
+  *MCP: `act(option=...)` picks by option text or ID; the end-of-run summary lists every relic and the full deck.*
 - 新 AI「通用 AI（推荐，模组角色也能用）」（`modai`）：选牌、休息、商店交给一个只看通用数值、不看卡名的小网络，**模组角色也能用**，速度同学习版，Windows 可用。测试中原版角色平均多走约 1.5–4 层，Claude娘 A0 16.8 → 20.2 层。模型文件只有网络权重。`modai-boss`（加首领战推演）在 Windows 上隐藏。
   *New "General AI" (`modai`, recommended): a small character-agnostic network for card rewards, rest sites and shops (generic numbers only, no card names), so it works for mod characters; same speed as the learned AI, works on Windows. Weights-only model file. `modai-boss` is hidden on Windows.*
 - 指定游戏种子：「新建测试 → 整局批量」可以填游戏里的种子（自动按游戏规则转大写、O→0、I→1），只打这一局并记录每一步的决策。命令行 `tools/batch.py --seed … --log-dir …`。
