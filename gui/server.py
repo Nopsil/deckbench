@@ -19,10 +19,12 @@ from pydantic import BaseModel
 from . import i18n, paths
 from .backend import get_backend
 from .jobs import JobManager
+from .modeditor import router as modeditor_router
 
 backend = get_backend()
 jobs = JobManager(backend)
 app = FastAPI(title="DeckBench GUI")
+app.include_router(modeditor_router)
 T = i18n.t
 
 
@@ -78,7 +80,10 @@ def start(req: StartReq):
     p = req.params
     if req.kind == "combat" and not p.get("preset") and not p.get("decks"):
         raise HTTPException(400, T("err.needDeck"))
-    return jobs.start(req.kind, p, req.title, lang=req.lang or i18n.current())
+    try:
+        return jobs.start(req.kind, p, req.title, lang=req.lang or i18n.current())
+    except ValueError as e:      # 例如 mod 名字不对 / 找不到
+        raise HTTPException(400, str(e))
 
 
 @app.get("/api/runs/{rid}")

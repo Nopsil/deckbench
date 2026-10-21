@@ -182,7 +182,7 @@ EXPR_NAMES = {
     "T", "P", "card", "upgraded", "amount", "n", "active", "card_paid", "damage", "multi",
     "stacks", "memory", "intent_damage", "attacking", "hand_size", "draw_size", "discard_size", "exhaust_size",
     "n_enemies", "enemies", "energy", "block", "hp", "max_hp", "alive", "hand_has", "turn", "sum_stacks",
-    "max_stacks", "count_with", "plays_this_turn", "cards_played_this_turn",
+    "max_stacks", "count_with", "plays_this_turn", "cards_played_this_turn", "others", "sorted", "range", "list", "float",
 }
 
 

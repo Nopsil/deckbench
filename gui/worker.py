@@ -4,6 +4,7 @@
   combat  —— 战斗实验（复用 sts2sim.runner 的 plan / _task / make_report），分块报告进度
   cards   —— 列出可强制加入/移除的卡牌（JSON）
   validate-mod —— 用模拟器的 ModSet 试加载一个 mod
+  mod-check —— 检查 / 试注册一个 YAML 数据 mod（整局用），输出问题、提醒、角色和每张牌在游戏里的 ID（JSON）
 
 进度协议（stdout 单独一行）：@@PROGRESS {"done": n, "total": m}；结束：@@DONE {...}
 """
@@ -68,7 +69,10 @@ def cmd_batch(a):
         akw.update(boss_aware=True, boss_search=False)
     cfg = {"name": a.agent, "kw": akw, "variant": a.variant or None,
            "force": [x for x in a.force.split(",") if x], "replace": [x for x in a.replace.split(",") if x],
-           "timeout": a.timeout or (60 if a.agent == "heuristic" else 900), "log_dir": a.log_dir or None}
+           "timeout": a.timeout or (60 if a.agent == "heuristic" else 900), "log_dir": a.log_dir or None,
+           "mods": [os.path.abspath(m) for m in a.mod]}
+    if cfg["mods"]:
+        batch._check_mods(cfg["mods"], a.char, cfg["variant"])   # 格式有错：大白话报错并退出（不开子进程）
     T = i18n.t
     none = T("common.none")
     seeds = T("log.seed", s=jobs[0][2]) if a.game_seed else T("log.seedRange", a=f"R{a.start}", b=f"R{a.start + a.n - 1}")
@@ -226,6 +230,30 @@ def cmd_validate(a):
                      ensure_ascii=False))
 
 
+def cmd_mod_check(a):
+    """YAML 数据 mod：先校验（不需要游戏）；没问题再真注册一遍（需要游戏数据），拿到每张牌在游戏里的 ID（强制加牌用）。"""
+    from sts2sim.engine import yamlmod
+    from sts2sim.modfmt import ModFormatError
+    pair = lambda xs: [{"where": w, "zhs": zh, "en": en} for w, zh, en in xs]  # noqa
+    chars, problems, warnings = yamlmod.check(a.dir, a.variant or None)
+    out = {"ok": not problems, "characters": chars, "problems": pair(problems), "warnings": pair(warnings), "cards": {}}
+    if not problems and a.build:
+        try:
+            yamlmod.load(a.dir, variant=a.variant or None)
+            m = yamlmod.loaded()[-1]
+            from sts2sim.rt.boot import game as G
+            out["cards"] = {cid: G.ModelDb.GetId(cls).Entry for cid, cls in m.card_classes.items()}
+        except ModFormatError as e:
+            out["ok"] = False
+            out["problems"] = pair(e.problems)
+        except Exception as e:  # noqa
+            import traceback
+            out["ok"] = False
+            out["problems"] = [{"where": "", "zhs": "注册到游戏引擎时出错：" + str(e), "en": "error while registering into the game engine: " + str(e),
+                                "trace": traceback.format_exc()[-1500:]}]
+    print(json.dumps(out, ensure_ascii=False))
+
+
 def _utf8_stdio():
     # 打包后的 exe 不读 PYTHONIOENCODING / PYTHONUNBUFFERED，这里显式设成 UTF-8 + 行缓冲，界面按 UTF-8 读日志
     for st in (sys.stdout, sys.stderr):
@@ -255,6 +283,7 @@ def main(argv=None):
     b.add_argument("--timeout", type=int, default=0)
     b.add_argument("--game-seed", default="", help="真游戏种子（逗号分隔）；给了就忽略 --n/--start")
     b.add_argument("--log-dir", default="", help="逐步决策日志目录（每局一个 JSONL）")
+    b.add_argument("--mod", action="append", default=[], help="YAML 数据 mod 文件夹（整局），可多次")
     c = sub.add_parser("combat")
     c.add_argument("experiment")
     c.add_argument("--fights", type=int)
@@ -267,8 +296,13 @@ def main(argv=None):
     v.add_argument("name")
     v.add_argument("--deps", default="")
     v.add_argument("--user-mods", required=True)
+    mc = sub.add_parser("mod-check")
+    mc.add_argument("dir")
+    mc.add_argument("--variant", default="")
+    mc.add_argument("--build", action="store_true", help="也真注册一遍（需要游戏数据），输出每张牌的游戏 ID")
     a = ap.parse_args(argv)
-    {"batch": cmd_batch, "combat": cmd_combat, "cards": cmd_cards, "validate-mod": cmd_validate}[a.cmd](a)
+    {"batch": cmd_batch, "combat": cmd_combat, "cards": cmd_cards, "validate-mod": cmd_validate,
+     "mod-check": cmd_mod_check}[a.cmd](a)
 
 
 if __name__ == "__main__":

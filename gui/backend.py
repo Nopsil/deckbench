@@ -262,6 +262,8 @@ class LocalPythonBackend(SimBackend):
                                "--procs", str(int(p.get("procs") or os.cpu_count() or 1)), "--agent", p.get("agent", "heuristic"),
                                "--variant", "+".join(p.get("variants") or []), "--force", ",".join(p.get("force") or []),
                                "--replace", ",".join(p.get("replace") or []), "--out", out)
+            if p.get("mod"):         # YAML 数据 mod（模组编辑器的「试跑」）：整局引擎直接加载
+                argv += ["--mod", mod_dir(p["mod"])]
             if p.get("game_seed"):   # 指定真游戏种子：只打这一局，并写逐步决策日志到 <run_dir>/steps/
                 argv += ["--game-seed", str(p["game_seed"]), "--log-dir", os.path.join(run_dir, "steps")]
             return argv, worker_env(), paths.SIM_ROOT
@@ -310,6 +312,29 @@ class LocalPythonBackend(SimBackend):
         if p.returncode != 0:
             return {"ok": False, "error": (p.stderr or p.stdout)[-3000:]}
         return json.loads(p.stdout.strip().splitlines()[-1])
+
+
+def mod_dir(name):
+    """mod 名字 → 文件夹：先找你自己的（界面里建的/上传的），再找自带的 mods/。"""
+    import re
+    if not re.match(r"^[A-Za-z0-9_]{1,40}$", str(name)):
+        raise ValueError(i18n.t("err.modName"))
+    for base in (paths.USER_MODS_DIR, os.path.join(paths.SIM_ROOT, "mods")):
+        d = os.path.join(base, name)
+        if os.path.isfile(os.path.join(d, "mod.yaml")):
+            return d
+    raise ValueError(i18n.t("me.err.noSuchMod", name=name))
+
+
+def mod_check(path, build=True, variant=""):
+    argv = worker_argv("mod-check", path) + (["--build"] if build else []) + (["--variant", variant] if variant else [])
+    p = subprocess.run(argv, env=worker_env(), cwd=paths.SIM_ROOT, capture_output=True, text=True, encoding="utf-8",
+                       timeout=600, **_no_window())
+    try:
+        return json.loads(p.stdout.strip().splitlines()[-1])
+    except Exception:  # noqa
+        tail = (p.stderr or p.stdout or "")[-2000:]
+        return {"ok": False, "problems": [{"where": "", "zhs": tail, "en": tail}], "warnings": [], "cards": {}, "characters": []}
 
 
 def _game_langs():
