@@ -108,6 +108,12 @@ Linux/macOS: see [docs/DEVELOPER.md](docs/DEVELOPER.md).
 In **New test → Full runs**, fill in **Game seed** with the seed shown in the game (for example `7F3K9Q2ZB8MA`). The AI then plays just that one run and records every decision, which you can look through on the results page.
 Lowercase letters, and the letters O and I, are converted to uppercase and the digits 0 and 1 automatically, just like the game does. Command line: `python tools/batch.py --char Silent --seed 7F3K9Q2ZB8MA --log-dir steps`.
 
+## Make a mod without code (Mod editor)
+
+Open **Mod editor** on the left. Fill in forms for a character (HP, energy, starting deck, starting relic), cards (pick effects from a menu, such as Deal damage, Apply a power or Draw cards, or use a template), powers and relics (when → what). **Check** points out problems in plain language.
+Then, under **Test**, start a full-run batch or a one-card A/B (same seeds, starting deck vs starting deck + this card) with one click. Import and export zips to share mods.
+The same YAML files also work from the command line: put them in `mods/` and run `python tools/batch.py --mod mods/my_mod --char MyHero --agent modai`. Format reference: [docs/MODDING.md](docs/MODDING.md).
+
 ## Let an AI assistant play step by step (MCP)
 
 If you use an AI assistant that supports MCP, such as Claude or Cursor, you can have it play a run in the simulator itself: it can read the situation, pick options, explain its reasons, undo and retry, and at the end export a step list so you can play the same seed in the real game and follow along.

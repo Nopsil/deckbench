@@ -8,6 +8,14 @@
   *Translations live in `gui/locales/<lang>.json`, shared by the web UI and the Python backend; `tests/test_i18n.py` checks every key exists in every language with matching placeholders. `gameloc` accepts any language code and gains `languages()`.*
 - 说明页（四种语言）去掉了「界面只有中文」的提示，改为说明语言切换，界面按钮名直接用对应语言。
   *READMEs: dropped the "interface is Chinese only" note and now describe the language switch, quoting on-screen labels in each README's own language.*
+- **整局也能用 YAML mod，不用写代码**：同一种 YAML 格式（旧 mod 照样能用）现在可以直接跑整局——批量、单卡 A/B、指定种子、各种 AI（推荐通用 AI）。能写角色（生命、能量、起始牌组、初始遗物）、按稀有度的卡池、卡牌（效果用 op 列表或模板）、能力、遗物、模组药水；能力和遗物用「什么时候 → 做什么」的触发器。格式有错时用大白话（中英）一次列出全部问题。命令行 `tools/batch.py --mod <文件夹>`、`tools/ab_card.py --mod …`。说明见 `docs/MODDING.md`。
+  *YAML mods in full runs, no code: the same YAML format (old mods still work) now runs full runs: batch, one-card A/B, game seeds, every AI. Characters, card pools by rarity, cards (op lists or templates), powers, relics and mod potions, with when → what triggers for powers and relics. Format errors are listed all at once in plain Chinese/English. CLI: `--mod <folder>` for `tools/batch.py` and `tools/ab_card.py`. See `docs/MODDING.md`.*
+- **图形界面「模组编辑器」**：填表做角色、卡牌（效果搭建器，也可以直接写 YAML）、能力、遗物；检查；导入 / 导出 zip；一键整局试跑和单卡 A/B。四种语言。
+  *GUI **Mod editor**: forms for character, cards (effect builder or raw YAML), powers and relics; check; import/export zip; one-click full-run test and one-card A/B. All four languages.*
+- `mods/claude_yaml/`：Claude娘 v3.5 的 YAML 数据版（`tools/convert_claude_v35.py` 自动转换）。86 张设计牌里 81 张是纯 YAML（69 张自动转换 + 12 张按设计手写，`--variant new_cards`），5 张需要 Python。和手写 Python 版逐张牌对拍 70/70 一致，通用 AI 各 300 局 A0 / A10 每个种子结果完全相同。
+  *`mods/claude_yaml/`: Claude娘 v3.5 as data. 81 of 86 design cards in pure YAML (69 converted automatically, 12 written from the design text), 5 need Python. Identical to the Python port card by card (70/70) and seed by seed over 300 `modai` runs at A0 and A10.*
+- YAML 角色的卡池太小时（比如某事件一次要 8 张不重复的普通牌），奖励改为允许重复而不是整局报错；原版角色不受影响。
+  *For YAML characters with small pools, reward generation allows repeats instead of crashing the run; base characters are unaffected.*
 
 ## 0.1.3 (2026-10)
 

@@ -2,7 +2,7 @@
 
 数值来自 cards_v35.py（它本身是 tools/extract_v35.py 从设计文档 design_v35.json 抽出来的）；
 每张牌的效果按它用的“效果实现名”（play）查下面的 PLAY 表，翻译成通用 op / 模板。
-同一个 play 被很多张牌共用，所以这张表只要写一次（54 个 play → 69 张牌）。
+同一个 play 被很多张牌共用，所以这张表只要写一次（65 个 play → 69 张牌）。
 另外 12 张手写版没实现的牌，直接按设计文档文字写成 YAML（cards_new.yaml，用变体 new_cards 打开）。
 
     python tools/convert_claude_v35.py [--out mods/claude_yaml]

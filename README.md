@@ -116,6 +116,14 @@ $env:DECKBENCH_GAME_DIR = "D:\SteamLibrary\steamapps\common\Slay the Spire 2"
 
 *Type a seed from the game into "Game seed" in New test → Full runs: the AI plays just that run and records every decision. Lowercase, O and I are normalized like the game does. CLI: `--seed` and `--log-dir`.*
 
+## 不写代码做 mod（模组编辑器） / Make a mod without code (Mod editor)
+
+左侧 **「模组编辑器」**：填表做一个角色（生命、能量、起始牌组、初始遗物）、卡牌（效果从菜单里选：造成伤害、施加能力、抽牌……或常用模板）、能力和遗物（「什么时候 → 做什么」），按 **「检查」** 会用大白话指出问题。
+然后在 **「试跑」** 里一键跑整局批量，或者做单卡 A/B（同一批种子，起始牌组 vs 起始牌组 + 这张牌）。可以导入 / 导出 zip 和别人交换。
+同样的 YAML 文件也能直接放进 `mods/` 用命令行跑：`python tools/batch.py --mod mods/my_mod --char MyHero --agent modai`。格式说明见 [docs/MODDING.md](docs/MODDING.md)。
+
+*The **Mod editor** page: build a character, cards (effects picked from a menu or templates), powers and relics (when → what) with forms; **Check** explains problems in plain language; **Test** runs a full-run batch or a one-card A/B with one click; import/export zip. The same YAML runs from the command line with `--mod`. Format: docs/MODDING.md.*
+
 ## 让 AI 助手一步一步打（MCP） / Let an AI assistant play (MCP)
 
 如果你用 Claude、Cursor 之类支持 MCP 的 AI 助手，可以让它在模拟器里亲自打一局：它能看局面、选选项、写理由、撤销重来，最后导出一份操作清单，你可以拿同一个种子在真游戏里照着打。

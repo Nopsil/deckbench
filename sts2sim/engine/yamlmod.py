@@ -719,6 +719,18 @@ class Mod:
         return add
 
     # ---- 构建
+    def _default_basic_tags(self):
+        """游戏里有些东西要找角色的「打击」「防御」基础牌（按标签找）。没写 tags 时：第一张基础攻击牌当打击、第一张基础技能牌当防御。"""
+        for c in self.cards.values():
+            c["tags"] = [str(t)[:1].upper() + str(t)[1:] for t in c.get("tags") or []]
+        basics = [c for c in self.cards.values() if c["rarity"] == "Basic"]
+        for tag, typ in (("Strike", "Attack"), ("Defend", "Skill")):
+            if not any(tag in c["tags"] for c in basics):
+                for c in basics:
+                    if c["type"] == typ:
+                        c["tags"].append(tag)
+                        break
+
     def build(self):
         self._load_python()
         for pid, p in self.powers.items():
@@ -727,6 +739,7 @@ class Mod:
             self._make_relic(r)
         for pid, p in self.potions.items():
             self._make_potion(p)
+        self._default_basic_tags()
         for cid, c in self.cards.items():
             self._make_card(c)
         for cid, ch in self.data["characters"].items():
