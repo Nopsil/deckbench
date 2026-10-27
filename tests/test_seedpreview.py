@@ -389,13 +389,24 @@ def test_preview_api_validates_neow_and_no_engine(monkeypatch):
     def post(**body):
         return client.post("/api/seed-preview", headers=headers, json=body)
 
+    # Invalid neow is its own validation 400. A valid selector with no local
+    # game data is a separate, stable no-engine 400.
     _block_engine(monkeypatch)
-    blocked = post(seed="ABCDEFGHJKLM", char="Ironclad", asc=0, neow="nope")
+    bad_neow = post(seed="ABCDEFGHJKLM", char="Ironclad", asc=0, neow="nope")
+    assert bad_neow.status_code == 400
+    bad_detail = bad_neow.json()["detail"]
+    assert "first, all, none, or an index" in bad_detail
+    assert "Local game logic is not generated yet" not in bad_detail
+    assert "bad_neow" not in bad_detail
+
+    blocked = post(seed="ABCDEFGHJKLM", char="Ironclad", asc=0, neow="first")
     assert blocked.status_code == 400
-    assert "Local game logic is not generated yet" in blocked.json()["detail"]
-    assert "bad_neow" not in blocked.json()["detail"]
-    again = post(seed="ABCDEFGHJKLM", char="Ironclad", asc=0, neow="first")
-    assert again.status_code == 400 and again.json()["detail"] == blocked.json()["detail"]
+    detail = blocked.json()["detail"]
+    assert detail.startswith("Local game logic is not generated yet")
+    assert "import of sts2sim.rt.boot halted; None in sys.modules" in detail
+    assert detail != bad_detail
+    again = post(seed="ABCDEFGHJKLM", char="Ironclad", asc=0, neow="none")
+    assert again.status_code == 400 and again.json()["detail"] == detail
 
     _use_stub(monkeypatch)
     for neow, keys in (("first", {"1"}), ("all", {"0", "1", "2"}), ("none", set()), ("2", {"2"})):
