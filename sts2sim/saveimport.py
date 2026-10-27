@@ -1,6 +1,7 @@
 """只读解析《杀戮尖塔 2》的对局记录 / 进行中存档。
 
 不写盘、不解密、不携带任何游戏文件。`summarize()` / `summary_json()` 给外部代理一份短 JSON，同样不写盘。
+`batch_summary()` 把一个目录里每条能读的 history 记录收成稳定的短行（种子、进阶、角色、层数、有胜负才写结果）。
 格式结论和已知缺口见 docs/SAVE_FORMAT.md。
 公开的对局记录（history/<unix 秒>.run）和进行中存档（current_run.save /
 current_run_mp.save）都是 UTF-8 JSON，但字段形状不一样，而且会随 schema_version 变。
@@ -8,7 +9,9 @@ current_run_mp.save）都是 UTF-8 JSON，但字段形状不一样，而且会�
 
 Read-only parser for finished run history and in-progress saves. Never writes, never
 decrypts, ships no game files. summarize() / summary_json() are the short JSON
-an external agent can read. See docs/SAVE_FORMAT.md.
+an external agent can read. batch_summary() is the stable per-run list for a
+history folder (seed, ascension, character, floors, result when the run ended).
+See docs/SAVE_FORMAT.md.
 """
 from __future__ import annotations
 
@@ -998,6 +1001,69 @@ def _summarize_folder(doc):
         "failures": failures,
         "warnings": [w.get("code") for w in doc.get("warnings") or [] if isinstance(w, dict) and w.get("code")],
     }
+
+
+_BATCH_RESULTS = {"won", "lost", "abandoned"}
+
+
+def _batch_row(run, file=None):
+    """一局 → 键顺序固定的短行。没有胜负或放弃时不写 result。"""
+    players = [p for p in (run.get("players") or []) if isinstance(p, dict)]
+    primary = players[0] if players else {}
+    route = run.get("route")
+    row = {
+        "file": file if file is not None else run.get("filename"),
+        "seed": run.get("seed"),
+        "ascension": run.get("ascension"),
+        "character": primary.get("sim_character") or primary.get("character"),
+        "floors": len(route) if isinstance(route, list) else 0,
+    }
+    result = run.get("result")
+    if result in _BATCH_RESULTS:
+        row["result"] = result
+    return row
+
+
+def _batch_failure(entry):
+    err = entry.get("error") or {}
+    code = err.get("code") if isinstance(err, dict) else None
+    return {"file": entry.get("file"), "error": code}
+
+
+def batch_summary(doc):
+    """load_path / normalize 的结果 → 稳定的每局摘要列表。不读盘、不写盘。
+
+    目录只收 history 记录（current_run 不在内），顺序跟文件名排序一致。
+    成功行的键是 file、seed、ascension、character、floors，打完才加 result
+    （won / lost / abandoned）。读不开的文件是 {file, error}，error 为
+    SaveImportError 的 code。扫过的文件超过上限时，末尾加 {error: truncated, n}。
+    """
+    if not isinstance(doc, dict):
+        raise SaveImportError("not_object")
+    if doc.get("kind") == "folder" and "entries" in doc:
+        rows = []
+        for entry in doc.get("entries") or []:
+            if not isinstance(entry, dict) or entry.get("role") != "history":
+                continue
+            run = entry.get("run")
+            if isinstance(run, dict):
+                rows.append(_batch_row(run, entry.get("file")))
+            else:
+                rows.append(_batch_failure(entry))
+        for warning in doc.get("warnings") or []:
+            if not isinstance(warning, dict) or warning.get("code") != "truncated":
+                continue
+            extra = {"error": "truncated"}
+            n = warning.get("n")
+            if isinstance(n, int) and not isinstance(n, bool):
+                extra["n"] = n
+            rows.append(extra)
+        return rows
+    if doc.get("kind") == "run" and isinstance(doc.get("run"), dict):
+        return [_batch_row(doc["run"], doc["run"].get("filename"))]
+    if doc.get("kind") in ("run_history", "live_save") or "players" in doc or "route" in doc:
+        return [_batch_row(doc)]
+    raise SaveImportError("unknown_shape")
 
 
 def summarize(doc):

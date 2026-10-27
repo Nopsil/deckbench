@@ -85,8 +85,25 @@ Steam 云缓存在 `<Steam>/userdata/<id>/2868840/`，和本地目录是两份�
 python tools/import_run.py tests/fixtures/saves/sample_history.run
 python tools/import_run.py tests/fixtures/saves/sample_history.run --lang en --json /tmp/run.json
 python tools/import_run.py tests/fixtures/saves/sample_live.save --lang en
+python tools/import_run.py tests/fixtures/saves --batch-summary
 python tools/import_run.py --discover
 ```
+
+### 一个文件夹的批量摘要 / Batch summary of a folder
+
+`python tools/import_run.py <目录> --batch-summary` 只读扫过 history 里每一个能打开的 `.run`（没有同名 `.run` 时才读 `.run.backup` / `.run.bak`），往标准输出打**一个 JSON 数组**。不写存档。`current_run.save` 不算进这个数组；要看进行中的那一局，把路径指到那个文件。
+
+每一局的键按这个顺序固定：`file`、`seed`、`ascension`、`character`、`floors`。记录里有结局时再加 `result`：`won`（胜）、`lost`（负）或 `abandoned`（放弃）。进行中、没有胜负字段的记录不加 `result`。`floors` 是路线里的层数（`map_point_history` 走过的点数）。`character` 是第一名玩家：能对上原版角色时用模拟器里的名字（`Ironclad` 这种），否则用记录里的角色 ID。缺了进阶时，解析器记成 `0`。
+
+读不开的 history 文件留在数组里，形如 `{"file": "bad.run", "error": "not_json"}`。`error` 是 `SaveImportError` 的 code（例如 `not_json`、`not_a_run`、`unknown_shape`），扫描不因此停。目录本身找不到，或里面没有任何对局文件时，打印一条 `{"ok": false, "read_only": true, "error": "..."}` 并以退出码 2 结束。文件超过上限时，数组末尾多一条 `{"error": "truncated", "n": N}`。
+
+`--lines` 把同一批对象改成每行一个 JSON。`--json 文件` 把同样的内容另存一份，仍然拒绝写进存档目录。
+
+```bash
+python tools/import_run.py path/to/saves/history --batch-summary --lines
+```
+
+*`--batch-summary` prints one JSON array for every readable history run. Keys are `file`, `seed`, `ascension`, `character`, `floors`, plus `result` (`won`, `lost`, `abandoned`) when the file records an ending. Unreadable history files stay in the array with a `SaveImportError` code and do not stop the scan. `current_run.save` is left out of a folder batch. `--lines` prints one JSON object per line. The command does not modify saves.*
 
 图形界面左侧 **导入对局**：贴路径、选文件，或点「查找本机存档」。地址 `#/import?path=` 后面也可以直接带文件路径。只读，不会改你的存档。
 接口（只监听本机）：

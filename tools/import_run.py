@@ -3,10 +3,14 @@
   python tools/import_run.py tests/fixtures/saves/sample_history.run
   python tools/import_run.py tests/fixtures/saves/sample_history.run --summary
   python tools/import_run.py tests/fixtures/saves/sample_history.run --summary --json /tmp/summary.json
+  python tools/import_run.py tests/fixtures/saves --batch-summary
+  python tools/import_run.py path/to/saves/history --batch-summary --lines
   python tools/import_run.py "%APPDATA%\\SlayTheSpire2\\steam\\<id>\\profile1\\saves"
   python tools/import_run.py --discover
 
 `--summary` 把短 JSON 打到标准输出（种子、角色、进阶、到达层、牌和遗物要点），不写存档。
+`--batch-summary` 对目录里每个能读的 history 记录打稳定摘要（种子、进阶、角色、层数，有胜负才写结果），
+默认一个 JSON 数组。`--lines` 改成每局一行 JSON。读不开的文件带上错误码，不中断。
 `--json` 只会写到你指出的路径，而且拒绝写进存档目录、覆盖刚读的文件，或写成 .run / .save。
 不修改存档，不解密。格式说明见 docs/SAVE_FORMAT.md。
 夹具里的 ID 是虚构的，用来演示解析，不是游戏数据。
@@ -19,7 +23,14 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, ".."))
 
-from sts2sim.saveimport import SaveImportError, discover, load_path, refuse_save_write, summarize  # noqa: E402
+from sts2sim.saveimport import (  # noqa: E402
+    SaveImportError,
+    batch_summary,
+    discover,
+    load_path,
+    refuse_save_write,
+    summarize,
+)
 
 
 def _t(lang):
@@ -131,6 +142,15 @@ def _dump(payload, fh):
     fh.write("\n")
 
 
+def _emit_batch(rows, fh, lines):
+    if lines:
+        for row in rows:
+            json.dump(row, fh, ensure_ascii=False)
+            fh.write("\n")
+        return
+    _dump(rows, fh)
+
+
 def _error_payload(err):
     body = {"ok": False, "read_only": True, "error": err.code}
     for k, v in err.params.items():
@@ -145,10 +165,19 @@ def main(argv=None):
     ap.add_argument("--json", help="把解析结果写成 JSON（拒绝写进存档目录）")
     ap.add_argument("--summary", action="store_true",
                     help="向标准输出打印短 JSON 摘要（种子、角色、进阶、到达层、牌和遗物要点），不写存档")
+    ap.add_argument("--batch-summary", action="store_true",
+                    help="目录（或单个记录）打印稳定的批量摘要：每局种子、进阶、角色、层数，"
+                         "有胜负或放弃才带 result。默认一个 JSON 数组。读不开的 history 文件写入错误码，不改存档")
+    ap.add_argument("--lines", action="store_true",
+                    help="配合 --batch-summary：每局一行 JSON，而不是一个数组")
     ap.add_argument("--list", action="store_true", help="目录只打印一行摘要")
     ap.add_argument("--discover", action="store_true", help="在常见位置查找存档目录（不读取内容）")
     ap.add_argument("--lang", default="zhs", choices=["zhs", "en", "ja", "ko"])
     a = ap.parse_args(argv)
+    if a.lines and not a.batch_summary:
+        ap.error("--lines requires --batch-summary")
+    if a.batch_summary and (a.summary or a.list or a.discover):
+        ap.error("--batch-summary cannot be combined with --summary, --list, or --discover")
     try:
         if a.discover:
             rows = discover()
@@ -168,19 +197,26 @@ def main(argv=None):
         if not a.path:
             ap.error("path")
         doc = load_path(a.path)
+        rows = batch_summary(doc) if a.batch_summary else None
         summary = summarize(doc) if a.summary else None
         if a.json:
             dest = refuse_save_write(a.json, a.path)
             with open(dest, "w", encoding="utf-8") as f:
-                _dump(summary if summary is not None else doc, f)
+                if a.batch_summary:
+                    _emit_batch(rows, f, a.lines)
+                else:
+                    _dump(summary if summary is not None else doc, f)
     except SaveImportError as e:
         t, i18n = _t(a.lang)
         key = "imp.err." + e.code
         msg = t(key, **e.params) if i18n.has(key, a.lang) else e.code
-        if a.summary:
+        if a.summary or a.batch_summary:
             _dump(_error_payload(e), sys.stdout)
         print(msg, file=sys.stderr)
         return 2
+    if a.batch_summary:
+        _emit_batch(rows, sys.stdout, a.lines)
+        return 0
     if a.summary:
         _dump(summary, sys.stdout)
         return 0
