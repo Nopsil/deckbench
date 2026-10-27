@@ -280,7 +280,7 @@ python tools/seed_preview.py 7F3K9Q2ZB8MA --char Silent --asc 0 --neow first --l
 python tools/seed_preview.py 7F3K9Q2ZB8MA --json - --cache
 ```
 
-图形界面多了「导入对局」和「种子预览」。接口：`POST /api/import`、`POST /api/import/upload`、`GET /api/saves/discover`、`POST /api/seed-preview`。导入页认 `#/import?path=`，预览页认 `#/preview?seed=`。
+图形界面多了「导入对局」和「种子预览」。接口：`POST /api/import`、`POST /api/import/upload`、`POST /api/import/batch`、`GET /api/saves/discover`、`POST /api/seed-preview`。导入页认 `#/import?path=`，预览页认 `#/preview?seed=`。
 *The GUI adds Import run and Seed preview. Import works without the game; seed preview needs the locally generated game logic and does not play combats. `#/import?path=` and `#/preview?seed=` open those pages with a value filled in.*
 
 种子预览的界面和接口采用「导入对局 + 种子预览」那一版（每一幕地图、投影标记、遗物队列、`POST /api/seed-preview`），没有改用更早那一版只画第 1 幕、并把名字从本机安装填进预览正文的页面。`tools/seed_probe.py` 保持原样：`sts2sim/engine/seedpreview.py` 和 MCP（`tools/sim_session.py`）都调用它的 `_map` / `_rooms` / `render_map`。把它收成对 `seedpreview` 的薄封装会和预览模块互相导入。

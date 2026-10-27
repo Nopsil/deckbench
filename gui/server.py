@@ -315,6 +315,12 @@ class ImportPathReq(BaseModel):
     path: str
 
 
+class ImportBatchReq(BaseModel):
+    """path 必填。lines 只跟命令行对齐，不改变 HTTP 的正文形状。"""
+    path: str | None = None
+    lines: bool = False
+
+
 class PreviewReq(BaseModel):
     seed: str = ""
     char: str = "Ironclad"
@@ -382,6 +388,26 @@ def import_save(req: ImportPathReq):
     from sts2sim.saveimport import SaveImportError, load_path
     try:
         return load_path(req.path)
+    except SaveImportError as e:
+        raise HTTPException(400, _import_http(e))
+
+
+@app.post("/api/import/batch")
+def import_batch(req: ImportBatchReq):
+    """只读目录批量摘要，和 import_run.py --batch-summary 同一份行。不写存档。
+
+    成功时返回一个 JSON 数组（application/json）。元素来自
+    sts2sim.saveimport.batch_summary，键和命令行相同。lines 为 true 时仍是
+    这个数组：每个对象就是命令行 --lines 的一行，不改成 NDJSON。
+    没给路径、空目录，以及其他 SaveImportError，是 HTTP 400。
+    """
+    from sts2sim.saveimport import SaveImportError, batch_summary, load_path
+    # req.lines 不改变正文：命令行 --lines 是 NDJSON，这里两种取值都返回下面的数组。
+    path = req.path if isinstance(req.path, str) else ""
+    if not path.strip():
+        raise HTTPException(400, _import_http(SaveImportError("not_found", path=path)))
+    try:
+        return batch_summary(load_path(path))
     except SaveImportError as e:
         raise HTTPException(400, _import_http(e))
 
