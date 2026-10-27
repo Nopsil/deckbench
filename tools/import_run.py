@@ -1,10 +1,13 @@
 """只读导入真游戏的一局记录或进行中存档，打印种子、路线、选牌和遗物。
 
   python tools/import_run.py tests/fixtures/saves/sample_history.run
-  python tools/import_run.py tests/fixtures/saves/sample_history.run --json out.json --lang en
+  python tools/import_run.py tests/fixtures/saves/sample_history.run --summary
+  python tools/import_run.py tests/fixtures/saves/sample_history.run --summary --json /tmp/summary.json
   python tools/import_run.py "%APPDATA%\\SlayTheSpire2\\steam\\<id>\\profile1\\saves"
   python tools/import_run.py --discover
 
+`--summary` 把短 JSON 打到标准输出（种子、角色、进阶、到达层、牌和遗物要点），不写存档。
+`--json` 只会写到你指出的路径，而且拒绝写进存档目录、覆盖刚读的文件，或写成 .run / .save。
 不修改存档，不解密。格式说明见 docs/SAVE_FORMAT.md。
 夹具里的 ID 是虚构的，用来演示解析，不是游戏数据。
 """
@@ -16,7 +19,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, ".."))
 
-from sts2sim.saveimport import SaveImportError, discover, load_path  # noqa: E402
+from sts2sim.saveimport import SaveImportError, discover, load_path, refuse_save_write, summarize  # noqa: E402
 
 
 def _t(lang):
@@ -123,10 +126,25 @@ def render_folder(doc, lang="zhs", full=False):
     return "\n".join(lines)
 
 
+def _dump(payload, fh):
+    json.dump(payload, fh, ensure_ascii=False, indent=1)
+    fh.write("\n")
+
+
+def _error_payload(err):
+    body = {"ok": False, "read_only": True, "error": err.code}
+    for k, v in err.params.items():
+        if v is None or isinstance(v, (str, int, float, bool)):
+            body[k] = v
+    return body
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("path", nargs="?", help="一个 .run / current_run.save，或存档目录")
-    ap.add_argument("--json", help="把解析结果写成 JSON")
+    ap.add_argument("--json", help="把解析结果写成 JSON（拒绝写进存档目录）")
+    ap.add_argument("--summary", action="store_true",
+                    help="向标准输出打印短 JSON 摘要（种子、角色、进阶、到达层、牌和遗物要点），不写存档")
     ap.add_argument("--list", action="store_true", help="目录只打印一行摘要")
     ap.add_argument("--discover", action="store_true", help="在常见位置查找存档目录（不读取内容）")
     ap.add_argument("--lang", default="zhs", choices=["zhs", "en", "ja", "ko"])
@@ -135,7 +153,12 @@ def main(argv=None):
         if a.discover:
             rows = discover()
             if a.json:
-                json.dump(rows, open(a.json, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+                dest = refuse_save_write(a.json, None)
+                with open(dest, "w", encoding="utf-8") as f:
+                    _dump(rows, f)
+            if a.summary:
+                _dump({"ok": True, "read_only": True, "kind": "discover", "roots": rows}, sys.stdout)
+                return 0
             t, _ = _t(a.lang)
             if not rows:
                 print(t("imp.discoverEmpty"))
@@ -145,15 +168,22 @@ def main(argv=None):
         if not a.path:
             ap.error("path")
         doc = load_path(a.path)
+        summary = summarize(doc) if a.summary else None
+        if a.json:
+            dest = refuse_save_write(a.json, a.path)
+            with open(dest, "w", encoding="utf-8") as f:
+                _dump(summary if summary is not None else doc, f)
     except SaveImportError as e:
         t, i18n = _t(a.lang)
         key = "imp.err." + e.code
         msg = t(key, **e.params) if i18n.has(key, a.lang) else e.code
+        if a.summary:
+            _dump(_error_payload(e), sys.stdout)
         print(msg, file=sys.stderr)
         return 2
-    if a.json:
-        with open(a.json, "w", encoding="utf-8") as f:
-            json.dump(doc, f, ensure_ascii=False, indent=1)
+    if a.summary:
+        _dump(summary, sys.stdout)
+        return 0
     if doc["kind"] == "run":
         print(render_run(doc["run"], a.lang))
     else:

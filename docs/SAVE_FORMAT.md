@@ -86,6 +86,7 @@ python tools/import_run.py tests/fixtures/saves/sample_history.run
 python tools/import_run.py tests/fixtures/saves/sample_history.run --lang en --json /tmp/run.json
 python tools/import_run.py tests/fixtures/saves/sample_live.save --lang en
 python tools/import_run.py --discover
+python tools/import_run.py tests/fixtures/saves/sample_history.run --summary
 ```
 
 图形界面左侧 **导入对局**：贴路径、选文件，或点「查找本机存档」。地址 `#/import?path=` 后面也可以直接带文件路径。读不开、损坏或不是一局对局的文件会说明原因；目录里坏掉的文件逐个标出来。只读，不会改你的存档。
@@ -96,6 +97,19 @@ python tools/import_run.py --discover
 - `GET /api/saves/discover`
 
 测试：`tests/test_saveimport.py`。
+
+## 给外部代理的短摘要 / Short summary for an external agent
+
+不打开图形界面。`summarize()`（`sts2sim/saveimport.py`）把同一份只读解析收成短 JSON：`seed`、`character`、`character_id`、`ascension`、`floor_reached`、`result`，以及 `highlights.cards` / `highlights.relics`。牌优先留升级、附魔、第 0 层之后拿到的；没有这类牌时才列牌组（有上限）。遗物把第 0 层之后拿到的放前面。`floor_reached` 是 `map_point_history` 里的最高层；那段是空的时候，改用 `visited_map_coords` 的个数。
+
+```bash
+python tools/import_run.py tests/fixtures/saves/sample_history.run --summary
+python tools/import_run.py tests/fixtures/saves/sample_live.save --summary --json /tmp/summary.json
+```
+
+`--summary` 把 JSON 打到标准输出。同时给 `--json` 时，写出去的也是这份摘要；只有 `--json` 时仍是完整解析。两条路径都拒绝把文件写进存档目录、覆盖刚读的存档，或写成 `.run` / `.save`。
+
+已经连上对战 MCP 时，工具 `import_save(path)` 返回同一份 JSON，不开始一局。没有本机游戏数据、对战服务起不来时，用 `python tools/mcp_server.py --import-only`，或上面的 `--summary`。见 [MCP.md](MCP.md)。
 
 ## 种子预览 / Seed preview
 
