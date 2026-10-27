@@ -2,12 +2,14 @@
 import gzip
 import json
 import os
+import subprocess
 import sys
 
 import pytest
 
 from sts2sim.saveimport import (
     SaveImportError,
+    batch_summary,
     candidate_roots,
     discover,
     load_path,
@@ -18,6 +20,7 @@ from sts2sim.saveimport import (
 FIX = os.path.join(os.path.dirname(__file__), "fixtures", "saves")
 HIST = os.path.join(FIX, "sample_history.run")
 LIVE = os.path.join(FIX, "sample_live.save")
+IMPORT_CLI = os.path.join(os.path.dirname(os.path.dirname(__file__)), "tools", "import_run.py")
 
 
 def test_history_seed_route_picks_relics():
@@ -623,6 +626,14 @@ def test_import_cli_errors_discover_and_kind_text(tmp_path, monkeypatch, capsys)
     assert "UTF-16" in live_out and "No top-level seed" in live_out
     assert "in-progress save" in live_out and "no map column" not in live_out
 
+    # 这个临时目录里已经有 .run / .save，写进去会被拒绝。结果放到旁边的空目录。
+    export = tmp_path.parent / f"{tmp_path.name}-export"
+    export.mkdir()
+    out = export / "out.json"
+    assert cli.main([HIST, "--json", str(out), "--lang", "en"]) == 0
+    doc = json.loads(out.read_text(encoding="utf-8"))
+    assert doc["kind"] == "run" and doc["run"]["kind"] == "run_history" and doc["run"]["schema_version"] == 9
+
     saves = tmp_path / "saves"
     (saves / "history").mkdir(parents=True)
     (saves / "history" / "1.run").write_bytes(open(HIST, "rb").read())
@@ -641,7 +652,7 @@ def test_import_cli_errors_discover_and_kind_text(tmp_path, monkeypatch, capsys)
     assert cli.main(["--discover", "--lang", "en"]) == 0
     discovered = capsys.readouterr().out
     assert "2 finished runs" in discovered and os.path.abspath(str(found)) in discovered
-    dest = tmp_path / "roots.json"
+    dest = export / "roots.json"
     assert cli.main(["--discover", "--json", str(dest), "--lang", "en"]) == 0
     rows = json.loads(dest.read_text(encoding="utf-8"))
     assert rows[0]["history"] == 2 and rows[0]["has_current"] is False
@@ -700,3 +711,224 @@ def test_import_api_encodings_discover_and_errors(tmp_path, monkeypatch):
     assert disc.status_code == 200
     hit = next(h for h in disc.json()["roots"] if h["path"] == os.path.abspath(str(found)))
     assert hit["history"] == 1 and hit["has_current"] is True
+
+
+def _tree_bytes(root):
+    out = {}
+    for dirpath, dirnames, names in os.walk(root):
+        dirnames.sort()
+        for name in sorted(names):
+            path = os.path.join(dirpath, name)
+            with open(path, "rb") as fh:
+                out[os.path.relpath(path, root)] = fh.read()
+    return out
+
+
+def _write_run(folder, name, doc):
+    (folder / name).write_text(json.dumps(doc), encoding="utf-8")
+
+
+def test_batch_summary_history_rows_are_stable(tmp_path, monkeypatch):
+    saves = tmp_path / "profile1" / "saves"
+    hist = saves / "history"
+    hist.mkdir(parents=True)
+    _write_run(hist, "10.run", _history(
+        seed="WINSEED00001", ascension=10, win=True, was_abandoned=False,
+        players=[{"id": 1, "character": "CHARACTER.SILENT", "deck": [], "relics": [], "potions": []}],
+        map_point_history=[[
+            {"map_point_type": "Monster"},
+            {"map_point_type": "Elite"},
+        ]],
+    ))
+    _write_run(hist, "2.run", _history(
+        seed="LOSESEED0001", ascension=0, win=False, was_abandoned=False,
+        map_point_history=[[{"map_point_type": "Monster"}]],
+    ))
+    _write_run(hist, "2.run.backup", _history(seed="HIDDENBACKUP1", win=True))
+    _write_run(hist, "3.run", _history(
+        seed="QUITSEED0001", ascension=5, win=False, was_abandoned=True, map_point_history=[],
+    ))
+    open_run = _history(
+        seed="OPENSEED00001", ascension=2,
+        map_point_history=[[{"map_point_type": "RestSite"}]],
+    )
+    del open_run["win"]
+    del open_run["was_abandoned"]
+    _write_run(hist, "4.run", open_run)
+    _write_run(hist, "5.run", _history(seed="NOCHARSEED01", ascension=1, win=True, players=[], map_point_history=[]))
+    (hist / "0-corrupt.run").write_bytes(b"\x00\x01not json")
+    (hist / "bad.run").write_text("not-json", encoding="utf-8")
+    (hist / "shape.run").write_text(json.dumps({"epochs": [1], "cards": []}), encoding="utf-8")
+    (hist / "weird.run").write_text(json.dumps({"hello": 1}), encoding="utf-8")
+    _write_run(hist, "orphan.run.bak", _history(seed="ORPHANSEED01", ascension=1, win=True, map_point_history=[]))
+    (hist / "notes.txt").write_text("ignore", encoding="utf-8")
+    (saves / "current_run.save").write_bytes(b"\x00corrupt-live")
+    (saves / "progress.save").write_text("{}", encoding="utf-8")
+    before = _tree_bytes(saves)
+
+    expected = [
+        {"file": "0-corrupt.run", "error": "not_json"},
+        {"file": "10.run", "seed": "WINSEED00001", "ascension": 10, "character": "Silent", "floors": 2, "result": "won"},
+        {"file": "2.run", "seed": "LOSESEED0001", "ascension": 0, "character": "Ironclad", "floors": 1, "result": "lost"},
+        {"file": "3.run", "seed": "QUITSEED0001", "ascension": 5, "character": "Ironclad", "floors": 0, "result": "abandoned"},
+        {"file": "4.run", "seed": "OPENSEED00001", "ascension": 2, "character": "Ironclad", "floors": 1},
+        {"file": "5.run", "seed": "NOCHARSEED01", "ascension": 1, "character": None, "floors": 0, "result": "won"},
+        {"file": "bad.run", "error": "not_json"},
+        {"file": "orphan.run.bak", "seed": "ORPHANSEED01", "ascension": 1, "character": "Ironclad", "floors": 0, "result": "won"},
+        {"file": "shape.run", "error": "not_a_run"},
+        {"file": "weird.run", "error": "unknown_shape"},
+    ]
+    from_history = batch_summary(load_path(str(hist)))
+    from_saves = batch_summary(load_path(str(saves)))
+    assert from_history == expected
+    assert from_saves == expected
+    assert [list(row) for row in expected if "seed" in row and "result" in row][0] == [
+        "file", "seed", "ascension", "character", "floors", "result",
+    ]
+    assert list(expected[4]) == ["file", "seed", "ascension", "character", "floors"]
+    assert list(expected[0]) == ["file", "error"]
+    assert _tree_bytes(saves) == before
+    assert all(row.get("file") != "current_run.save" for row in from_saves)
+    assert all(row.get("seed") != "HIDDENBACKUP1" for row in from_saves)
+
+    fixture_before = _tree_bytes(FIX)
+    assert batch_summary(load_path(FIX)) == [{
+        "file": "sample_history.run",
+        "seed": "SAMPLESEED01",
+        "ascension": 3,
+        "character": "Ironclad",
+        "floors": 3,
+        "result": "lost",
+    }]
+    assert batch_summary(load_path(LIVE)) == [{
+        "file": "sample_live.save",
+        "seed": "LIVESEED0001",
+        "ascension": 0,
+        "character": "Silent",
+        "floors": 1,
+    }]
+    assert _tree_bytes(FIX) == fixture_before
+
+    multi = parse_bytes(json.dumps({
+        "seed": "MP",
+        "win": False,
+        "was_abandoned": True,
+        "acts": ["ACT.SAMPLE_ONE"],
+        "players": [
+            {"id": 1, "character": "CHARACTER.REGENT", "deck": [], "relics": []},
+            {"id": 2, "character": "CHARACTER.NECROBINDER", "deck": [], "relics": []},
+        ],
+        "map_point_history": [[{"map_point_type": "Shop"}]],
+    }).encode(), filename="mp.run")
+    assert batch_summary(multi) == [{
+        "file": "mp.run",
+        "seed": "MP",
+        "ascension": 0,
+        "character": "Regent",
+        "floors": 1,
+        "result": "abandoned",
+    }]
+    with pytest.raises(SaveImportError) as bad_doc:
+        batch_summary({"kind": "nope"})
+    assert bad_doc.value.code == "unknown_shape"
+    with pytest.raises(SaveImportError) as not_obj:
+        batch_summary([])
+    assert not_obj.value.code == "not_object"
+
+    only = tmp_path / "only-live" / "saves"
+    only.mkdir(parents=True)
+    (only / "current_run.save").write_bytes(open(LIVE, "rb").read())
+    assert batch_summary(load_path(str(only))) == []
+
+    cap = tmp_path / "capped" / "history"
+    cap.mkdir(parents=True)
+    _write_run(cap, "a.run", _history(seed="AAA", win=True))
+    _write_run(cap, "b.run", _history(seed="BBB", win=False))
+    monkeypatch.setattr("sts2sim.saveimport.MAX_FILES", 1)
+    capped = batch_summary(load_path(str(cap)))
+    assert capped[0]["seed"] == "AAA" and capped[0]["result"] == "won"
+    assert capped[1] == {"error": "truncated", "n": 1}
+    assert len(capped) == 2
+
+
+def test_batch_summary_cli_prints_json_and_skips_writes(tmp_path, capsys):
+    cli = _import_cli()
+    hist = tmp_path / "saves" / "history"
+    hist.mkdir(parents=True)
+    _write_run(hist, "a.run", _history(seed="AAA", ascension=7, win=True, map_point_history=[[{"map_point_type": "Boss"}]]))
+    (hist / "bad.run").write_bytes(b"\x00nope")
+    _write_run(hist, "c.run", _history(
+        seed="CCC", ascension=1, win=False,
+        players=[{"id": 1, "character": "CHARACTER.DEFECT", "deck": [], "relics": [], "potions": []}],
+        map_point_history=[[{"map_point_type": "Monster"}, {"map_point_type": "Shop"}]],
+    ))
+    (hist.parent / "current_run.save").write_bytes(open(LIVE, "rb").read())
+    before = _tree_bytes(hist.parent)
+
+    assert cli.main([str(hist), "--batch-summary"]) == 0
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    rows = json.loads(captured.out)
+    assert rows == [
+        {"file": "a.run", "seed": "AAA", "ascension": 7, "character": "Ironclad", "floors": 1, "result": "won"},
+        {"file": "bad.run", "error": "not_json"},
+        {"file": "c.run", "seed": "CCC", "ascension": 1, "character": "Defect", "floors": 2, "result": "lost"},
+    ]
+    assert _tree_bytes(hist.parent) == before
+
+    assert cli.main([str(hist.parent), "--batch-summary", "--lines"]) == 0
+    lined = capsys.readouterr()
+    assert lined.err == ""
+    assert [json.loads(line) for line in lined.out.splitlines()] == rows
+    assert _tree_bytes(hist.parent) == before
+
+    dest = tmp_path / "batch.json"
+    assert cli.main([str(hist), "--batch-summary", "--json", str(dest)]) == 0
+    assert json.loads(dest.read_text(encoding="utf-8")) == rows
+    assert json.loads(capsys.readouterr().out) == rows
+    inside = hist / "out.json"
+    assert cli.main([str(hist), "--batch-summary", "--json", str(inside), "--lang", "en"]) == 2
+    refused = capsys.readouterr()
+    assert json.loads(refused.out)["error"] == "refuse_write"
+    assert json.loads(refused.out)["read_only"] is True
+    assert not inside.exists()
+    assert _tree_bytes(hist.parent) == before
+
+    assert cli.main([HIST, "--batch-summary"]) == 0
+    one = json.loads(capsys.readouterr().out)
+    assert one[0]["result"] == "lost" and "highlights" not in one[0]
+    assert cli.main([HIST, "--summary"]) == 0
+    rich = json.loads(capsys.readouterr().out)
+    assert rich["kind"] == "run_history" and rich["floor_reached"] == 3
+    assert rich["highlights"]["deck_size"] >= 1
+
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    assert cli.main([str(empty), "--batch-summary", "--lang", "en"]) == 2
+    empty_out = capsys.readouterr()
+    assert json.loads(empty_out.out)["error"] == "dir_empty"
+    assert "No .run" in empty_out.err
+
+    bad = tmp_path / "bad.run"
+    bad.write_bytes(b"\x00\x01")
+    assert cli.main([str(bad), "--batch-summary", "--lang", "en"]) == 2
+    assert json.loads(capsys.readouterr().out)["error"] == "not_json"
+
+    corrupt_only = tmp_path / "corrupt-only"
+    corrupt_only.mkdir()
+    (corrupt_only / "z.run").write_text("{", encoding="utf-8")
+    assert cli.main([str(corrupt_only), "--batch-summary"]) == 0
+    assert json.loads(capsys.readouterr().out) == [{"file": "z.run", "error": "not_json"}]
+
+    with pytest.raises(SystemExit) as lines_only:
+        cli.main([str(hist), "--lines"])
+    assert lines_only.value.code == 2
+    with pytest.raises(SystemExit) as both:
+        cli.main([str(hist), "--batch-summary", "--summary"])
+    assert both.value.code == 2
+
+    help_out = subprocess.run([sys.executable, IMPORT_CLI, "--help"], capture_output=True, text=True, check=False)
+    assert help_out.returncode == 0
+    assert "--batch-summary" in help_out.stdout
+    assert "--lines" in help_out.stdout
+    assert "result" in help_out.stdout
