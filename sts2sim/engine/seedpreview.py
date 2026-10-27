@@ -462,6 +462,10 @@ def _cache_file(spec, cache_dir):
     return os.path.join(cache_dir, name)
 
 
+def _all_dicts(value):
+    return isinstance(value, list) and all(isinstance(item, dict) for item in value)
+
+
 def _cache_complete(preview, spec):
     if not isinstance(preview, dict) or preview.get("v") != SCHEMA_V:
         return False
@@ -470,7 +474,23 @@ def _cache_complete(preview, spec):
             return False
     if preview.get("seed") != spec["canon"] or preview.get("character") != spec["char"]:
         return False
-    return _as_int(preview.get("ascension"), -1) == spec["asc"]
+    if _as_int(preview.get("ascension"), -1) != spec["asc"]:
+        return False
+    # 错类型会被 public_document 拆成空列表或单个字符，读起来像另一份预览。
+    if not _all_dicts(preview.get("maps")) or not _all_dicts(preview.get("distribution")):
+        return False
+    if not isinstance(preview.get("limits"), list):
+        return False
+    if "acts" in preview and not isinstance(preview["acts"], list):
+        return False
+    for field in ("warnings", "rooms", "neow_options"):
+        if field in preview and not _all_dicts(preview[field]):
+            return False
+    if "after_neow" in preview and not isinstance(preview["after_neow"], dict):
+        return False
+    if "relics" in preview and not isinstance(preview["relics"], dict):
+        return False
+    return True
 
 
 def cache_load(spec, cache_dir):
@@ -480,25 +500,36 @@ def cache_load(spec, cache_dir):
             payload = json.load(f)
     except (OSError, json.JSONDecodeError, UnicodeError):
         return None
-    if not isinstance(payload, dict) or payload.get("cache_v") != CACHE_FORMAT:
+    try:
+        if not isinstance(payload, dict) or payload.get("cache_v") != CACHE_FORMAT:
+            return None
+        if payload.get("key") != _cache_key(spec):
+            return None
+        preview = payload.get("preview")
+        if not _cache_complete(preview, spec):
+            return None
+        return public_document(preview)
+    except (TypeError, ValueError):
+        # 嵌套坏了（地图行不是数组这类）时丢掉，不要把异常抛给调用方。
         return None
-    if payload.get("key") != _cache_key(spec):
-        return None
-    preview = payload.get("preview")
-    if not _cache_complete(preview, spec):
-        return None
-    return public_document(preview)
 
 
 def cache_store(spec, doc, cache_dir):
     os.makedirs(cache_dir, exist_ok=True)
     path = _cache_file(spec, cache_dir)
     payload = {"cache_v": CACHE_FORMAT, "key": _cache_key(spec), "preview": public_document(doc)}
-    tmp = path + f".{os.getpid()}.tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=1)
-        f.write("\n")
-    os.replace(tmp, path)
+    # 临时名每次不同，同进程多线程不会截断同一个文件；替换是原子的，读者看到旧文件或新文件。
+    tmp = path + "." + os.urandom(8).hex() + ".tmp"
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=1)
+            f.write("\n")
+        os.replace(tmp, path)
+    finally:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
 
 
 def _bind_seed(doc, raw, canon):

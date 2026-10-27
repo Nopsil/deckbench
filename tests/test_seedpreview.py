@@ -3,13 +3,19 @@ import json
 import os
 import subprocess
 import sys
+import threading
+import time
 
 import pytest
 
 from sts2sim.engine.seedpreview import (
+    PUBLIC_KEYS,
     PreviewError,
     _neow_indexes,
+    _request,
     assemble,
+    cache_load,
+    cache_store,
     distribution,
     format_text,
     map_counts,
@@ -423,3 +429,312 @@ def test_preview_api_validates_neow_and_no_engine(monkeypatch):
     assert empty.status_code == 400 and "Enter a seed first." in empty.json()["detail"]
     high = post(seed="oooooooooooo", char="Silent", asc=10, neow="none")
     assert high.status_code == 200 and high.json()["seed"] == "000000000000" and high.json()["ascension"] == 10
+
+
+def _engine_blob(spec):
+    """虚构的引擎结果。多出来的字段必须在进缓存前被稳定的 v1 文档丢掉。"""
+    neow = spec["neow"]
+    after = {}
+    if neow != "none":
+        after[neow] = {
+            "encounter": "ENCOUNTER." + neow,
+            "rewards": [{"cards": ["CARD.SAMPLE"], "gold": spec["asc"], "flavor": "drop-me"}],
+            "note": "drop-me",
+        }
+    return assemble(
+        spec["raw"], spec["canon"], seed_warning_codes(spec["raw"], spec["canon"]),
+        spec["char"], spec["asc"],
+        ["ACT.SAMPLE_ONE"],
+        [{
+            "act_index": 0, "act": "ACT.SAMPLE_ONE", "cols": 1,
+            "rows": [[{"col": 0, "row": 1, "type": "Monster", "children": [[1, 2]], "name": "drop-me"}]],
+            "boss": {"col": 0, "row": 2, "label": "drop-me"},
+            "confidence": "act_entry", "counts": {"Monster": 1}, "leak": "drop-me",
+        }],
+        [{
+            "act": "ACT.SAMPLE_ONE", "boss": "ENCOUNTER.SAMPLE_BOSS", "second_boss": None,
+            "ancient": "EVENT.SAMPLE_START", "normal": ["ENCOUNTER.A", "ENCOUNTER.A"],
+            "elite": ["ENCOUNTER.E"], "events": [], "title": "drop-me",
+        }],
+        "EVENT.SAMPLE_START",
+        [{"index": 0, "key": "EVENT.SAMPLE.OPT", "id": "OPT", "locked": False, "text": "drop-me"}],
+        after,
+        {"starting": ["RELIC.SAMPLE_START"], "shared_queue": [], "character_queue": [], "extra": "drop-me"},
+    )
+
+
+def _stub_generate(monkeypatch):
+    state = {"n": 0, "boom": False}
+
+    def fake(spec):
+        if state["boom"]:
+            raise AssertionError("cache hit must not generate")
+        state["n"] += 1
+        return _engine_blob(spec)
+
+    monkeypatch.setattr("sts2sim.engine.seedpreview._generate", fake)
+    return state
+
+
+def _cache_json(cache_dir):
+    files = [p for p in cache_dir.iterdir() if p.suffix == ".json" and not p.name.endswith(".tmp")]
+    assert len(files) == 1
+    return files[0]
+
+
+def test_cache_hit_returns_the_same_stable_v1_json(tmp_path, monkeypatch):
+    state = _stub_generate(monkeypatch)
+    cache = tmp_path / "cache"
+    kw = dict(use_cache=True, cache_dir=str(cache))
+    first = preview("ABCDEFGHJKLM", "Ironclad", 0, neow="first", **kw)
+    assert state["n"] == 1
+    assert first["v"] == 1
+    assert list(first) == list(PUBLIC_KEYS)
+    assert first["seed"] == "ABCDEFGHJKLM"
+    assert first["seed_input"] == "ABCDEFGHJKLM"
+    assert first["character"] == "Ironclad"
+    assert first["ascension"] == 0
+    assert set(first["after_neow"]) == {"first"}
+    assert first["after_neow"]["first"]["encounter"] == "ENCOUNTER.first"
+    assert first["maps"][0]["rows"][0][0]["children"] == [[1, 2]]
+    assert "name" not in first["maps"][0]["rows"][0][0]
+    assert "drop-me" not in json.dumps(first, ensure_ascii=False)
+    assert json.loads(json.dumps(first, ensure_ascii=False)) == first
+
+    path = _cache_json(cache)
+    stored = json.loads(path.read_text(encoding="utf-8"))
+    assert stored["cache_v"] == 1
+    assert stored["key"] == {"seed": "ABCDEFGHJKLM", "char": "Ironclad", "asc": 0, "neow": "first"}
+    assert stored["preview"] == first
+    assert "drop-me" not in path.read_text(encoding="utf-8")
+    blob = path.read_bytes()
+
+    state["boom"] = True
+    second = preview("ABCDEFGHJKLM", "Ironclad", 0, neow="first", **kw)
+    assert second == first
+    assert path.read_bytes() == blob
+    assert cache_load(_request("ABCDEFGHJKLM", "Ironclad", 0, "first"), str(cache)) == first
+
+    alias = preview("abcdefghjklm", "Ironclad", 0, neow="first", **kw)
+    assert alias["seed"] == first["seed"]
+    assert alias["seed_input"] == "abcdefghjklm"
+    assert alias["v"] == 1
+    assert alias["maps"] == first["maps"]
+    assert alias["distribution"] == first["distribution"]
+    assert alias["after_neow"] == first["after_neow"]
+    assert alias["relics"] == first["relics"]
+    assert alias["limits"] == first["limits"]
+    assert any(w["code"] == "seedNormalized" for w in alias["warnings"])
+    assert path.read_bytes() == blob
+
+    assert preview("ABCDEFGHJKLM", "Ironclad", "0", neow="first", **kw) == first
+
+    state["boom"] = False
+    indexed = preview("ABCDEFGHJKLM", "Ironclad", 0, neow=2, **kw)
+    assert state["n"] == 2
+    assert set(indexed["after_neow"]) == {"2"}
+    state["boom"] = True
+    assert preview("ABCDEFGHJKLM", "Ironclad", 0, neow="2", **kw) == indexed
+    assert len([p for p in cache.iterdir() if p.suffix == ".json"]) == 2
+    assert not any(p.name.endswith(".tmp") for p in cache.iterdir())
+
+
+def test_cache_misses_when_seed_char_asc_or_neow_changes(tmp_path, monkeypatch):
+    state = _stub_generate(monkeypatch)
+    cache = tmp_path / "cache"
+    kw = dict(use_cache=True, cache_dir=str(cache))
+
+    def run(seed, char, asc, neow):
+        doc = preview(seed, char, asc, neow=neow, **kw)
+        assert doc["v"] == 1
+        assert list(doc) == list(PUBLIC_KEYS)
+        assert doc["character"] == char
+        assert doc["ascension"] == int(asc)
+        if neow == "none":
+            assert doc["after_neow"] == {}
+        else:
+            assert set(doc["after_neow"]) == {str(neow)}
+        return doc
+
+    first = run("ABCDEFGHJKLM", "Ironclad", 0, "first")
+    assert state["n"] == 1
+    variants = [
+        ("ZZZZZZZZZZZZ", "Ironclad", 0, "first"),
+        ("ABCDEFGHJKLM", "Silent", 0, "first"),
+        ("ABCDEFGHJKLM", "Ironclad", 3, "first"),
+        ("ABCDEFGHJKLM", "Ironclad", 0, "all"),
+        ("ABCDEFGHJKLM", "Ironclad", 0, "none"),
+        ("ABCDEFGHJKLM", "Ironclad", 0, "2"),
+    ]
+    seen = {(first["seed"], first["character"], first["ascension"], "first")}
+    for seed, char, asc, neow in variants:
+        doc = run(seed, char, asc, neow)
+        marker = (doc["seed"], doc["character"], doc["ascension"], neow)
+        assert marker not in seen
+        seen.add(marker)
+    assert state["n"] == 1 + len(variants)
+    assert len(list(cache.glob("*.json"))) == 1 + len(variants)
+
+    again = preview("ABCDEFGHJKLM", "Ironclad", 0, neow="first", **kw)
+    assert again == first
+    assert state["n"] == 1 + len(variants)
+
+
+def test_corrupt_cache_entry_is_ignored_and_regenerated(tmp_path, monkeypatch):
+    state = _stub_generate(monkeypatch)
+    cache = tmp_path / "cache"
+    kw = dict(use_cache=True, cache_dir=str(cache))
+    good = preview("ABCDEFGHJKLM", "Ironclad", 0, neow="first", **kw)
+    path = _cache_json(cache)
+    assert state["n"] == 1
+
+    def rewrite(mutate):
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        mutate(payload)
+        path.write_text(json.dumps(payload), encoding="utf-8")
+
+    def expect_rebuild(mutate):
+        mutate(path)
+        got = preview("ABCDEFGHJKLM", "Ironclad", 0, neow="first", **kw)
+        assert got == good
+        expect_rebuild.n += 1
+        assert state["n"] == expect_rebuild.n
+        text = path.read_text(encoding="utf-8")
+        payload = json.loads(text)
+        assert payload["cache_v"] == 1
+        assert payload["key"] == {"seed": "ABCDEFGHJKLM", "char": "Ironclad", "asc": 0, "neow": "first"}
+        assert payload["preview"] == good
+        assert "drop-me" not in text
+
+    expect_rebuild.n = 1
+    expect_rebuild(lambda p: p.write_text("{", encoding="utf-8"))
+    expect_rebuild(lambda p: p.write_text("", encoding="utf-8"))
+    expect_rebuild(lambda p: p.write_bytes(b"\xff\xfe"))
+    expect_rebuild(lambda p: p.write_text("[]", encoding="utf-8"))
+    expect_rebuild(lambda p: p.write_text("null", encoding="utf-8"))
+    expect_rebuild(lambda p: rewrite(lambda d: d.__setitem__("cache_v", 99)))
+    expect_rebuild(lambda p: rewrite(lambda d: d["key"].__setitem__("asc", 9)))
+    expect_rebuild(lambda p: rewrite(lambda d: d["key"].__setitem__("neow", "none")))
+    expect_rebuild(lambda p: rewrite(lambda d: d["key"].__setitem__("char", "Silent")))
+    expect_rebuild(lambda p: rewrite(lambda d: d["key"].__setitem__("seed", "ZZZZZZZZZZZZ")))
+    expect_rebuild(lambda p: rewrite(lambda d: d.pop("preview")))
+    expect_rebuild(lambda p: rewrite(lambda d: d["preview"].__setitem__("v", 2)))
+    expect_rebuild(lambda p: rewrite(lambda d: d["preview"].pop("maps")))
+    expect_rebuild(lambda p: rewrite(lambda d: d["preview"].__setitem__("maps", 1)))
+    expect_rebuild(lambda p: rewrite(lambda d: d["preview"].__setitem__("maps", "abc")))
+    expect_rebuild(lambda p: rewrite(lambda d: d["preview"].__setitem__("maps", [1])))
+    expect_rebuild(lambda p: rewrite(lambda d: d["preview"].__setitem__(
+        "maps", [{"rows": [1], "act_index": 0, "act": "ACT.SAMPLE_ONE", "cols": 1}])))
+    expect_rebuild(lambda p: rewrite(lambda d: d["preview"].__setitem__("distribution", {"n": 1})))
+    expect_rebuild(lambda p: rewrite(lambda d: d["preview"].__setitem__("limits", "nope")))
+    expect_rebuild(lambda p: rewrite(lambda d: d["preview"].__setitem__("acts", "ACT")))
+    expect_rebuild(lambda p: rewrite(lambda d: d["preview"].__setitem__("after_neow", [])))
+    expect_rebuild(lambda p: rewrite(lambda d: d["preview"].__setitem__("relics", [])))
+    expect_rebuild(lambda p: rewrite(lambda d: d["preview"].__setitem__("warnings", [1])))
+    expect_rebuild(lambda p: rewrite(lambda d: d["preview"].__setitem__("rooms", [1])))
+
+
+def test_concurrent_cache_readers_do_not_crash(tmp_path, monkeypatch):
+    state = {"n": 0}
+    counter = threading.Lock()
+
+    def fake(spec):
+        with counter:
+            state["n"] += 1
+        return _engine_blob(spec)
+
+    monkeypatch.setattr("sts2sim.engine.seedpreview._generate", fake)
+    cache = tmp_path / "warm"
+    args = ("ABCDEFGHJKLM", "Ironclad", 0, "first")
+    kw = dict(use_cache=True, cache_dir=str(cache))
+    first = preview(*args, **kw)
+    assert first["v"] == 1 and list(first) == list(PUBLIC_KEYS)
+    before = state["n"]
+
+    errors = []
+    results = []
+    readers = 12
+    barrier = threading.Barrier(readers)
+
+    def reader():
+        try:
+            barrier.wait(timeout=10)
+            results.append(preview(*args, **kw))
+        except Exception as exc:
+            errors.append(exc)
+
+    threads = [threading.Thread(target=reader) for _ in range(readers)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=20)
+    assert errors == []
+    assert all(not thread.is_alive() for thread in threads)
+    assert results == [first] * readers
+    assert state["n"] == before
+
+    spec = _request("ABCDEFGHJKLM", "Ironclad", 0, "first")
+    loaded = []
+    stop = threading.Event()
+
+    def writer():
+        try:
+            while not stop.is_set():
+                cache_store(spec, first, str(cache))
+        except Exception as exc:
+            errors.append(exc)
+
+    def loader():
+        try:
+            while not stop.is_set():
+                got = cache_load(spec, str(cache))
+                if got is not None:
+                    loaded.append(got)
+        except Exception as exc:
+            errors.append(exc)
+
+    threads = [threading.Thread(target=writer) for _ in range(4)]
+    threads += [threading.Thread(target=loader) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    time.sleep(0.15)
+    stop.set()
+    for thread in threads:
+        thread.join(timeout=20)
+    assert errors == []
+    assert all(not thread.is_alive() for thread in threads)
+    assert loaded
+    assert all(item == first for item in loaded)
+    assert state["n"] == before
+
+    cold = tmp_path / "cold"
+    cold_results = []
+    barrier = threading.Barrier(8)
+
+    def cold_reader():
+        try:
+            barrier.wait(timeout=10)
+            cold_results.append(preview(
+                "ZZZZZZZZZZZZ", "Silent", 4, neow="none", use_cache=True, cache_dir=str(cold)))
+        except Exception as exc:
+            errors.append(exc)
+
+    threads = [threading.Thread(target=cold_reader) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=20)
+    assert errors == []
+    assert len(cold_results) == 8
+    assert all(item == cold_results[0] for item in cold_results)
+    assert cold_results[0]["v"] == 1
+    assert cold_results[0]["character"] == "Silent"
+    assert cold_results[0]["ascension"] == 4
+    assert cold_results[0]["after_neow"] == {}
+    saved = [p for p in cold.iterdir() if p.suffix == ".json"]
+    assert len(saved) == 1
+    payload = json.loads(saved[0].read_text(encoding="utf-8"))
+    assert payload["cache_v"] == 1
+    assert payload["key"] == {"seed": "ZZZZZZZZZZZZ", "char": "Silent", "asc": 4, "neow": "none"}
+    assert payload["preview"] == cold_results[0]
+    assert not any(p.name.endswith(".tmp") for p in cold.iterdir())
