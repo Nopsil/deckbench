@@ -271,6 +271,69 @@ async def import_zip(file: UploadFile = File(...)):
     return m
 
 
+def _from_dll(mod, report):
+    """导入结果 → 编辑器正在用的字典。不写盘；作者看完提示再按保存。"""
+    m = _public(mod)
+    m.pop("_dll_report", None)
+    m["readonly"] = False
+    s = S()
+    pr, wr = s.validate(m, fullrun=bool(m.get("characters")))
+    pair = lambda xs: [{"where": w, "zhs": zh, "en": en} for w, zh, en in xs]  # noqa
+    m["_check"] = {"problems": pair(pr), "warnings": list(report.get("limitations") or [])
+                   + list(report.get("notes") or []) + pair(wr)}
+    translated = sum(1 for c in report.get("cards") or [] if c.get("status") == "translated")
+    m["_dll"] = {"name": m.get("title") or m.get("name"), "cards": len(m.get("cards") or []),
+                 "translated": translated, "mode": report.get("mode")}
+    return m
+
+
+@router.get("/installed")
+def installed():
+    """本机游戏 mods/ 里能点开的 mod。没有游戏就给空列表。不返回磁盘路径。"""
+    try:
+        from sts2sim.dllmod import list_installed
+        rows = list_installed()
+    except Exception:
+        rows = []
+    return [{"id": r.get("id"), "name": r.get("name") or r.get("id"), "version": r.get("version") or ""}
+            for r in rows if r.get("id")]
+
+
+@router.post("/import-dll")
+async def import_dll(file: UploadFile = File(...)):
+    """作者自己的 mod zip（清单 JSON + DLL，可选 .pck）。读成 YAML 交给编辑器，不执行 DLL。"""
+    data = await file.read()
+    if len(data) > 80 * 1024 * 1024:
+        raise HTTPException(400, T("err.dllTooBig"))
+    import tempfile
+    tmp = tempfile.NamedTemporaryFile(prefix="deckbench-modzip-", suffix=".zip", delete=False)
+    try:
+        tmp.write(data)
+        tmp.close()
+        from sts2sim.dllmod import DllModError, import_path
+        try:
+            mod, report = import_path(tmp.name, lang=i18n.GAME_LANG.get(i18n.current(), "eng"))
+        except DllModError as e:
+            raise HTTPException(400, T(e.key, **e.params))
+    finally:
+        os.remove(tmp.name)
+    return _from_dll(mod, report)
+
+
+class InstalledBody(BaseModel):
+    id: str
+
+
+@router.post("/import-installed")
+def import_installed_mod(body: InstalledBody):
+    from sts2sim.dllmod import DllModError, import_installed
+    try:
+        mod, report = import_installed(body.id, lang=i18n.GAME_LANG.get(i18n.current(), "eng"))
+    except DllModError as e:
+        raise HTTPException(400, T(e.key, **e.params))
+    return _from_dll(mod, report)
+
+
 @router.delete("/mod/{name}")
 def delete(name: str):
     if not NAME_RE.match(name):

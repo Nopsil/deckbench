@@ -288,7 +288,7 @@
  "err.onlyUserMods": "削除できるのは自分でアップロードした Mod だけです",
  "err.badLang": "対応していない言語です",
  "backend.name": "内蔵 Python シミュレーター",
- "backend.engine": "ローカルの変換済みエンジン（フルラン、バージョンはあなたのインストールに合わせる）+ YAML 戦闘シミュレーター",
+ "backend.engine": "ローカルの変換済みエンジン（フルラン、バージョンはあなたのインストールに合わせる）+ YAML 戦闘シミュレーター。ゲームMODの DLL はこの YAML に読み込めます。DLL 自体は実行しません。",
  "backend.cardsFailed": "カード一覧の読み込みに失敗しました：",
  "agent.heuristic.name": "ヒューリスティック（高速）",
  "agent.heuristic.desc": "1 手ずつ試す貪欲法で最速。フルランの既定",
@@ -647,5 +647,16 @@
  "chip.style": "スタイル {style}",
  "log.style": "プレイスタイル：{style}",
  "style.unknown": "不明なプレイスタイル：{id}",
- "style.incompatible": "プレイスタイル「{style}」は AI「{agent}」では使えません。学習版・汎用・強 AI を選んでください"
+ "style.incompatible": "プレイスタイル「{style}」は AI「{agent}」では使えません。学習版・汎用・強 AI を選んでください",
+ "me.importDll": "ゲームMODを読み込む",
+ "me.dllHint": "作ってあるゲームMODは「ゲームMODを読み込む」で、マニフェスト JSON と DLL を読みます。読めたカードはフォームになります。DLL は実行しません。docs/DLL_MODS.md を見てください。",
+ "me.installedPh": "ゲームに入っているMOD",
+ "me.dllImported": "「{name}」を読みました。カード {cards} 枚、効果まで読めたのは {translated} 枚。注意を確認してから保存してください。",
+ "err.dllGame": "これはゲーム本体のファイルです（{name}）。ゲームの DLL ではなく、あなたの MOD を指定してください。",
+ "err.dllNone": "MOD の DLL が見つかりません。ゲームの MOD フォルダには、id と has_dll を含む JSON と、同じ名前の DLL が入ります。",
+ "err.dllMany": "このアーカイブには MOD が複数あります（{ids}）。一つずつ読み込んでください。",
+ "err.dllRead": "この DLL を読めませんでした（{err}）。実行はしていません。",
+ "err.dllEmpty": "この DLL にはカード、パワー、レリック、ポーション、キャラクターのクラスがありません。",
+ "err.dllTooBig": "ファイルが大きすぎます（最大 80 MB）。",
+ "err.dllNeedReader": "MOD の DLL を読むには dnfile が必要です。requirements.txt の依存を入れてからもう一度。"
 }

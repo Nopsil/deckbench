@@ -2,6 +2,9 @@
 
 ## 未发布（0.1.4） / Unreleased (0.1.4)
 
+- **导入已经写好的游戏 mod DLL**：模组编辑器的「导入游戏 mod」，或 `python tools/import_dll_mod.py <游戏的 mods/某个mod>`。读作者自己的清单 JSON 和 DLL，能反编译时把直线的伤害、格挡、抽牌、施加能力翻成现有的 YAML，再在编辑器里改、保存、整局试跑。DLL 不执行，游戏文件不复制进来。认不出的分支和 Harmony 补丁会标明，不会猜成「每次都发动」。说明和限制见 `docs/DLL_MODS.md`。
+  *Import a game mod DLL you already built: Mod editor → Import game mod, or `python tools/import_dll_mod.py <the game's mods/ThatMod>`. Reads the author's manifest JSON and DLL and, when decompilation works, turns straight-line damage, block, draw and apply-power into the existing YAML so you can edit, save and run it. The DLL is not executed and game files are not copied in. Branches and Harmony patches are flagged instead of being guessed as always-on. See `docs/DLL_MODS.md`.*
+
 - **界面多语言**：图形界面支持简体中文、English、日本語、한국어。第一次打开跟着系统语言走（中文 → 简体中文，日语 → 日本語，韩语 → 한국어，其他 → English），左下角随时切换，选择保存在数据目录的 `settings.json`。按钮、提示、报告图表、运行日志、错误信息都会翻译；卡牌、角色、遭遇的名字按所选语言从你自己的游戏安装读（游戏里没有该语言就依次回退英文、中文，最后显示 ID），仍然不随项目分发任何游戏文本。战斗实验的完整 report.md（旧版战斗模拟器生成）暂时只有中文。
   *UI languages: the desktop app now speaks 简体中文, English, 日本語 and 한국어. It starts in your system language and can be switched from the bottom-left menu; the choice is saved in `settings.json` in the data folder. Buttons, hints, report charts, run logs and error messages are translated; card, character and encounter names are read in the same language from your own game install (falling back to English, then Chinese, then the ID), and still no game text is shipped. The legacy combat simulator's full report.md is Chinese only for now.*
 - 翻译表在 `gui/locales/<语言>.json`（前后端共用）；`tests/test_i18n.py` 检查每个键四种语言都有、占位符一致、代码里用到的键都存在。`sts2sim/gameloc.py` 支持任意语言代码（`DECKBENCH_GAME_LOC_JPN` / `_KOR` 等覆盖），新增 `languages()`。

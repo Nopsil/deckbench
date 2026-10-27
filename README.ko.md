@@ -114,6 +114,8 @@ Linux/macOS는 [docs/DEVELOPER.md](docs/DEVELOPER.md)를 참고하세요.
 **「테스트」**에서 클릭 한 번으로 전체 런 일괄 실행이나 카드 하나 A/B(같은 시드로 시작 덱 vs 시작 덱+이 카드)를 돌릴 수 있습니다. zip 가져오기/내보내기로 공유할 수 있습니다.
 같은 YAML 파일은 `mods/`에 넣으면 명령줄에서도 동작합니다: `python tools/batch.py --mod mods/my_mod --char MyHero --agent modai`. 형식 설명은 [docs/MODDING.md](docs/MODDING.md)(중국어·영어).
 
+게임에 이미 설치된 모드를 먼저 YAML로 다시 쓸 필요는 없습니다. **모드 편집기**에서 **「게임 모드 가져오기」**로 그 모드의 zip(매니페스트 JSON + DLL)을 고르거나, 게임 `mods/`에 있는 목록에서 고르세요. 읽힌 카드는 양식이 됩니다. DLL은 실행하지 않습니다. 제한은 [docs/DLL_MODS.md](docs/DLL_MODS.md).
+
 ## AI 비서에게 한 수씩 플레이시키기 (MCP)
 
 Claude나 Cursor처럼 MCP를 지원하는 AI 비서를 쓰고 있다면, 시뮬레이터 안에서 직접 한 판을 플레이하게 할 수 있습니다. 상황을 보고, 선택지를 고르고, 이유를 적고, 되돌려서 다시 할 수도 있습니다. 마지막에는 조작 목록을 내보낼 수 있어서, 같은 시드로 실제 게임에서 그대로 따라 할 수 있습니다.

@@ -11,6 +11,12 @@
 > 注意：只写你自己原创的内容。不要把游戏原版卡牌的文字、数值表或美术放进 mod 再提交到本仓库（见 [CONTRIBUTING.md](../CONTRIBUTING.md)）。
 > 要和原版角色对比，需要本机的原版对照组 `mods/vanilla/`，见 [DEVELOPER.md · 旧版 YAML 战斗模拟器](DEVELOPER.md#旧版-yaml-战斗模拟器--legacy-yaml-combat-simulator)。
 
+## 已经写好的游戏 mod（DLL） / A mod you already built (DLL)
+
+不用把牌重写成 YAML 才能开始。把游戏 `mods/<名字>/` 里的那一份（清单 JSON + 同名 DLL）交给导入器，它读 DLL 的类型，能反编译时把直线效果翻成上面这种 YAML，然后在模组编辑器里打开。DLL 不会被执行，游戏文件也不会被复制进来。分支、Harmony 补丁和画面认不了，会标出来。步骤和限制见 [DLL_MODS.md](DLL_MODS.md)。
+
+*You do not have to rewrite cards as YAML to start. Point the importer at the mod folder the game already loads (manifest JSON + the DLL). It reads the DLL's types and, when it can decompile, turns straight-line effects into the YAML above, then opens that in the mod editor. The DLL is not executed and game files are not copied in. Branches, Harmony patches and visuals are flagged instead of guessed. Steps and limits: [DLL_MODS.md](DLL_MODS.md).*
+
 ## 整局用的 YAML mod（新） / YAML mods for full runs (new)
 
 从 0.1.4 起，同一种 YAML 格式**也能直接在整局模拟里用**：批量整局、单卡 A/B、指定种子、各种 AI（推荐「通用 AI」`modai`）都认。不用写 Python，也不用编译 DLL。

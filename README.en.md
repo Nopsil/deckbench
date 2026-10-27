@@ -114,6 +114,8 @@ Open **Mod editor** on the left. Fill in forms for a character (HP, energy, star
 Then, under **Test**, start a full-run batch or a one-card A/B (same seeds, starting deck vs starting deck + this card) with one click. Import and export zips to share mods.
 The same YAML files also work from the command line: put them in `mods/` and run `python tools/batch.py --mod mods/my_mod --char MyHero --agent modai`. Format reference: [docs/MODDING.md](docs/MODDING.md).
 
+A mod already installed in the game does not have to be rewritten by hand first. In **Mod editor**, use **Import game mod** and pick that mod's zip (manifest JSON + DLL), or pick it from the dropdown of mods under the game's `mods/` folder. Cards we can read become a form. The DLL is not executed. Limits: [docs/DLL_MODS.md](docs/DLL_MODS.md).
+
 ## Let an AI assistant play step by step (MCP)
 
 If you use an AI assistant that supports MCP, such as Claude or Cursor, you can have it play a run in the simulator itself: it can read the situation, pick options, explain its reasons, undo and retry, and at the end export a step list so you can play the same seed in the real game and follow along.

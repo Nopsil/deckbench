@@ -288,7 +288,7 @@
  "err.onlyUserMods": "Only mods you uploaded can be deleted",
  "err.badLang": "Unsupported language",
  "backend.name": "Built-in Python simulator",
- "backend.engine": "Local transpiled engine (full runs, version taken from your install) + YAML combat simulator",
+ "backend.engine": "Local transpiled engine (full runs, version taken from your install) + YAML combat simulator. A game mod DLL can be imported into that YAML; it is not executed.",
  "backend.cardsFailed": "Failed to read the card list:",
  "agent.heuristic.name": "Heuristic (fast)",
  "agent.heuristic.desc": "Greedy, simulates each action; fastest. Default for full runs",
@@ -647,5 +647,16 @@
  "chip.style": "Style {style}",
  "log.style": "Play style: {style}",
  "style.unknown": "Unknown play style: {id}",
- "style.incompatible": "Play style \"{style}\" does not work with AI \"{agent}\"; pick a learned, general or strong AI"
+ "style.incompatible": "Play style \"{style}\" does not work with AI \"{agent}\"; pick a learned, general or strong AI",
+ "me.importDll": "Import game mod",
+ "me.dllHint": "Already have a game mod? Use Import game mod to read its manifest JSON and DLL. Cards we can read become a form. The DLL is not executed. See docs/DLL_MODS.md.",
+ "me.installedPh": "Mod in your game install",
+ "me.dllImported": "Read {name}: {cards} cards, {translated} with effects. Review the notes, then Save.",
+ "err.dllGame": "This file is the game itself ({name}). Point DeckBench at your mod, not the game DLL.",
+ "err.dllNone": "No mod DLL found. A game mod folder has a manifest JSON (with id and has_dll) and a DLL with the same name.",
+ "err.dllMany": "This archive contains more than one mod ({ids}). Import one mod at a time.",
+ "err.dllRead": "Could not read this DLL ({err}). It was not executed.",
+ "err.dllEmpty": "This DLL has no card, power, relic, potion or character classes.",
+ "err.dllTooBig": "File too large (80 MB max).",
+ "err.dllNeedReader": "Reading a mod DLL needs the dnfile package. Install dependencies from requirements.txt and try again."
 }
