@@ -24,7 +24,7 @@ cd gui/web && npm install && npm run build         # 改了前端后重新构建
 - `web/`：Vue 3 + Vite + Naive UI + ECharts。页面还有「导入对局」（只读解析玩家指出的 `.run` / `current_run.save`）和「种子预览」（不打完整一局）。
 - 接口：`POST /api/import`、`POST /api/import/upload`、`GET /api/saves/discover`、`POST /api/seed-preview`。格式见 [docs/SAVE_FORMAT.md](../docs/SAVE_FORMAT.md)。
 - `locales/<lang>.json` + `i18n.py` + `web/src/i18n.js`：界面多语言（zhs 简体中文默认/回退、en、ja、ko），前后端共用同一份扁平键翻译表；选择存在数据目录的 `settings.json`，第一次按系统语言。游戏里的名字（卡牌、角色、遭遇）不进翻译表，按所选语言从玩家自己的游戏安装读（`sts2sim/gameloc.py`，缺了回退 eng → zhs → ID）。加新文字时四个文件都要加同一个键，`tests/test_i18n.py` 会检查。
-- `packaging/`：PyInstaller 打包（`DeckBench.spec`、`launcher.py`、`build.ps1`、图标、Windows API 冒烟测试）。模拟器源码以普通文件放在 exe 旁的 `sim/`；游戏相关代码首次运行时在本机从你自己的安装生成（见根目录 README），不打包、不分发。
+- `packaging/`：PyInstaller 打包（`DeckBench.spec`、`launcher.py`、`build.ps1`、`audit.ps1`、`dry_check.py`、`ship-manifest.txt`、图标、Windows API 冒烟测试）。`dry_check.py` 不编译 exe、不需要游戏，确认 import / 种子预览 / dllmod / 反编译器启动器 / `mentor.local.json` 说明会进安装包。模拟器源码以普通文件放在 exe 旁的 `sim/`；游戏相关代码首次运行时在本机从你自己的安装生成（见根目录 README），不打包、不分发。
 - `tests_e2e.py`：Playwright 端到端测试 + 截图。
 
 ## 已知限制

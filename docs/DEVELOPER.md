@@ -99,7 +99,7 @@ PYTHONPATH=. .venv/bin/python tools/batch.py --char Claude --asc 10 --n 100 --ag
 | `--boss-search` | 关 | `strong-nosearch` 下只在首领战开搜索 |
 | `--timeout` | heuristic 60，其余 900 | 每局秒数上限 |
 
-宝箱遗物：0.1.3 起真正进遗物栏（以前的版本没有，所以旧的胜率/层数偏低）；`DECKBENCH_TREASURE_FIX=0` 恢复旧行为，只用于复现旧数字。
+宝箱遗物：0.1.5 起真正进遗物栏（以前的版本没有，所以旧的胜率/层数偏低）；`DECKBENCH_TREASURE_FIX=0` 恢复旧行为，只用于复现旧数字。
 
 带搜索的 AI（`strong`、`search`、`learned-search`、`learned-boss`、`planner-search`、`modai-boss`）用 `os.fork()` 给游戏状态拍快照，只能在 Linux/macOS 上用。
 
@@ -369,3 +369,48 @@ powershell -ExecutionPolicy Bypass -File gui\packaging\audit.ps1 -Path <工作�
 加一个新风格：写一个 mixin（参考 `JugglerMixin`）和 `apply_xxx(agent)`，在 `STYLES` 里加一项，再把 id 加进 `tools/batch.py` 的 `STYLE_IDS`；`tests/test_style.py` 会检查两边一致，并检查 `standard` 和不加风格的结果完全相同。
 
 *Play styles are a rule layer on top of an AI, registered in `STYLES` in `sts2sim/engine/style.py` (names/descriptions in four languages, an `apply` function, compatible AI prefixes). Batch `--style`, `ab_card.py --style`, the GUI dropdown / `GET /api/styles` / run param `style`, and MCP `new_run(style=…)` / `list_styles` all read it. Each run record has a `style` field.*
+
+```powershell
+# 0) 不编译 exe、不需要游戏：确认 0.1.5 的工具会进安装包
+python gui/packaging/dry_check.py
+# 1) 自包含反编译器（只需一次；需要 .NET 9 SDK，可以在任何系统上交叉发布 win-x64）
+dotnet tool install -g ilspycmd --version 9.1.0.7988
+dotnet publish gui\packaging\decompiler\ilspycmd-host.csproj -c Release -r win-x64 --self-contained -o <decompiler 目录> -p:IlspyToolDir=<ilspycmd 工具目录 tools\net8.0\any>
+# 2) 打包（Python 3.12 venv 里装 requirements-gui.txt + pyinstaller；需要 Node.js）
+powershell -ExecutionPolicy Bypass -File gui\packaging\build.ps1 -Work <工作目录> -Py <venv>\Scripts\python.exe -Decompiler <decompiler 目录> -Version 0.1.5
+
+
+- `build.ps1` 只打包 **git 跟踪的文件**（`git ls-files`），所以本机生成的 `game.py`、缓存等不可能混进去；临时文件/缓存都放在 `-Work` 目录。
+- `dry_check.py`（`tests/test_packaging_dry.py`）对照这份收录规则和 `gui/packaging/ship-manifest.txt`，确认 `tools/import_run.py`、`tools/seed_preview.py`、`tools/import_dll_mod.py`、`sts2sim/dllmod/`、`sts2sim/saveimport.py`、`sts2sim/engine/seedpreview.py` 会进 `sim/`，反编译器启动器还在 `gui/packaging/decompiler/`，`README-win.txt` 和四种语言的界面文案都指向 `mentor.local.json` 与 `docs/DEVELOPER.md`。不启动 PyInstaller，也不读游戏安装。
+  *`dry_check.py` (and `tests/test_packaging_dry.py`) checks `git ls-files` against `build.ps1` and `gui/packaging/ship-manifest.txt`: `import_run`, `seed_preview`, the dllmod importer, `saveimport` and `seedpreview` land in `sim/`, the decompiler host project is still under `gui/packaging/decompiler/`, and `README-win.txt` plus the four UI locales point at `mentor.local.json` and `docs/DEVELOPER.md`. No PyInstaller and no game install.*
+- 自带的反编译器是**未修改的** ilspycmd 9.1.0.7988（MIT）加一个很小的启动器（`gui/packaging/decompiler/`），连同 .NET 9 运行时自包含发布，
+  玩家不需要安装 .NET SDK。`sts2sim/gamedata.py` 查找顺序：`DECKBENCH_ILSPY` → exe 旁的 `decompiler\` → 系统里的 `ilspycmd`。
+  它生成的 `game.py` 与 SDK 版 ilspycmd 生成的逐字节一致。
+- 第三方声明：`gui/packaging/THIRD-PARTY-NOTICES.txt` + `gui/packaging/notices/`，打包时一起放进 zip。
+
+- `build.ps1` 只打包 **git 跟踪的文件**（`git ls-files`），所以本机生成的 `game.py`、缓存等不可能混进去；临时文件/缓存都放在 `-Work` 目录。
+- `dry_check.py`（`tests/test_packaging_dry.py`）对照这份收录规则和 `gui/packaging/ship-manifest.txt`，确认 `tools/import_run.py`、`tools/seed_preview.py`、`tools/import_dll_mod.py`、`sts2sim/dllmod/`、`sts2sim/saveimport.py`、`sts2sim/engine/seedpreview.py` 会进 `sim/`，反编译器启动器还在 `gui/packaging/decompiler/`，`README-win.txt` 和四种语言的界面文案都指向 `mentor.local.json` 与 `docs/DEVELOPER.md`。不启动 PyInstaller，也不读游戏安装。
+  *`dry_check.py` (and `tests/test_packaging_dry.py`) checks `git ls-files` against `build.ps1` and `gui/packaging/ship-manifest.txt`: `import_run`, `seed_preview`, the dllmod importer, `saveimport` and `seedpreview` land in `sim/`, the decompiler host project is still under `gui/packaging/decompiler/`, and `README-win.txt` plus the four UI locales point at `mentor.local.json` and `docs/DEVELOPER.md`. No PyInstaller and no game install.*
+- 自带的反编译器是**未修改的** ilspycmd 9.1.0.7988（MIT）加一个很小的启动器（`gui/packaging/decompiler/`），连同 .NET 9 运行时自包含发布，
+  玩家不需要安装 .NET SDK。`sts2sim/gamedata.py` 查找顺序：`DECKBENCH_ILSPY` → exe 旁的 `decompiler\` → 系统里的 `ilspycmd`。
+  它生成的 `game.py` 与 SDK 版 ilspycmd 生成的逐字节一致。
+- 第三方声明：`gui/packaging/THIRD-PARTY-NOTICES.txt` + `gui/packaging/notices/`，打包时一起放进 zip。
+- 打包版参数：`DeckBench.exe --game-dir <游戏目录>`（之后会记住）、`--browser`、`--serve --port N`；环境变量 `DECKBENCH_NO_DIALOG=1` 关闭弹窗（自动化测试用）。
+
+- 第三方声明：`gui/packaging/THIRD-PARTY-NOTICES.txt` + `gui/packaging/notices/`，打包时一起放进 zip。
+- 打包版参数：`DeckBench.exe --game-dir <游戏目录>`（之后会记住）、`--browser`、`--serve --port N`；环境变量 `DECKBENCH_NO_DIALOG=1` 关闭弹窗（自动化测试用）。
+- `sim/gui`：我们自己的界面 Python（不含 `web/`、不含 `packaging/`），给玩家本机的 CPython 跑 `mentor-full` / `mentor-full-ev`。不要把 `sts2_rs`、`sts2_hint`、`.onnx`、`champions.toml`、`mentor.local.json` 或 `mentor\` 放进 zip。`audit.ps1` 会拒收这些路径和扩展名，并按 `ship-manifest.txt` 要求 `sim/` 里的导入 / 种子预览 / dllmod、`decompiler\ilspycmd-host.exe`，以及 `README.txt` 里的 `mentor.local.json` / `docs/DEVELOPER.md` 说明。还没编反编译器时加 `-AllowMissingDecompiler`。
+  *`sim/gui` is our own UI code so the player's CPython can run the mentor agents. Do not put `sts2_rs`, `sts2_hint`, `.onnx`, `champions.toml`, `mentor.local.json` or a `mentor\` directory in the zip. `audit.ps1` rejects those paths and, via `ship-manifest.txt`, requires the import / seed-preview / dllmod files under `sim/`, `decompiler\ilspycmd-host.exe`, and the `mentor.local.json` / `docs/DEVELOPER.md` pointer in `README.txt`. Pass `-AllowMissingDecompiler` only when that host has not been built yet.*
+
+## 已知限制 / Known limitations
+
+- 模拟结果只适合在同一套假设下横向比较，不是真实胜率。
+
+- 打包版参数：`DeckBench.exe --game-dir <游戏目录>`（之后会记住）、`--browser`、`--serve --port N`；环境变量 `DECKBENCH_NO_DIALOG=1` 关闭弹窗（自动化测试用）。
+- `sim/gui`：我们自己的界面 Python（不含 `web/`、不含 `packaging/`），给玩家本机的 CPython 跑 `mentor-full` / `mentor-full-ev`。不要把 `sts2_rs`、`sts2_hint`、`.onnx`、`champions.toml`、`mentor.local.json` 或 `mentor\` 放进 zip。`audit.ps1` 会拒收这些路径和扩展名，并按 `ship-manifest.txt` 要求 `sim/` 里的导入 / 种子预览 / dllmod、`decompiler\ilspycmd-host.exe`，以及 `README.txt` 里的 `mentor.local.json` / `docs/DEVELOPER.md` 说明。还没编反编译器时加 `-AllowMissingDecompiler`。
+  *`sim/gui` is our own UI code so the player's CPython can run the mentor agents. Do not put `sts2_rs`, `sts2_hint`, `.onnx`, `champions.toml`, `mentor.local.json` or a `mentor\` directory in the zip. `audit.ps1` rejects those paths and, via `ship-manifest.txt`, requires the import / seed-preview / dllmod files under `sim/`, `decompiler\ilspycmd-host.exe`, and the `mentor.local.json` / `docs/DEVELOPER.md` pointer in `README.txt`. Pass `-AllowMissingDecompiler` only when that host has not been built yet.*
+
+## 已知限制 / Known limitations
+
+- 模拟结果只适合在同一套假设下横向比较，不是真实胜率。
+- 作者自己的游戏 mod DLL 可以导入成 YAML（[DLL_MODS.md](DLL_MODS.md)），不能在模拟器里直接执行：模拟器是本机转译的 Python，不是游戏的 .NET + Godot 宿主，Harmony 补丁不会打到 Python 上。

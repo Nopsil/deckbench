@@ -1,0 +1,26 @@
+# Package-relative paths for the Windows zip (audit.ps1 and dry_check.py).
+# sim/... is staged from git by build.ps1. app/... is added while assembling.
+# A "pointer" file must mention mentor.local.json and docs/DEVELOPER.md.
+# Do not list the published decompiler as a git path; app/decompiler is the host exe.
+sim/tools/import_run.py
+sim/tools/seed_preview.py
+sim/tools/import_dll_mod.py
+sim/sts2sim/dllmod/__init__.py
+sim/sts2sim/dllmod/__main__.py
+sim/sts2sim/dllmod/extract.py
+sim/sts2sim/dllmod/metadata.py
+sim/sts2sim/dllmod/package.py
+sim/sts2sim/saveimport.py
+sim/sts2sim/engine/seedpreview.py
+sim/sts2sim/engine/mentor_paths.py
+sim/gui/server.py
+sim/gui/modeditor.py
+sim/gui/worker.py
+sim/gui/backend.py
+sim/gui/i18n.py
+sim/gui/locales/en.json pointer
+sim/gui/locales/zhs.json pointer
+sim/gui/locales/ja.json pointer
+sim/gui/locales/ko.json pointer
+app/README.txt pointer
+app/decompiler/ilspycmd-host.exe
