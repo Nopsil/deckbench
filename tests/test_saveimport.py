@@ -164,6 +164,14 @@ def test_import_and_preview_api():
     folder = client.post("/api/import", headers={"x-lang": "en"}, json={"path": FIX})
     assert folder.status_code == 200
     assert any(e.get("run", {}).get("seed") == "SAMPLESEED01" for e in folder.json()["entries"])
+    junk = client.post("/api/import/upload", headers={"x-lang": "en"},
+                       files={"file": ("broken.run", b"{not json", "application/octet-stream")})
+    assert junk.status_code == 400
+    detail = junk.json()["detail"]
+    assert isinstance(detail, str) and "JSON" in detail and "Expecting" in detail
+    settings = client.post("/api/import/upload", headers={"x-lang": "en"},
+                           files={"file": ("settings.save", b'{"lang":"en"}', "application/octet-stream")})
+    assert settings.status_code == 400 and "not one run" in settings.json()["detail"]
 
 
 def test_abandoned_and_multiplayer_second_player():
