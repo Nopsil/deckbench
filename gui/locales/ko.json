@@ -733,6 +733,7 @@
  "imp.err.too_big": "파일이 너무 큽니다(상한 32MB).",
  "imp.err.decode": "파일이 UTF-8도 UTF-16도 아닙니다.",
  "imp.err.dir_empty": "이 폴더에 .run도 current_run.save도 없습니다: {path}",
+ "imp.err.refuse_write": "저장 폴더에는 쓰지 않습니다: {path}",
  "imp.warn.gzip": "파일이 gzip으로 압축된 JSON이라 메모리에서 풀었습니다.",
  "imp.warn.utf16": "파일이 UTF-16이라 텍스트로 읽었습니다.",
  "imp.warn.bom": "UTF-8 BOM이 있어 무시했습니다.",

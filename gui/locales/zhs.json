@@ -733,6 +733,7 @@
  "imp.err.too_big": "文件太大（上限 32MB）。",
  "imp.err.decode": "文件不是 UTF-8 或 UTF-16 文本。",
  "imp.err.dir_empty": "这个目录里没有 .run 或 current_run.save：{path}",
+ "imp.err.refuse_write": "不会把结果写进存档目录：{path}",
  "imp.warn.gzip": "文件是 gzip 压缩的 JSON，已在内存里解开。",
  "imp.warn.utf16": "文件是 UTF-16，已按文本读入。",
  "imp.warn.bom": "文件带有 UTF-8 BOM，已忽略。",
