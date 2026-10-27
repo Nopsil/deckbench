@@ -11,7 +11,10 @@
 `--summary` 把短 JSON 打到标准输出（种子、角色、进阶、到达层、牌和遗物要点），不写存档。
 `--batch-summary` 对目录里每个能读的 history 记录打稳定摘要（种子、进阶、角色、层数，有胜负才写结果），
 默认一个 JSON 数组。`--lines` 改成每局一行 JSON。读不开的文件带上错误码，不中断。
-`--json` 只会写到你指出的路径，而且拒绝写进存档目录、覆盖刚读的文件，或写成 .run / .save。
+`--json` 只会写到你指出的路径。拒绝写进本机存档树（saves / history / SlayTheSpire2，
+以及 candidate_roots 找到的游戏数据目录）、覆盖刚读的文件，或写成 .run / .save。
+和夹具 .run / .save 放在同一个工作目录里的 JSON 摘要可以写。
+
 不修改存档，不解密。格式说明见 docs/SAVE_FORMAT.md。
 夹具里的 ID 是虚构的，用来演示解析，不是游戏数据。
 """
