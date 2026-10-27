@@ -558,10 +558,14 @@ def test_unreadable_and_ambiguous_packages_are_rejected(tmp_path, monkeypatch):
     assert many.value.key == "err.dllMany"
 
 
-def test_decompile_real_fixture_when_ilspy_exists(tmp_path):
+def test_decompile_real_fixture_when_ilspy_exists(tmp_path, monkeypatch):
     from sts2sim import gamedata
     if gamedata._find_ilspy()[0] is None:
         pytest.skip("ilspycmd not installed")
+    # 夹具按桩的枚举序数编译。反编译时把 find_dll 固定成找不到游戏（并清掉 DECKBENCH_GAME_DIR），
+    # 有安装的机器和 CI 都只拿到数字枚举，不会把真 sts2.dll 加进引用。
+    monkeypatch.delenv("DECKBENCH_GAME_DIR", raising=False)
+    monkeypatch.setattr(gamedata, "find_dll", lambda game_dir=None: None)
     folder = tmp_path / "SyntheticMod"
     folder.mkdir()
     (folder / "SyntheticMod.dll").write_bytes(_dll_bytes())
