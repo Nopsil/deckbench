@@ -8,6 +8,7 @@
 - [安装（命令行）](#安装命令行--setup-command-line)
 - [首次运行：本机生成的原理](#首次运行本机生成的原理--how-first-run-generation-works)
 - [命令行整局批量运行](#命令行整局批量运行--full-run-batches-from-the-command-line)
+- [只读导入真实对局](#只读导入真实对局--read-only-import-of-a-real-run)
 - [可选：spire-mentor](#可选spire-mentor更强的-mcts-战斗-ai-optional-spire-mentor)
 - [旧版 YAML 战斗模拟器](#旧版-yaml-战斗模拟器--legacy-yaml-combat-simulator)
 - [目录结构](#目录结构--layout)
@@ -106,6 +107,14 @@ PYTHONPATH=. .venv/bin/python tools/batch.py --char Claude --asc 10 --n 100 --ag
 其他工具：`tools/ab_card.py`（同种子单卡 A/B：`--force`、`--replace`、`--variant`、`--base-variant`…）、`tools/boss_bench.py`（首领战基准）、
 `tools/tune_cma.py`（CMA-ES 自我对局调参 → `data/ai_weights.json`）、`tools/imitate.py`（模仿学习 → `data/imitation_model.json`）、
 `tools/trace_run.py`（单局逐步追踪）、`tools/ai_eval.sh` / `tools/ai_summary.py`（AI 对比）。Gym 接口：`from sts2sim.engine.gym import Sts2Env`（见模块文档字符串）。
+
+## 只读导入真实对局 / Read-only import of a real run
+
+`python -m sts2sim.saveimport <文件或文件夹>`（`tools/import_run.py` 是同一个入口）读取玩家自己的 `history/*.run` 或 `current_run.save` / `current_run_mp.save`，打印种子、路线、选牌和遗物。只读打开，不需要先跑 `gamedata setup`，也不需要游戏安装。格式和容易读错的地方见 [SAVE_FORMAT.md](SAVE_FORMAT.md)。
+
+图形界面是 `GET /api/saves/suggest`、`POST /api/saves/open`、`POST /api/saves/upload`，页面在 `gui/web/src/pages/ImportRun.vue`。显示名在有游戏安装时按界面语言从本机本地化表读取，没有就显示 id。
+
+*Same entry as `tools/import_run.py`. Read-only, and it does not need `gamedata setup` or a game install. Format notes: [SAVE_FORMAT.md](SAVE_FORMAT.md). The GUI uses those three endpoints and `ImportRun.vue`. Names come from the local install when it is present; otherwise the view shows ids.*
 
 ## 可选：spire-mentor（更强的 AI）/ Optional: spire-mentor
 
@@ -221,9 +230,10 @@ sts2sim/gamedata.py  首次运行：找安装、本机反编译+转译、缓存�
 sts2sim/gen/         只有 __init__.py：从本机缓存加载 game.py（仓库里没有生成代码）
 sts2sim/rt/          转译代码的运行时（C#/LINQ 语义、少量手写覆盖）
 sts2sim/engine/      整局驱动、Gym 接口、AI（heuristic / strong / learned / planner / search / imitation / mentor 桥接）
+sts2sim/saveimport.py 只读解析玩家自己的 .run / current_run.save（docs/SAVE_FORMAT.md）
 sts2sim/*.py         旧版 YAML 战斗模拟器（core、cards、powers、enemies、runner、report…）
 mods/                示例 mod：Claude娘 v3.4（YAML）、v3.5（整局引擎）
-tools/               转译器 cs2py_*、解析器、batch.py、调参 tune_cma.py、A/B 工具
+tools/               转译器 cs2py_*、解析器、batch.py、import_run.py、调参 tune_cma.py、A/B 工具
 gui/                 桌面界面（后端 + Vue 前端 + PyInstaller 打包脚本）
 data/                我们自己训练的 AI 参数（ai_weights*.json、imitation_model.json）
 tests/               单元测试

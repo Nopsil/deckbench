@@ -1,0 +1,59 @@
+{
+  "schema_version": 14,
+  "platform_type": 1,
+  "ascension": 5,
+  "win_time": 0,
+  "current_act_index": 1,
+  "start_time": 1700001000,
+  "rng": {"seed": "ABCDEFGHJKLM", "counters": {"shuffle": 3}},
+  "players": [
+    {
+      "net_id": 76561198000000001,
+      "character_id": "CHARACTER.HERO",
+      "current_hp": 40,
+      "max_hp": 70,
+      "gold": 12,
+      "deck": [{"id": "CARD.ALPHA", "floor_added_to_deck": 1, "current_upgrade_level": 0}],
+      "relics": [{"id": "RELIC.START", "floor_added_to_deck": 1}],
+      "potions": [],
+      "rng": {"seed": 2189922105, "counters": {"rewards": 1}}
+    }
+  ],
+  "acts": [
+    {
+      "id": "ACT.FIRST",
+      "saved_map": {
+        "points": [
+          {"coord": {"col": 0, "row": 0}, "point_type": "monster", "children": [{"col": 1, "row": 1}]},
+          {"coord": {"col": 1, "row": 1}, "point_type": "shop", "children": []}
+        ]
+      }
+    },
+    {"id": "ACT.SECOND"}
+  ],
+  "visited_map_coords": [{"col": 2, "row": 0}],
+  "map_point_history": [
+    [
+      {
+        "map_point_type": "monster",
+        "rooms": [{"room_type": "monster", "model_id": "ENCOUNTER.ONE", "monster_ids": ["MONSTER.BLOB"], "turns_taken": 2}],
+        "player_stats": [
+          {
+            "player_id": 76561198000000001,
+            "card_choices": [
+              {"card": {"id": "CARD.ALPHA", "floor_added_to_deck": 2}, "was_picked": true},
+              {"card": {"id": {"category": "CARD", "entry": "BETA"}}, "was_picked": false}
+            ]
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "map_point_type": "elite",
+        "rooms": [{"room_type": "elite", "model_id": "ENCOUNTER.END"}],
+        "player_stats": [{"player_id": 76561198000000001, "current_hp": 40, "current_gold": 12}]
+      }
+    ]
+  ]
+}

@@ -16,6 +16,8 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from sts2sim import saveimport
+
 from . import i18n, paths
 from .backend import get_backend
 from .jobs import JobManager
@@ -359,6 +361,68 @@ def post_settings(req: SettingsReq):
     paths.ensure_dirs()
     i18n.save_settings(lang=req.lang)
     return {"ok": True, "lang": req.lang}
+
+
+class SavePathReq(BaseModel):
+    path: str
+
+
+def _imp_error(err):
+    key = f"imp.err.{err.code}"
+    info = {k: "" if v is None else v for k, v in err.info.items()}
+    if i18n.has(key):
+        raise HTTPException(400, T(key, **info))
+    raise HTTPException(400, err.code)
+
+
+def _with_names(node):
+    """卡牌 / 遗物 / 角色的显示名从玩家自己的游戏安装读。读不到就只留 ID。"""
+    lang = i18n.current()
+    cache = {}
+
+    def lookup(mid):
+        if mid not in cache:
+            found = None
+            for table, key in saveimport.lookup_tables(mid):
+                found = i18n.game_text(table, key, lang)
+                if found:
+                    break
+            cache[mid] = found
+        return cache[mid]
+
+    return saveimport.apply_names(node, lookup)
+
+
+@app.get("/api/saves/suggest")
+def saves_suggest():
+    """本机上像是存档目录的文件夹（只列路径，不上传）。没有就空列表。"""
+    return {"folders": saveimport.discover()}
+
+
+@app.post("/api/saves/open")
+def saves_open(req: SavePathReq):
+    """只读打开用户给出的文件或文件夹。"""
+    path = (req.path or "").strip()
+    if not path:
+        raise HTTPException(400, T("imp.err.not_found", path=""))
+    try:
+        result = saveimport.open_path(path)
+    except saveimport.SaveImportError as e:
+        _imp_error(e)
+    return _with_names(result)
+
+
+@app.post("/api/saves/upload")
+async def saves_upload(file: UploadFile = File(...)):
+    """浏览器选中的单个文件，在内存里解析，不写盘。"""
+    data = await file.read(saveimport.MAX_IN + 1)
+    if len(data) > saveimport.MAX_IN:
+        raise HTTPException(400, T("imp.err.too_big", mb=saveimport.MAX_IN // (1024 * 1024)))
+    try:
+        run = saveimport.parse_bytes(data, file.filename or "upload")
+    except saveimport.SaveImportError as e:
+        _imp_error(e)
+    return _with_names({"type": "run", "run": run})
 
 
 @app.get("/api/version")

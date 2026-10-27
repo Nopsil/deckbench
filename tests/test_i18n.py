@@ -63,7 +63,7 @@ def test_keys_used_in_code_exist():
     missing = sorted(k for k in used if k not in zh and not k.endswith("."))
     assert not missing, missing
     # 动态拼出来的键
-    dyn = [f"page.{p}.{x}" for p in ("new", "run", "report", "ab", "history") for x in ("title", "sub")]
+    dyn = [f"page.{p}.{x}" for p in ("new", "run", "report", "ab", "history", "import") for x in ("title", "sub")]
     dyn += [f"status.{s}" for s in ("running", "done", "failed", "cancelled", "interrupted", "queued")]
     dyn += [f"metric.{k}" for k in ("floor", "boss1", "act2", "act3", "win")]
     dyn += [f"room.{r}" for r in backend.ROOMS + ["Monster", "Elite", "Boss", "Event", "_unrecorded", "探针"]]

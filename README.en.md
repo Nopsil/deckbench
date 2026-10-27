@@ -108,6 +108,12 @@ Linux/macOS: see [docs/DEVELOPER.md](docs/DEVELOPER.md).
 In **New test → Full runs**, fill in **Game seed** with the seed shown in the game (for example `7F3K9Q2ZB8MA`). The AI then plays just that one run and records every decision, which you can look through on the results page.
 Lowercase letters, and the letters O and I, are converted to uppercase and the digits 0 and 1 automatically, just like the game does. Command line: `python tools/batch.py --char Silent --seed 7F3K9Q2ZB8MA --log-dir steps`.
 
+## Look at a run you played
+
+**Import run** on the left opens a history file (`history/*.run`) or the save of a run still in progress (`current_run.save` / `current_run_mp.save`) and shows the seed, the route, the cards that were offered and the relics. It only reads the file you point at. You can also point it at the whole `saves` folder and pick a run from the list.
+
+Command line: `python -m sts2sim.saveimport <file or folder>`. Format notes: [docs/SAVE_FORMAT.md](docs/SAVE_FORMAT.md).
+
 ## Make a mod without code (Mod editor)
 
 Open **Mod editor** on the left. Fill in forms for a character (HP, energy, starting deck, starting relic), cards (pick effects from a menu, such as Deal damage, Apply a power or Draw cards, or use a template), powers and relics (when → what). **Check** points out problems in plain language.

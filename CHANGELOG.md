@@ -1,5 +1,10 @@
 # 更新日志 / Changelog
 
+## 未发布（0.1.5） / Unreleased (0.1.5)
+
+- **只读导入真实对局**：图形界面左侧「导入对局」可以打开你自己的 `history/*.run`，或还在打的 `current_run.save` / `current_run_mp.save`（以及旁边的备份），查看这一局的种子、路线、选牌和遗物。只读取你指出的文件，不写回游戏，也不上传。命令行：`python -m sts2sim.saveimport <文件或文件夹>`，或 `python tools/import_run.py`。两种 JSON 的差别、种子在 `rng.seed`、玩家自己的 rng 计数器是另一个数、历史记录没有列坐标、选牌在每个地图点的 `player_stats` 里，这些写在 `docs/SAVE_FORMAT.md`。测试用合成样例，不需要安装游戏。
+  *Read-only import of a real run: **Import run** in the sidebar opens your own `history/*.run`, or an in-progress `current_run.save` / `current_run_mp.save` (and the backup beside it), and shows that run's seed, route, card picks and relics. It only reads the file you point at. CLI: `python -m sts2sim.saveimport <file or folder>`, or `python tools/import_run.py`. The two JSON shapes, the seed living in `rng.seed`, the separate numeric player rng counter, the lack of columns in history, and picks nested on each map point's `player_stats` are documented in `docs/SAVE_FORMAT.md`. Tests use synthetic fixtures and do not need the game installed.*
+
 ## 未发布（0.1.4） / Unreleased (0.1.4)
 
 - **界面多语言**：图形界面支持简体中文、English、日本語、한국어。第一次打开跟着系统语言走（中文 → 简体中文，日语 → 日本語，韩语 → 한국어，其他 → English），左下角随时切换，选择保存在数据目录的 `settings.json`。按钮、提示、报告图表、运行日志、错误信息都会翻译；卡牌、角色、遭遇的名字按所选语言从你自己的游戏安装读（游戏里没有该语言就依次回退英文、中文，最后显示 ID），仍然不随项目分发任何游戏文本。战斗实验的完整 report.md（旧版战斗模拟器生成）暂时只有中文。

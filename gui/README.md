@@ -32,5 +32,6 @@ cd gui/web && npm install && npm run build         # 改了前端后重新构建
 - Windows 上没有 fork，「强 AI（带搜索）」「束搜索」两种整局 AI 不可用（界面自动隐藏）。
 - 「通用 AI（推荐，模组角色也能用）」= `modai`；「通用 AI（首领战搜索）」= `modai-boss`（用 fork，Windows 上隐藏）。
 - 「新建测试 → 整局批量」可以填「指定游戏种子」：只打这一局，逐步决策日志写到该次运行目录的 `steps/`。
+- 「导入对局」只读打开玩家自己的 `history/*.run` 或 `current_run.save`，显示种子、路线、选牌、遗物。格式见 [docs/SAVE_FORMAT.md](../docs/SAVE_FORMAT.md)。
 - 「spire-mentor 整局 AI（外部）」（`mentor-full`）和「spire-mentor 整局 AI＋事件」（`mentor-full-ev`）只有在启动前设置了 `DECKBENCH_MENTOR_SITE` / `DECKBENCH_MENTOR_PY`（指向自己构建的 spire-mentor）时才能选，否则显示为灰色并带提示；只支持原版 5 个角色，模组角色（如 Claude娘）回退到学习版 AI。见 [docs/DEVELOPER.md](../docs/DEVELOPER.md)。
   *The external `mentor-full` agent is selectable only when spire-mentor is configured (greyed out with a hint otherwise); vanilla characters only, mod characters fall back to the learned AI.*

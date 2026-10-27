@@ -1,0 +1,92 @@
+{
+  "schema_version": 9,
+  "seed": "seed0o",
+  "win": false,
+  "was_abandoned": false,
+  "ascension": 1,
+  "game_mode": "Standard",
+  "platform_type": "Steam",
+  "start_time": 1700000000,
+  "run_time": 120.5,
+  "build_id": "test-build",
+  "killed_by_encounter": "ENCOUNTER.END",
+  "players": [
+    {
+      "id": 1,
+      "character": "CHARACTER.HERO",
+      "deck": [
+        {
+          "id": "CARD.ALPHA",
+          "current_upgrade_level": 2,
+          "floor_added_to_deck": 2,
+          "enchantment": {"id": "ENCHANTMENT.EXAMPLE", "amount": 1}
+        }
+      ],
+      "relics": [
+        {"id": "RELIC.START", "floor_added_to_deck": 1},
+        {"id": "RELIC.MID", "floor_added_to_deck": 3}
+      ],
+      "potions": [{"id": "POTION.RED", "slot_index": 0}],
+      "max_potion_slot_count": 3
+    },
+    {
+      "id": 2,
+      "character": "CHARACTER.OTHER",
+      "deck": [],
+      "relics": [],
+      "potions": []
+    }
+  ],
+  "acts": ["ACT.FIRST", "ACT.SECOND"],
+  "map_point_history": [
+    [
+      {
+        "map_point_type": "Ancient",
+        "rooms": [{"model_id": "EVENT.HELLO", "room_type": "event", "turns_taken": 0}],
+        "player_stats": [
+          {
+            "player_id": 1,
+            "current_hp": 70,
+            "max_hp": 70,
+            "current_gold": 99,
+            "ancient_choice": [
+              {"TextKey": "MID", "was_chosen": true},
+              {"TextKey": "SKIP", "was_chosen": false}
+            ],
+            "relic_choices": [{"choice": "RELIC.MID", "was_picked": true}]
+          },
+          {
+            "player_id": 2,
+            "card_choices": [{"card": {"id": "CARD.OTHER"}, "was_picked": true}]
+          }
+        ]
+      }
+    ],
+    [
+      {
+        "map_point_type": "monster",
+        "rooms": [
+          {
+            "model_id": "ENCOUNTER.END",
+            "monster_ids": ["MONSTER.BLOB"],
+            "turns_taken": 4,
+            "room_type": "monster"
+          }
+        ],
+        "player_stats": [
+          {
+            "player_id": 1,
+            "current_hp": 0,
+            "max_hp": 70,
+            "current_gold": 40,
+            "card_choices": [
+              {"card": {"id": "CARD.ALPHA", "floor_added_to_deck": 2, "current_upgrade_level": 0}, "was_picked": true},
+              {"card": {"id": "CARD.GAMMA"}, "was_picked": false}
+            ],
+            "cards_removed": [{"id": "CARD.BASIC"}]
+          }
+        ]
+      }
+    ]
+  ]
+}

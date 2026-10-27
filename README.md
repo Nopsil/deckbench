@@ -116,6 +116,14 @@ $env:DECKBENCH_GAME_DIR = "D:\SteamLibrary\steamapps\common\Slay the Spire 2"
 
 *Type a seed from the game into "Game seed" in New test → Full runs: the AI plays just that run and records every decision. Lowercase, O and I are normalized like the game does. CLI: `--seed` and `--log-dir`.*
 
+## 看自己打过的一局 / Look at a run you played
+
+左侧 **「导入对局」** 可以打开你自己的历史记录（`history` 里的 `.run`），或还在打的 `current_run.save` / `current_run_mp.save`，看这一局的种子、走过的路线、选过的牌和遗物。只读取你指出的文件。也可以把整个 `saves` 文件夹指过去，先列出里面的局再点开。
+
+命令行：`python -m sts2sim.saveimport <文件或文件夹>`。格式说明见 [docs/SAVE_FORMAT.md](docs/SAVE_FORMAT.md)。
+
+*The **Import run** page reads a history `.run` or a live `current_run.save` and shows the seed, route, card picks and relics. It only reads the file you point at. CLI: `python -m sts2sim.saveimport`. Format: [docs/SAVE_FORMAT.md](docs/SAVE_FORMAT.md).*
+
 ## 不写代码做 mod（模组编辑器） / Make a mod without code (Mod editor)
 
 左侧 **「模组编辑器」**：填表做一个角色（生命、能量、起始牌组、初始遗物）、卡牌（效果从菜单里选：造成伤害、施加能力、抽牌……或常用模板）、能力和遗物（「什么时候 → 做什么」），按 **「检查」** 会用大白话指出问题。
