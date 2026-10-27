@@ -30,6 +30,25 @@ DeckBench 最初用来给一套原创内容（Claude娘）做数值测试。作�
 
 *1. Find the mod folder the game loads: `<game>/mods/<Id>/<Id>.json` and `<Id>.dll` (a `.pck` is optional). 2. Metadata lists card, power, relic, potion and character classes, plus the initializer method. Nothing is executed. 3. If ilspycmd is installed the same way as first-run setup, and your game install can be found, only that mod DLL is decompiled (the game directory is a reference, and the output is deleted). With references, enums stay names. Without them, the decompiler prints numbers, and those numbers are not guessed into attack/rarity/keywords. 4. Straight-line effects become the existing YAML: damage, block, draw, energy, heal, apply-power, upgrade deltas, keywords given by name, relic rarity, and turn-start / turn-end / combat-start triggers. 5. The mod editor opens the result. Read the notes, fix what is wrong, then save. After that it is the same full-run test as hand-written YAML.*
 
+## 已支持的直线效果 / Supported straight-line effects
+
+| C# | YAML |
+|---|---|
+| `DamageCmd.Attack`（`WithHitCount`、`TargetingAll*`、`TargetingRandom*`） | `damage`（`hits`、`target: all` / `random`） |
+| `CreatureCmd.GainBlock` | `block` |
+| `CardPileCmd.Draw` | `draw` |
+| `PlayerCmd.GainEnergy` / `LoseEnergy` | `energy` |
+| `CreatureCmd.Heal` | `heal` |
+| `PowerCmd.Apply<T>` | `apply`（类名 → id，如 `StrengthPower` → `STRENGTH`） |
+| `DynamicVars.X.UpgradeValueBy` / `EnergyCost.UpgradeBy` | `upgrade.vars` / `upgrade.cost` |
+| `CardKeyword.Name`（名字，不是数字） | `keywords` |
+| `RelicRarity.Name` | 遗物 `rarity` |
+| `AfterTurnStart` / `AfterTurnEnd` / `BeforeCombat`（及同类钩子） | `turn_start` / `turn_end` / `battle_start` |
+
+`if` / 循环 / 选项 / 还不认识的命令整段留空。覆盖这些映射的合成源码在 `tests/fixtures/dllmod/`（核心五类）和 `tests/fixtures/dllmod/extra/`（上表其余项）。ilspycmd 仍是可选的。
+
+*A branch, loop, choice, or unmapped command blanks that method. Synthetic coverage lives in `tests/fixtures/dllmod/` (the core five types) and `tests/fixtures/dllmod/extra/` (the rest of this table). ilspycmd stays optional.*
+
 ## 作者怎么试 / How to try it
 
 图形界面：左侧 **模组编辑器**。
