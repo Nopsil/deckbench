@@ -33,7 +33,7 @@ python tools/import_run.py tests/fixtures/saves/sample_history.run --summary
 python tools/import_run.py --discover
 ```
 
-`--summary` 打出 JSON 摘要（种子、角色、进阶、到达层、牌和遗物要点），不打开图形界面。MCP 工具 `import_save(path)` 返回同一份；没有本机游戏数据时用 `python tools/mcp_server.py --import-only`。
+`--summary` 打出 JSON 摘要（种子、角色、进阶、到达层、牌和遗物要点），不打开图形界面。MCP 工具 `import_save(path)` 返回同一份。`import_history_batch(path, lines=false)` 返回和命令行 `--batch-summary` 相同的 JSON（`lines` 为 true 时和 `--lines` 一样，每局一行）：只读，跳过 `current_run.save`，读不开的文件保留 `SaveImportError` 的 code，路径不存在或目录是空的返回 `ok: false`。没有本机游戏数据时用 `python tools/mcp_server.py --import-only`，它提供 `import_save` 和 `import_history_batch`，没有对战工具，也没有 `seed_preview`。说明见 `docs/MCP.md`。
 
 换成你自己的存档：`python tools/import_run.py <文件或目录>`。常见位置是 `%APPDATA%\SlayTheSpire2\steam\<steam64>\profile1\saves`（Linux / macOS 见 SAVE_FORMAT.md）。打完留下来的是 `history/*.run`；`current_run.save` 在死亡或通关后会被游戏删掉。
 
@@ -111,7 +111,7 @@ python tools/import_run.py tests/fixtures/saves/sample_history.run --summary
 python tools/import_run.py --discover
 ```
 
-`--summary` prints a JSON summary (seed, character, ascension, floor reached, card and relic highlights) without the GUI. MCP `import_save(path)` returns the same summary; without local game data use `python tools/mcp_server.py --import-only`.
+`--summary` prints a JSON summary (seed, character, ascension, floor reached, card and relic highlights) without the GUI. MCP `import_save(path)` returns the same summary. `import_history_batch(path, lines=false)` returns the same JSON as the CLI `--batch-summary` (`lines` true matches `--lines`, one object per line): read-only, skips `current_run.save`, keeps `SaveImportError` codes on unreadable files, and returns `ok: false` JSON when the path is missing or the folder is empty. Without local game data, `python tools/mcp_server.py --import-only` exposes `import_save` and `import_history_batch`, still without play tools or `seed_preview`. See `docs/MCP.md`.
 
 Your own save: `python tools/import_run.py <file or folder>`. On Windows that is often `%APPDATA%\SlayTheSpire2\steam\<steam64>\profile1\saves` (Linux / macOS paths are in SAVE_FORMAT.md). What remains after a finished run is `history/*.run`. The game deletes `current_run.save` on death or victory.
 
