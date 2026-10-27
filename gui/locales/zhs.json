@@ -312,7 +312,8 @@
  "agent.mentor-full.desc": "战斗用 spire-mentor 的 MCTS，选牌/路线/商店/休息用它的 PPO 网络；只支持 5 个原版角色（模组角色回退学习版 AI）；约 30–50 秒/局",
  "agent.mentor-full-ev.name": "spire-mentor 整局 AI＋事件（外部，A10 最强）",
  "agent.mentor-full-ev.desc": "在上一项基础上，普通事件和锻造/删牌/变形/附魔也交给 PPO（事件英文文本运行时从你的游戏安装读），首领/精英战 4000 次模拟；约 50–130 秒/局",
- "agent.mentorHint": "需要自己构建外部的 spire-mentor，并设置 DECKBENCH_MENTOR_SITE / DECKBENCH_MENTOR_PY 后重启（见 docs/DEVELOPER.md）",
+ "agent.mentorHint": "安装包不含 spire-mentor。请自己构建后设置 DECKBENCH_MENTOR_SITE 和 DECKBENCH_MENTOR_PY，或在程序旁边放 mentor.local.json，然后重启（见 docs/DEVELOPER.md）",
+ "agent.mentorHintPython": "打包版的 DeckBench.exe 加载不了 spire-mentor。请把 DECKBENCH_MENTOR_PYTHON（或 mentor.local.json 里的 python）指到构建 sts2_rs 的 Python，然后重启（见 docs/DEVELOPER.md）",
  "agentc.heuristic.name": "启发式（快）",
  "agentc.heuristic.desc": "贪心，不规划下回合",
  "agentc.beam.name": "束搜索",
@@ -646,6 +647,11 @@
  "nt.styleNeedAgent": "这个风格要配 {agents} 系 AI",
  "chip.style": "风格 {style}",
  "log.style": "打法风格：{style}",
+ "log.mentorUnavailable": "spire-mentor 加载失败，已停止（不会静默改用学习版）：{err}。检查：python -m sts2sim.engine.mentor_paths（见 docs/DEVELOPER.md）",
+ "log.mentorVanilla": "这个 AI 的网络只覆盖原版 5 个角色（Ironclad、Silent、Defect、Necrobinder、Regent）；{char} 的局外决策会回退到学习版 AI。",
+ "log.mentorStats": "spire-mentor 决策 {ok}，回退 {fb}（{pct}）；PPO 网络/回退 {ppo}",
+ "log.mentorAllFallback": "战斗决策全部回退到了学习版 AI。不要拿这次结果做种子筛选（见 docs/DEVELOPER.md）。",
+ "log.mentorPpoFallback": "局外 PPO 选择全部回退。多半是构建 sts2_rs 时写死的网络路径上没有模型。不要拿这次结果做种子筛选。",
  "style.unknown": "没有这个打法风格：{id}",
  "style.incompatible": "打法风格「{style}」不能配 AI「{agent}」，请换一个学习版 / 通用 AI / 强 AI"
 }

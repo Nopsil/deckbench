@@ -105,9 +105,9 @@ $env:DECKBENCH_GAME_DIR = "D:\SteamLibrary\steamapps\common\Slay the Spire 2"
 
 - **「通用 AI（推荐，模组角色也能用）」**：大多数情况推荐用它。选牌、休息、商店交给一个小网络，它只看通用数值（费用、伤害、格挡、稀有度……），不认具体卡名，所以**你自己做的模组角色也能用**。速度和学习版一样（每局 1–2 秒），Windows 可用。我们的测试里它比学习版平均多走 1–4 层。
 - **「学习版 AI」**：上一版的推荐，速度一样，可以拿来对照。
-- **「spire-mentor 整局 AI」两项**：最强，但要你自己另外构建第三方的 spire-mentor，只支持 5 个原版角色，详见 [docs/DEVELOPER.md](docs/DEVELOPER.md)。
+- **「spire-mentor 整局 AI」两项**：原版 5 个角色上更强，适合种子筛选。官方安装包里就能选，但**不附带** spire-mentor，需要你自己构建，并在程序旁边放 `mentor.local.json`（打包版还要把 `python` 指到构建它的 Python）。没配好时这两项是灰的。详见 [docs/DEVELOPER.md](docs/DEVELOPER.md)。
 
-*"通用 AI" (modai, recommended) uses a small network that only looks at generic numbers (cost, damage, block, rarity…), not card names, so it works for your own mod characters too; same speed as the learned AI, works on Windows. The spire-mentor agents are stronger but need the external spire-mentor and support vanilla characters only.*
+*"通用 AI" (modai, recommended) uses a small network that only looks at generic numbers, so it works for mod characters too and on Windows. The spire-mentor agents are stronger on the 5 base-game characters and can be selected in the official package once you point them at your own build; they are not bundled.*
 
 ## 用游戏里的种子 / Play a real game seed
 
@@ -172,8 +172,8 @@ $env:DECKBENCH_GAME_DIR = "D:\SteamLibrary\steamapps\common\Slay the Spire 2"
 ## 进阶 / Advanced
 
 - [docs/DEVELOPER.md](docs/DEVELOPER.md)：命令行批量运行（全部参数）、首次生成的内部原理、可选的 spire-mentor AI、旧版战斗模拟器、目录结构、测试（含 Linux/macOS 命令）。
-- 可选的更强 AI：自己构建第三方 [spire-mentor](https://github.com/tfriedel/spire-mentor) 后，可以用 `mentor-full`（它的 MCTS 打战斗 + PPO 网络做局外决策，只支持 5 个原版角色）。spire-mentor 不随本项目分发；它在 v0.111 的 19 张新牌（SIDESTEP 等）上有一个已知的读取问题，我们提供了一个很小的本地补丁。详见 [docs/DEVELOPER.md](docs/DEVELOPER.md#可选spire-mentor更强的-ai--optional-spire-mentor)。
-  *Optional stronger AI: build the third-party spire-mentor yourself to use `mentor-full` (vanilla characters only). It is not shipped with DeckBench; a known upstream loader bug for 19 v0.111 cards (SIDESTEP etc.) has a small local patch. See docs/DEVELOPER.md.*
+- 可选的更强 AI：自己构建第三方 [spire-mentor](https://github.com/tfriedel/spire-mentor) 后，官方安装包里就可以选 `mentor-full` / `mentor-full-ev`（MCTS 打战斗，PPO 做局外决策，只支持 5 个原版角色），不用重编 DeckBench。spire-mentor 不随本项目分发；Windows 打包版要把 `mentor.local.json` 的 `python` 指到构建 `sts2_rs` 的解释器。它在 v0.111 的 19 张新牌（SIDESTEP 等）上有一个已知的读取问题，我们提供了一个很小的本地补丁。冒烟和打包注意见 [docs/DEVELOPER.md](docs/DEVELOPER.md#可选spire-mentor更强的-ai--optional-spire-mentor)。
+  *Optional stronger AI: after you build spire-mentor yourself, the official package can run `mentor-full` / `mentor-full-ev` (vanilla characters only) without rebuilding DeckBench. It is not shipped here; the Windows package needs `mentor.local.json` `python` set to the interpreter that built `sts2_rs`. A known upstream loader bug for 19 v0.111 cards (SIDESTEP etc.) has a small local patch. Smoke steps and packaging rules: docs/DEVELOPER.md.*
 - [docs/MODDING.md](docs/MODDING.md)：用 YAML + Python 写自己的 mod（卡牌、能力、遗物、卡组、实验）。
 - [gui/README.md](gui/README.md)：图形界面的结构和打包。
 - [CONTRIBUTING.md](CONTRIBUTING.md)：贡献须知（不接受任何游戏内容）。

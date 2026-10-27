@@ -32,5 +32,5 @@ cd gui/web && npm install && npm run build         # 改了前端后重新构建
 - Windows 上没有 fork，「强 AI（带搜索）」「束搜索」两种整局 AI 不可用（界面自动隐藏）。
 - 「通用 AI（推荐，模组角色也能用）」= `modai`；「通用 AI（首领战搜索）」= `modai-boss`（用 fork，Windows 上隐藏）。
 - 「新建测试 → 整局批量」可以填「指定游戏种子」：只打这一局，逐步决策日志写到该次运行目录的 `steps/`。
-- 「spire-mentor 整局 AI（外部）」（`mentor-full`）和「spire-mentor 整局 AI＋事件」（`mentor-full-ev`）只有在启动前设置了 `DECKBENCH_MENTOR_SITE` / `DECKBENCH_MENTOR_PY`（指向自己构建的 spire-mentor）时才能选，否则显示为灰色并带提示；只支持原版 5 个角色，模组角色（如 Claude娘）回退到学习版 AI。见 [docs/DEVELOPER.md](../docs/DEVELOPER.md)。
-  *The external `mentor-full` agent is selectable only when spire-mentor is configured (greyed out with a hint otherwise); vanilla characters only, mod characters fall back to the learned AI.*
+- 「spire-mentor 整局 AI（外部）」（`mentor-full`）和「spire-mentor 整局 AI＋事件」（`mentor-full-ev`）在「新建测试 → 整局批量」里。指向自己构建的 spire-mentor 之后才能选（环境变量、`mentor.local.json`，或旁边的 `mentor/` 目录），否则是灰色并带提示。打包版还要把 `python` 设成构建 `sts2_rs` 的解释器，界面会用它跑 `sim/gui` 里的工作进程，而不是用 exe 里的解释器。只支持原版 5 个角色；模组角色局外决策回退学习版，日志会写明。库加载失败则这次运行停止。见 [docs/DEVELOPER.md](../docs/DEVELOPER.md)。
+  *`mentor-full` and `mentor-full-ev` are in New test → Full runs. They stay greyed out until your own spire-mentor build is configured (env, `mentor.local.json`, or a `mentor/` folder). The packaged app also needs `python` set to the interpreter that built `sts2_rs` and then runs the worker from `sim/gui`. Vanilla characters only; mod characters fall back out of combat and the log says so. If the library fails to import, the run stops.*

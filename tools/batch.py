@@ -263,6 +263,16 @@ def main():
     ap.add_argument("--log-dir", default="", help="逐步决策日志目录（每局一个 JSONL）")
     a = ap.parse_args()
     a.style = check_style(a.style, a.agent)
+    if str(a.agent).startswith("mentor"):
+        # 库根本没装上就停，避免整批静默退回 learned，把筛选结果看成 mentor 的成绩
+        from sts2sim.engine.mentor_paths import VANILLA, explain_import_failure, import_error
+        err = import_error()
+        if err:
+            sys.stderr.write(explain_import_failure(err))
+            raise SystemExit(2)
+        if a.char not in VANILLA:
+            sys.stderr.write(f"注意 / note: {a.agent} 的 PPO 只覆盖原版 5 个角色 {', '.join(VANILLA)}；"
+                             f"{a.char} 的局外决策会回退到 learned。\n")
     if a.mod:
         _check_mods(a.mod, a.char, a.variant)
     if a.seed:
@@ -310,6 +320,11 @@ def main():
         if pp:
             print("  ppo non-combat (net/fallback):", {k: tuple(v) for k, v in sorted(pp.items())},
                   "| errors", dict(collections.Counter(k for m in ms for k, n in (m.get("ppo_err") or {}).items() for _ in range(n))))
+        if str(a.agent).startswith("mentor") and nm == 0 and nf:
+            print("  WARNING: every combat decision fell back to the learned AI; do not use these results for seed screening.")
+        if str(a.agent).startswith("mentor") and pp and all(v[0] == 0 for v in pp.values()) and any(v[1] for v in pp.values()):
+            print("  WARNING: every out-of-combat PPO choice fell back (networks missing from the compile-time path?). "
+                  "Do not use these results for seed screening.")
     for r in errs[:5]:
         ls = r["error"].splitlines()
         print("ERR", r["seed"], ls[0][:200], "|", ls[-2][:200] if len(ls) > 1 else "")
