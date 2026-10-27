@@ -37,7 +37,7 @@ python tools/import_run.py --discover
 
 换成你自己的存档：`python tools/import_run.py <文件或目录>`。常见位置是 `%APPDATA%\SlayTheSpire2\steam\<steam64>\profile1\saves`（Linux / macOS 见 SAVE_FORMAT.md）。打完留下来的是 `history/*.run`；`current_run.save` 在死亡或通关后会被游戏删掉。
 
-图形界面左侧 **导入对局**。地址 `#/import` 打开这一页；`#/import?path=` 后面直接带文件路径。本机接口：`POST /api/import`（正文 `{"path":"..."}`）、`POST /api/import/upload`、`GET /api/saves/discover`。
+图形界面左侧 **导入对局**。地址 `#/import` 打开这一页；`#/import?path=` 后面直接带文件路径。打开目录时列出批量摘要。本机接口：`POST /api/import`（正文 `{"path":"..."}`）、`POST /api/import/batch-summary`、`POST /api/import/upload`、`GET /api/saves/discover`。
 
 先看种子再决定要不要拿去录像（需要已经跑过 `python -m sts2sim.gamedata setup`，否则说明原因并以退出码 2 停下，不猜地图）：
 
@@ -115,7 +115,7 @@ python tools/import_run.py --discover
 
 Your own save: `python tools/import_run.py <file or folder>`. On Windows that is often `%APPDATA%\SlayTheSpire2\steam\<steam64>\profile1\saves` (Linux / macOS paths are in SAVE_FORMAT.md). What remains after a finished run is `history/*.run`. The game deletes `current_run.save` on death or victory.
 
-GUI: **Import run** on the left. `#/import` opens the page; `#/import?path=` opens one file directly. Local API: `POST /api/import` with `{"path":"..."}`, `POST /api/import/upload`, `GET /api/saves/discover`.
+GUI: **Import run** on the left. `#/import` opens the page; `#/import?path=` opens one file directly. A folder also lists the batch summary. Local API: `POST /api/import` with `{"path":"..."}`, `POST /api/import/batch-summary`, `POST /api/import/upload`, `GET /api/saves/discover`.
 
 Preview a seed before you record it. This needs data already generated with `python -m sts2sim.gamedata setup`. With no local game logic the tool explains, exits 2, and does not invent a map:
 

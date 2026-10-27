@@ -38,6 +38,43 @@
         <div v-if="badCount && !okCount" class="hint warn">{{ t('imp.allUnreadable') }}</div>
         <div v-else-if="badCount" class="hint warn">{{ t('imp.someUnreadable', { bad: badCount, ok: okCount }) }}</div>
         <div v-else class="hint">{{ t('imp.pickRun') }}</div>
+        <div v-if="batch" class="batch-block">
+          <div class="label">{{ t('imp.batch') }}</div>
+          <div v-if="!batch.length" class="hint">{{ t('imp.batchEmpty') }}</div>
+          <table v-else class="runs">
+            <thead>
+              <tr>
+                <th>{{ t('imp.file') }}</th>
+                <th>{{ t('imp.seed') }}</th>
+                <th>{{ t('imp.character') }}</th>
+                <th>{{ t('imp.floors') }}</th>
+                <th>{{ t('imp.result') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(row, i) in batch" :key="row.file || ('row' + i)"
+                  :class="{ on: batchOn(row), bad: !!row.error }" @click="pickBatch(row)">
+                <template v-if="row.error === 'truncated'">
+                  <td colspan="5" class="bad-cell">{{ t('imp.warn.truncated', { n: row.n }) }}</td>
+                </template>
+                <template v-else-if="row.error">
+                  <td class="mono">{{ row.file }}</td>
+                  <td colspan="4" class="bad-cell">
+                    <b>{{ t('imp.unreadable') }}</b>
+                    <div class="hint warn">{{ errText({ code: row.error }) }}</div>
+                  </td>
+                </template>
+                <template v-else>
+                  <td class="mono">{{ row.file }}</td>
+                  <td class="mono">{{ row.seed || t('common.none') }}</td>
+                  <td>{{ row.character || t('common.none') }}</td>
+                  <td>{{ row.floors }}</td>
+                  <td>{{ row.result ? t('imp.result.' + row.result) : t('imp.noResult') }}</td>
+                </template>
+              </tr>
+            </tbody>
+          </table>
+        </div>
         <table class="runs">
           <thead>
             <tr>
@@ -99,6 +136,7 @@ const doc = ref(null)
 const error = ref('')
 const discoverError = ref('')
 const selected = ref(null)
+const batch = ref(null)
 
 const run = computed(() => {
   if (!doc.value) return null
@@ -131,9 +169,18 @@ function who(r) {
 function pick(e) {
   if (e && e.run) selected.value = e
 }
+function batchOn(row) {
+  return !!(row && row.file && !row.error && selected.value && selected.value.file === row.file)
+}
+function pickBatch(row) {
+  if (!row || row.error || !doc.value || !row.file) return
+  const hit = (doc.value.entries || []).find((e) => e.file === row.file && e.run)
+  if (hit) selected.value = hit
+}
 async function loadPath() {
   if (!path.value.trim()) {
     doc.value = null
+    batch.value = null
     selected.value = null
     error.value = t('imp.needPath')
     return
@@ -141,15 +188,21 @@ async function loadPath() {
   loading.value = true
   error.value = ''
   selected.value = null
+  batch.value = null
   try {
-    doc.value = await api.post('/api/import', { path: path.value.trim() })
-    if (doc.value.kind === 'folder') selected.value = (doc.value.entries || []).find((e) => e.run) || null
-  } catch (e) { doc.value = null; error.value = e.message; msg.error(e.message) }
+    const p = path.value.trim()
+    doc.value = await api.post('/api/import', { path: p })
+    if (doc.value.kind === 'folder') {
+      selected.value = (doc.value.entries || []).find((e) => e.run) || null
+      batch.value = await api.post('/api/import/batch-summary', { path: p })
+    }
+  } catch (e) { doc.value = null; batch.value = null; error.value = e.message; msg.error(e.message) }
   finally { loading.value = false }
 }
 async function upload({ file, onFinish, onError }) {
   loading.value = true
   error.value = ''
+  batch.value = null
   const fd = new FormData()
   fd.append('file', file.file)
   const name = (file && file.name) || ''
@@ -190,6 +243,7 @@ watch(() => route.query.path, (v, prev) => { if (qstr(v) && qstr(v) !== qstr(pre
 .roots { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .root { text-align: left; background: #26262B; border: 1px solid #2E2E34; color: inherit; border-radius: 10px; padding: 8px 12px; cursor: pointer; display: flex; justify-content: space-between; gap: 12px; }
 .root:hover { border-color: #D97757; }
+.batch-block { margin-top: 14px; }
 .runs { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
 .runs th { text-align: left; color: #9C978F; font-weight: 600; padding: 6px 8px; }
 .runs td { padding: 8px; border-top: 1px solid #2A2A30; }

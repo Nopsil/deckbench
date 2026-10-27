@@ -105,12 +105,15 @@ python tools/import_run.py path/to/saves/history --batch-summary --lines
 
 *`--batch-summary` prints one JSON array for every readable history run. Keys are `file`, `seed`, `ascension`, `character`, `floors`, plus `result` (`won`, `lost`, `abandoned`) when the file records an ending. Unreadable history files stay in the array with a `SaveImportError` code and do not stop the scan. `current_run.save` is left out of a folder batch. `--lines` prints one JSON object per line. The command does not modify saves.*
 
-图形界面左侧 **导入对局**：贴路径、选文件，或点「查找本机存档」。地址 `#/import?path=` 后面也可以直接带文件路径。只读，不会改你的存档。
+图形界面左侧 **导入对局**：贴路径、选文件，或点「查找本机存档」。地址 `#/import?path=` 后面也可以直接带文件路径。打开存档目录或 `history` 目录时，页面列出批量摘要（种子、角色、层数、结果）。只读，不会改你的存档。
 接口（只监听本机）：
 
 - `POST /api/import`，正文 `{"path": "..."}` 
+- `POST /api/import/batch-summary`，正文 `{"path": "..."}`。返回和 `--batch-summary` 相同的 JSON 数组
 - `POST /api/import/upload`，表单字段 `file`
 - `GET /api/saves/discover`
+
+*Opening a save folder or a `history` folder on **Import run** also lists the batch summary (seed, character, floors, result). `POST /api/import/batch-summary` returns the same JSON array as `--batch-summary`. Read-only.*
 
 测试：`tests/test_saveimport.py`。
 

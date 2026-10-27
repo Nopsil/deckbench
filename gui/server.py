@@ -386,6 +386,16 @@ def import_save(req: ImportPathReq):
         raise HTTPException(400, _import_http(e))
 
 
+@app.post("/api/import/batch-summary")
+def import_batch_summary(req: ImportPathReq):
+    """只读。JSON 数组与 import_run.py --batch-summary 相同，不写盘。"""
+    from sts2sim.saveimport import SaveImportError, batch_summary, load_path
+    try:
+        return batch_summary(load_path(req.path))
+    except SaveImportError as e:
+        raise HTTPException(400, _import_http(e))
+
+
 @app.post("/api/import/upload")
 async def import_upload(file: UploadFile = File(...)):
     """浏览器选中的存档只在内存里解析，不写回游戏目录。"""

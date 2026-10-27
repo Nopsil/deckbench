@@ -8,6 +8,8 @@
 
 - **对局目录的批量摘要**：`python tools/import_run.py <目录> --batch-summary` 把 history 里每一局打成稳定 JSON（种子、进阶、角色、层数，有胜负或放弃才写 `result`）。`--lines` 改成每行一局。读不开的文件带上错误码，不中断，也不改存档。见 `docs/SAVE_FORMAT.md`。
   *Folder batch summary: `python tools/import_run.py <folder> --batch-summary` prints stable JSON for each history run (seed, ascension, character, floors, and `result` when the run ended). `--lines` prints one object per line. Unreadable files keep their error code; nothing is written back to the save folder. See `docs/SAVE_FORMAT.md`.*
+- **导入页显示目录批量摘要**：打开存档目录或 `history` 目录时，「导入对局」多一张只读表（种子、角色、层数、结果）。`POST /api/import/batch-summary`（正文 `{"path":"..."}`）返回和 `--batch-summary` 相同的 JSON 数组，不改存档。
+  *Import run shows a folder batch summary: opening a save folder or a `history` folder adds a read-only table (seed, character, floors, result). `POST /api/import/batch-summary` with `{"path":"..."}` returns the same JSON array as `--batch-summary` and does not modify saves.*
 - **种子预览的 JSON 和本机缓存**：`python tools/seed_preview.py --json 文件` 写出稳定的 v1 文档（`--json -` 只打到标准输出）。可选 `--cache [目录]` 按规范化种子、角色、进阶、`neow` 把结果留在本机（默认 `DECKBENCH_CACHE/seed-preview`）。缓存含游戏派生 ID，不进仓库、不进安装包；目录指到仓库里会拒绝。没有引擎时仍然说明原因并退出，不编地图。说明见 `docs/SAVE_FORMAT.md`。
   *Seed preview JSON and a local cache: `python tools/seed_preview.py --json FILE` writes the stable v1 document (`--json -` prints only that JSON). Optional `--cache [DIR]` stores a result locally, keyed by canonical seed, character, ascension and `neow` (default `DECKBENCH_CACHE/seed-preview`). The cache holds game-derived ids and is not committed or packaged; a directory inside the repository is refused. With no engine it still explains and exits instead of inventing a map. See `docs/SAVE_FORMAT.md`.*
 

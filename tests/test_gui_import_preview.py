@@ -204,3 +204,92 @@ def test_seed_preview_stub_json_matches_the_page(client, monkeypatch):
     assert skipped["character"] == "Silent" and skipped["ascension"] == 10
     assert skipped["after_neow"] == {}
     assert skipped["seed"] == "ABCDEFGHJKLM"
+
+
+def _tree_bytes(root):
+    out = {}
+    for dirpath, dirnames, names in os.walk(root):
+        dirnames.sort()
+        for name in sorted(names):
+            path = os.path.join(dirpath, name)
+            with open(path, "rb") as fh:
+                out[os.path.relpath(path, root)] = fh.read()
+    return out
+
+
+def _post_batch(client, path):
+    return client.post("/api/import/batch-summary", headers=EN, json={"path": path})
+
+
+def test_import_folder_batch_summary_matches_cli_shape(client, tmp_path):
+    """文件夹导入的批量摘要与 --batch-summary 同形。夹具即可，不安装游戏，也不写盘。"""
+    import shutil
+
+    saves = tmp_path / "saves"
+    hist = saves / "history"
+    hist.mkdir(parents=True)
+    shutil.copy(HIST, hist / "sample_history.run")
+    (hist / "bad.run").write_bytes(b"\x00nope")
+    shutil.copy(LIVE, saves / "current_run.save")
+    before = _tree_bytes(saves)
+    fixture_before = _tree_bytes(FIX)
+
+    page = open(os.path.join(os.path.dirname(__file__), "..", "gui", "web", "src", "pages", "ImportRun.vue"), encoding="utf-8").read()
+    assert "/api/import/batch-summary" in page
+    for key in ("imp.batch", "imp.floors", "imp.batchEmpty", "imp.noResult"):
+        assert key in page
+
+    rows = [
+        {"file": "bad.run", "error": "not_json"},
+        {
+            "file": "sample_history.run",
+            "seed": "SAMPLESEED01",
+            "ascension": 3,
+            "character": "Ironclad",
+            "floors": 3,
+            "result": "lost",
+        },
+    ]
+    for path in (str(saves), str(hist)):
+        got = _post_batch(client, path)
+        assert got.status_code == 200, got.text
+        assert got.json() == rows
+    assert list(rows[1]) == ["file", "seed", "ascension", "character", "floors", "result"]
+    assert list(rows[0]) == ["file", "error"]
+    assert all(row.get("file") != "current_run.save" for row in rows)
+    folder = _post_import(client, str(saves))
+    assert folder.status_code == 200 and folder.json()["kind"] == "folder"
+    assert _tree_bytes(saves) == before
+
+    one = _post_batch(client, HIST)
+    assert one.status_code == 200, one.text
+    assert one.json() == [rows[1] | {"file": "sample_history.run"}]
+    assert one.json()[0]["result"] == "lost"
+    live = _post_batch(client, LIVE)
+    assert live.status_code == 200, live.text
+    assert live.json() == [{
+        "file": "sample_live.save",
+        "seed": "LIVESEED0001",
+        "ascension": 0,
+        "character": "Silent",
+        "floors": 1,
+    }]
+    assert "result" not in live.json()[0]
+    assert _tree_bytes(FIX) == fixture_before
+
+    only = tmp_path / "only-live"
+    only.mkdir()
+    shutil.copy(LIVE, only / "current_run.save")
+    empty_rows = _post_batch(client, str(only))
+    assert empty_rows.status_code == 200, empty_rows.text
+    assert empty_rows.json() == []
+
+    missing = _post_batch(client, str(tmp_path / "no-such"))
+    assert missing.status_code == 400
+    assert missing.json()["detail"].startswith("Path not found")
+    bare = tmp_path / "empty-dir"
+    bare.mkdir()
+    bare_res = _post_batch(client, str(bare))
+    assert bare_res.status_code == 400
+    assert "No .run" in bare_res.json()["detail"]
+    assert _tree_bytes(saves) == before
