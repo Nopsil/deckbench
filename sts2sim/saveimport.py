@@ -753,25 +753,14 @@ def _save_filename(name):
     ))
 
 
-def _marks_save_dir(name):
-    low = name.lower()
-    if low in ("history", "current_run.save", "current_run_mp.save"):
-        return True
-    return _save_filename(low)
+_SAVE_DIR_NAMES = ("saves", "history", "slaythespire2")
 
 
 def _looks_like_save_dir(path):
-    """玩家的存档目录，或任何直接放着 .run / .save 的文件夹。用来拒绝把结果写回去。"""
+    """路径上的 saves / history / SlayTheSpire2。旁边有夹具文件的普通文件夹不算。"""
     if not path or not os.path.isdir(path):
         return False
-    base = os.path.basename(path).lower()
-    if base in ("saves", "history", "slaythespire2"):
-        return True
-    try:
-        names = os.listdir(path)
-    except OSError:
-        return False
-    return any(_marks_save_dir(n) for n in names)
+    return os.path.basename(path).lower() in _SAVE_DIR_NAMES
 
 
 def _realpath(path):
@@ -803,7 +792,11 @@ def _save_ancestors(start):
 
 
 def refuse_save_write(dest, source=None):
-    """拒绝把输出写进存档目录、覆盖刚读的文件，或写成 .run / .save。通过则返回规范化后的目标路径。"""
+    """拒绝把输出写进存档树、覆盖刚读的文件，或写成 .run / .save。
+
+    存档树是本机游戏数据根（candidate_roots），以及路径上名叫 saves / history /
+    SlayTheSpire2 的目录。旁边有夹具的工作目录可以写 JSON。通过则返回规范化后的目标路径。
+    """
     dest_abs = _realpath(dest)
     if _save_filename(dest_abs):
         raise SaveImportError("refuse_write", path=dest_abs)
@@ -814,7 +807,10 @@ def refuse_save_write(dest, source=None):
             raise SaveImportError("refuse_write", path=dest_abs)
         if os.path.isdir(src):
             roots.extend(_save_ancestors(src))
-            roots.append(_realpath(_save_dir(src)))
+            save_dir = _realpath(_save_dir(src))
+            # 只把真正的存档目录加进去。放着夹具的普通文件夹不是存档树。
+            if _looks_like_save_dir(save_dir):
+                roots.append(save_dir)
         else:
             roots.extend(_save_ancestors(os.path.dirname(src)))
     parent = os.path.dirname(dest_abs)

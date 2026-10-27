@@ -15,6 +15,7 @@ from sts2sim.saveimport import (
     load_path,
     parse_bytes,
     parse_path,
+    refuse_save_write,
 )
 
 FIX = os.path.join(os.path.dirname(__file__), "fixtures", "saves")
@@ -659,6 +660,98 @@ def test_import_cli_errors_discover_and_kind_text(tmp_path, monkeypatch, capsys)
     monkeypatch.setattr("sts2sim.saveimport.candidate_roots", lambda: [])
     assert cli.main(["--discover", "--lang", "en"]) == 0
     assert "No save folder" in capsys.readouterr().out
+
+
+def test_json_beside_save_fixtures_is_not_refuse_write(tmp_path, monkeypatch, capsys):
+    """工作目录里有 .run / .save 夹具时，JSON 摘要可以写在旁边。
+
+    覆盖真正的 .run / .save，或写进 saves / history / 本机游戏数据根，仍然拒绝。
+    """
+    work = tmp_path / "work"
+    work.mkdir()
+    (work / "bad.run").write_bytes(b"\x00\x01")
+    (work / "prefs.save").write_text("{}", encoding="utf-8")
+    (work / "current_run.save").write_bytes(open(LIVE, "rb").read())
+    (work / "h.run").write_bytes(open(HIST, "rb").read())
+    (work / "h.run.backup").write_bytes(open(HIST, "rb").read())
+    cli = _import_cli()
+    summary = work / "summary.json"
+    assert cli.main([str(work / "h.run"), "--summary", "--json", str(summary), "--lang", "en"]) == 0
+    body = json.loads(summary.read_text(encoding="utf-8"))
+    assert body["ok"] is True and body["seed"] == "SAMPLESEED01" and body["read_only"] is True
+    captured = capsys.readouterr()
+    assert "SAMPLESEED01" in captured.out and captured.err == ""
+
+    full = work / "full.json"
+    assert cli.main([HIST, "--json", str(full), "--lang", "en"]) == 0
+    doc = json.loads(full.read_text(encoding="utf-8"))
+    assert doc["kind"] == "run" and doc["run"]["kind"] == "run_history"
+    capsys.readouterr()
+
+    monkeypatch.setattr("sts2sim.saveimport.candidate_roots", lambda: [])
+    discovered = work / "roots.json"
+    assert cli.main(["--discover", "--json", str(discovered), "--lang", "en"]) == 0
+    assert json.loads(discovered.read_text(encoding="utf-8")) == []
+    capsys.readouterr()
+
+    for name in ("out.run", "out.save", "notes.run.bak", "current_run.save.backup", "prefs.save", "h.run"):
+        dest = work / name
+        before = dest.read_bytes() if dest.exists() else None
+        with pytest.raises(SaveImportError) as ei:
+            refuse_save_write(str(dest), str(work / "h.run"))
+        assert ei.value.code == "refuse_write"
+        assert cli.main([str(work / "h.run"), "--json", str(dest), "--lang", "en"]) == 2
+        err = capsys.readouterr()
+        assert "refuse_write" in err.err
+        after = dest.read_bytes() if dest.exists() else None
+        assert after == before
+
+    with pytest.raises(SaveImportError) as ei:
+        refuse_save_write(os.path.join(FIX, "out.json"), HIST)
+    assert ei.value.code == "refuse_write"
+    assert not os.path.exists(os.path.join(FIX, "out.json"))
+
+    # 名字不像存档目录，只靠 candidate_roots 认成本机游戏数据根。
+    live_root = tmp_path / "game-data"
+    saves = live_root / "steam" / "1" / "profile1" / "saves"
+    (saves / "history").mkdir(parents=True)
+    (saves / "history" / "1.run").write_bytes(open(HIST, "rb").read())
+    (saves / "current_run.save").write_bytes(open(LIVE, "rb").read())
+    monkeypatch.setattr("sts2sim.saveimport.candidate_roots", lambda: [str(live_root)])
+    for dest in (
+        saves / "report.json",
+        saves / "history" / "report.json",
+        live_root / "steam" / "1" / "profile1" / "notes" / "report.json",
+        live_root / "report.json",
+    ):
+        with pytest.raises(SaveImportError) as ei:
+            refuse_save_write(str(dest), str(saves / "history" / "1.run"))
+        assert ei.value.code == "refuse_write"
+    blocked = saves / "cli.json"
+    assert cli.main([str(saves / "history" / "1.run"), "--summary", "--json", str(blocked), "--lang", "en"]) == 2
+    assert "refuse_write" in capsys.readouterr().err
+    assert not blocked.exists()
+
+    monkeypatch.setattr("sts2sim.saveimport.candidate_roots", lambda: [])
+    copied = tmp_path / "copied" / "saves"
+    (copied / "history").mkdir(parents=True)
+    (copied / "history" / "9.run").write_bytes(open(HIST, "rb").read())
+    with pytest.raises(SaveImportError) as ei:
+        refuse_save_write(str(copied / "report.json"), HIST)
+    assert ei.value.code == "refuse_write"
+    with pytest.raises(SaveImportError) as ei:
+        refuse_save_write(str(copied / "history" / "report.json"), str(copied / "history" / "9.run"))
+    assert ei.value.code == "refuse_write"
+    beside = tmp_path / "copied" / "report.json"
+    assert refuse_save_write(str(beside), str(copied)) == os.path.realpath(str(beside))
+    loose = tmp_path / "loose"
+    loose.mkdir()
+    (loose / "a.run").write_bytes(open(HIST, "rb").read())
+    loose_report = loose / "report.json"
+    assert refuse_save_write(str(loose_report), str(loose)) == os.path.realpath(str(loose_report))
+    assert cli.main([str(loose), "--summary", "--json", str(loose_report), "--lang", "en"]) == 0
+    listed = json.loads(loose_report.read_text(encoding="utf-8"))
+    assert listed["kind"] == "folder" and listed["entries"][0]["seed"] == "SAMPLESEED01"
 
 
 def test_import_api_encodings_discover_and_errors(tmp_path, monkeypatch):
