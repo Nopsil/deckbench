@@ -1,5 +1,10 @@
 # 更新日志 / Changelog
 
+## 未发布 / Unreleased
+
+- **种子预览的 JSON 和本机缓存**：`python tools/seed_preview.py --json 文件` 写出稳定的 v1 文档（`--json -` 只打到标准输出）。可选 `--cache [目录]` 按规范化种子、角色、进阶、`neow` 把结果留在本机（默认 `DECKBENCH_CACHE/seed-preview`）。缓存含游戏派生 ID，不进仓库、不进安装包；目录指到仓库里会拒绝。没有引擎时仍然说明原因并退出，不编地图。说明见 `docs/SAVE_FORMAT.md`。
+  *Seed preview JSON and a local cache: `python tools/seed_preview.py --json FILE` writes the stable v1 document (`--json -` prints only that JSON). Optional `--cache [DIR]` stores a result locally, keyed by canonical seed, character, ascension and `neow` (default `DECKBENCH_CACHE/seed-preview`). The cache holds game-derived ids and is not committed or packaged; a directory inside the repository is refused. With no engine it still explains and exits instead of inventing a map. See `docs/SAVE_FORMAT.md`.*
+
 ## 未发布（0.1.5） / Unreleased (0.1.5)
 
 这一版把四条还没进 `main` 的功能收在一起。版本号是 `0.1.5`（`sts2sim.__version__`、界面 `package.json`、Windows 打包脚本的默认 `-Version`）。

@@ -12,6 +12,8 @@ dist_win/
 gui-shots/
 
 # ---- 游戏派生内容：永远不进仓库 / game-derived content: NEVER commit ----
+# 种子预览缓存默认在用户缓存目录（DECKBENCH_CACHE/seed-preview）。若被写进工作区，不要提交。
+seed-preview-cache/
 # 由 `python -m sts2sim.gamedata setup` 在本机从你自己的安装生成（默认在用户缓存目录，不在仓库里）
 sts2sim/gen/*
 !sts2sim/gen/__init__.py
