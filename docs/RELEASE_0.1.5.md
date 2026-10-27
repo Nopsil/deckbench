@@ -67,7 +67,7 @@ python tools/import_dll_mod.py "/path/to/Slay the Spire 2/mods/MyMod" --out mods
 }
 ```
 
-`python` 必须是构建 `sts2_rs` 的那个 `python.exe`。源码版也可以用环境变量 `DECKBENCH_MENTOR_SITE`、`DECKBENCH_MENTOR_PY`、`DECKBENCH_MENTOR_PYTHON`。改完重启。冒烟要看到 `import: ok`：
+`python` 必须是构建 `sts2_rs` 的那个 `python.exe`。环境变量 `DECKBENCH_MENTOR_SITE`、`DECKBENCH_MENTOR_PY`、`DECKBENCH_MENTOR_PYTHON` 会覆盖这份 json，源码和打包版都能用。改完重启。冒烟要看到 `import: ok`：
 
 ```bash
 python -m sts2sim.engine.mentor_paths
@@ -142,7 +142,7 @@ To screen seeds with `mentor-full`, build [spire-mentor](https://github.com/tfri
 }
 ```
 
-`python` must be the `python.exe` that built `sts2_rs`. From source you can use `DECKBENCH_MENTOR_SITE`, `DECKBENCH_MENTOR_PY` and `DECKBENCH_MENTOR_PYTHON` instead. Restart after changing them. Smoke check — you want `import: ok`:
+`python` must be the `python.exe` that built `sts2_rs`. `DECKBENCH_MENTOR_SITE`, `DECKBENCH_MENTOR_PY` and `DECKBENCH_MENTOR_PYTHON` override this file, from source and from the package. Restart after changing them. Smoke check — you want `import: ok`:
 
 ```bash
 python -m sts2sim.engine.mentor_paths
