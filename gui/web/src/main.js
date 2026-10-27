@@ -8,6 +8,8 @@ import Running from './pages/Running.vue'
 import Report from './pages/Report.vue'
 import AB from './pages/AB.vue'
 import History from './pages/History.vue'
+import ImportRun from './pages/ImportRun.vue'
+import SeedPreview from './pages/SeedPreview.vue'
 import ModEditor from './pages/ModEditor.vue'
 
 const router = createRouter({
@@ -19,6 +21,8 @@ const router = createRouter({
     { path: '/report/:id?', component: Report, meta: { key: 'report' } },
     { path: '/ab', component: AB, meta: { key: 'ab' } },
     { path: '/history', component: History, meta: { key: 'history' } },
+    { path: '/import', component: ImportRun, meta: { key: 'import' } },
+    { path: '/preview', component: SeedPreview, meta: { key: 'preview' } },
     { path: '/mods', component: ModEditor, meta: { key: 'mods' } },
   ],
 })

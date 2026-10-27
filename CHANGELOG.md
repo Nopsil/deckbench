@@ -1,5 +1,12 @@
 # 更新日志 / Changelog
 
+## 未发布（0.1.5） / Unreleased (0.1.5)
+
+- **导入真游戏的一局**：只读打开你指出的 `history/*.run` 或正在打的 `current_run.save` / `current_run_mp.save`（也认目录、`.backup`、gzip、UTF-16）。显示种子、进阶、路线、每层选牌、遗物和牌组。图形界面「导入对局」；命令行 `python tools/import_run.py <文件或目录>`；`POST /api/import`。不修改存档，不解密。格式和已知缺口（打完的记录没有地图列号、进行中存档和历史记录不是同一种 JSON）写在 `docs/SAVE_FORMAT.md`。夹具 `tests/fixtures/saves/sample_history.run` 用虚构 ID，不是游戏文件。
+  *Import a real run: read-only open of a `history/*.run` or an in-progress `current_run.save` / `current_run_mp.save` (also a folder, `.backup`, gzip, UTF-16). Shows seed, ascension, route, per-floor card picks, relics and deck. GUI **Import run**; CLI `python tools/import_run.py`; `POST /api/import`. Does not modify or decrypt saves. Format and known gaps (finished history has no map column; live saves and history are different JSON) are in `docs/SAVE_FORMAT.md`. The sample fixture uses fictional IDs, not a game file.*
+- **种子预览**：给一个游戏种子（原版角色、进阶），不打完整的一局，显示每一幕地图、普通/精英/首领队列、开局选项，以及第一场普通战斗的奖励。第 2 幕及以后的地图标成「未打完上一幕的投影」。命令行 `python tools/seed_preview.py`；图形界面「种子预览」；`POST /api/seed-preview`。没有本机游戏逻辑时说明原因并退出，不猜地图。
+  *Seed preview: given a game seed (base character, ascension), show each act's map, normal/elite/boss queues, opening choices and the first normal-fight rewards without playing the run. Act 2+ maps are marked as projections that skip playing the previous act. CLI `python tools/seed_preview.py`; GUI **Seed preview**; `POST /api/seed-preview`. With no local game logic it explains and exits instead of inventing a map.*
+
 ## 未发布（0.1.4） / Unreleased (0.1.4)
 
 - **界面多语言**：图形界面支持简体中文、English、日本語、한국어。第一次打开跟着系统语言走（中文 → 简体中文，日语 → 日本語，韩语 → 한국어，其他 → English），左下角随时切换，选择保存在数据目录的 `settings.json`。按钮、提示、报告图表、运行日志、错误信息都会翻译；卡牌、角色、遭遇的名字按所选语言从你自己的游戏安装读（游戏里没有该语言就依次回退英文、中文，最后显示 ID），仍然不随项目分发任何游戏文本。战斗实验的完整 report.md（旧版战斗模拟器生成）暂时只有中文。

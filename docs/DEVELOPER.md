@@ -214,13 +214,30 @@ spire-mentor 已经实现了这些牌，但 `state_from_dict` 查牌 id 时只�
 - 召唤不生成新敌人；少数敌人能力只记层数；随机数和游戏不同，同种子出招不会逐招一致（分布和约束一致）。
 - 启发式 AI 是贪心的，不会为下回合规划；需要先铺引擎的组合可以换束搜索 AI（`--agent beam`）。
 
+## 导入对局记录、预览种子 / Import a run, preview a seed
+
+格式、路径和已知缺口见 [SAVE_FORMAT.md](SAVE_FORMAT.md)。两条命令都不携带游戏文件。
+
+```bash
+# 不需要游戏。夹具 ID 是虚构的。
+python tools/import_run.py tests/fixtures/saves/sample_history.run --lang en
+python tools/import_run.py --discover
+
+# 需要已经生成本机游戏逻辑（python -m sts2sim.gamedata setup）。不打战斗。
+python tools/seed_preview.py 7F3K9Q2ZB8MA --char Silent --asc 0 --neow first --lang en
+```
+
+图形界面多了「导入对局」和「种子预览」。接口：`POST /api/import`、`POST /api/import/upload`、`GET /api/saves/discover`、`POST /api/seed-preview`。
+*The GUI adds Import run and Seed preview. Import works without the game; seed preview needs the locally generated game logic and does not play combats.*
+
 ## 目录结构 / Layout
 
 ```
 sts2sim/gamedata.py  首次运行：找安装、本机反编译+转译、缓存绑定与校验
 sts2sim/gen/         只有 __init__.py：从本机缓存加载 game.py（仓库里没有生成代码）
 sts2sim/rt/          转译代码的运行时（C#/LINQ 语义、少量手写覆盖）
-sts2sim/engine/      整局驱动、Gym 接口、AI（heuristic / strong / learned / planner / search / imitation / mentor 桥接）
+sts2sim/engine/      整局驱动、Gym 接口、AI；seedpreview.py 种子预览（不打战斗）
+sts2sim/saveimport.py  只读解析对局记录 / 进行中存档（不写盘、不解密）
 sts2sim/*.py         旧版 YAML 战斗模拟器（core、cards、powers、enemies、runner、report…）
 mods/                示例 mod：Claude娘 v3.4（YAML）、v3.5（整局引擎）
 tools/               转译器 cs2py_*、解析器、batch.py、调参 tune_cma.py、A/B 工具
@@ -238,7 +255,8 @@ tests/               单元测试
 .venv\Scripts\python -m pytest -q tests     # Windows
 ```
 
-- 不需要游戏：`tests/test_gamedata.py`（找安装、缓存绑定/拒绝加载、仓库里没有生成代码）。
+- 不需要游戏：`tests/test_gamedata.py`（找安装、缓存绑定/拒绝加载、仓库里没有生成代码）、`tests/test_saveimport.py`（虚构的对局 JSON）、`tests/test_seedpreview.py` 里不启动引擎的部分。
+- 种子预览的真生成：有本机缓存时 `tests/test_seedpreview.py` 会跑 `preview()`；没有就只检查「缺少引擎」的报错。
 - 需要本机生成的缓存（没有时自动 skip）：`test_engine.py`、`test_ai_upgrade.py`、`test_claude_v35.py`、`test_status_damage.py`。
 - 需要旧版模拟器的本机数据（spire-codex JSON + `mods/vanilla/`，没有时不收集）：`test_claude.py`、`test_intents.py`、`test_shensu.py`。
 - 图形界面端到端：`gui/tests_e2e.py`（Playwright，先 `python -m gui.app --serve --port 8765`）。
