@@ -265,11 +265,12 @@ spire-mentor 已经实现了这些牌，但 `state_from_dict` 查牌 id 时只�
 
 ## 导入对局记录、预览种子 / Import a run, preview a seed
 
-格式、路径和已知缺口见 [SAVE_FORMAT.md](SAVE_FORMAT.md)。两条命令都不携带游戏文件。
+格式、路径和已知缺口见 [SAVE_FORMAT.md](SAVE_FORMAT.md)。下面这些命令都不携带游戏文件。
 
 ```bash
 # 不需要游戏。夹具 ID 是虚构的。
 python tools/import_run.py tests/fixtures/saves/sample_history.run --lang en
+python tools/import_run.py tests/fixtures/saves/sample_history.run --summary
 python tools/import_run.py --discover
 
 # 需要已经生成本机游戏逻辑（python -m sts2sim.gamedata setup）。不打战斗。

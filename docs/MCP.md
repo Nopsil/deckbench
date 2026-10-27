@@ -28,6 +28,9 @@ python tools/mcp_server.py --http --port 8765   # streamable-HTTP → http://127
 | `undo(steps)` / `restore(step)` | 回退几步 / 回到第 step 个决策之前 |
 | `get_log(last)` / `export_log()` | 决策日志；导出 decisions.jsonl + replay.md |
 | `list_runs()` / `open_run(run_id)` | 列出 / 重新打开以前的局 |
+| `import_save(path)` | 只读导入一个 `.run` / `current_run.save` / 存档目录，返回 JSON 摘要（`seed`、`character`、`ascension`、`floor_reached`、`highlights.cards`、`highlights.relics`）。不开始模拟，不写存档 |
+
+`import_save` 和 `python tools/import_run.py <path> --summary` 是同一份摘要（`sts2sim/saveimport.py` 的 `summarize`）。没有本机游戏数据时，对战服务仍会退出；改跑 `python tools/mcp_server.py --import-only`（只有这一个工具）或上面的命令行。格式见 [SAVE_FORMAT.md](SAVE_FORMAT.md)。
 
 同一种子 + 同一串选择 = 同一局，所以撤销/恢复是「重开 + 重放」；服务器重启后也能 `open_run` 接着打。
 奖励里的金币/药水/遗物默认全拿，不算决策；宝箱遗物会真正进遗物栏（0.1.3 修复）。一局结束时列出全部遗物和牌组。`auto` 用的 AI 内部随机状态不随撤销回滚，撤销后再 `auto` 可能走出不同的路线。

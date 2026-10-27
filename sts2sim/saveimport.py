@@ -1,12 +1,14 @@
 """只读解析《杀戮尖塔 2》的对局记录 / 进行中存档。
 
-不写盘、不解密、不携带任何游戏文件。格式结论和已知缺口见 docs/SAVE_FORMAT.md。
+不写盘、不解密、不携带任何游戏文件。`summarize()` / `summary_json()` 给外部代理一份短 JSON，同样不写盘。
+格式结论和已知缺口见 docs/SAVE_FORMAT.md。
 公开的对局记录（history/<unix 秒>.run）和进行中存档（current_run.save /
 current_run_mp.save）都是 UTF-8 JSON，但字段形状不一样，而且会随 schema_version 变。
 这里按「认得出的键」取值（snake_case / camelCase / PascalCase 都认），认不出的键留着不报错。
 
 Read-only parser for finished run history and in-progress saves. Never writes, never
-decrypts, ships no game files. See docs/SAVE_FORMAT.md.
+decrypts, ships no game files. summarize() / summary_json() are the short JSON
+an external agent can read. See docs/SAVE_FORMAT.md.
 """
 from __future__ import annotations
 
@@ -17,6 +19,10 @@ import re
 
 MAX_BYTES = 32 * 1024 * 1024
 MAX_FILES = 200
+# 给外部代理的短摘要上限。牌优先留升级 / 附魔 / 第 0 层之后拿到的；没有这类牌时才列牌组。
+SUMMARY_CARD_CAP = 40
+SUMMARY_RELIC_CAP = 40
+SUMMARY_PICK_CAP = 20
 
 # 模拟器角色类名。只在记录里的模型 ID 能对上时填，用来跳到种子预览。
 _SIM_CHAR = {
@@ -731,3 +737,291 @@ def discover():
                         "has_current": "current_run.save" in filenames or "current_run_mp.save" in filenames,
                     })
     return found
+
+
+def _save_filename(name):
+    low = os.path.basename(str(name)).lower()
+    if low in _NOT_RUN:
+        return True
+    return low.endswith((
+        ".run", ".save", ".run.backup", ".save.backup", ".run.bak", ".save.bak",
+    ))
+
+
+def _marks_save_dir(name):
+    low = name.lower()
+    if low in ("history", "current_run.save", "current_run_mp.save"):
+        return True
+    return _save_filename(low)
+
+
+def _looks_like_save_dir(path):
+    """玩家的存档目录，或任何直接放着 .run / .save 的文件夹。用来拒绝把结果写回去。"""
+    if not path or not os.path.isdir(path):
+        return False
+    base = os.path.basename(path).lower()
+    if base in ("saves", "history", "slaythespire2"):
+        return True
+    try:
+        names = os.listdir(path)
+    except OSError:
+        return False
+    return any(_marks_save_dir(n) for n in names)
+
+
+def _realpath(path):
+    return os.path.realpath(os.path.abspath(os.path.expanduser(path)))
+
+
+def _under(path, root):
+    path = os.path.normcase(_realpath(path))
+    root = os.path.normcase(_realpath(root))
+    if path == root:
+        return True
+    try:
+        return os.path.normcase(os.path.commonpath([path, root])) == root
+    except ValueError:
+        return False
+
+
+def _save_ancestors(start):
+    roots = []
+    cur = os.path.abspath(start)
+    for _ in range(10):
+        if _looks_like_save_dir(cur):
+            roots.append(cur)
+        parent = os.path.dirname(cur)
+        if parent == cur:
+            break
+        cur = parent
+    return roots
+
+
+def refuse_save_write(dest, source=None):
+    """拒绝把输出写进存档目录、覆盖刚读的文件，或写成 .run / .save。通过则返回规范化后的目标路径。"""
+    dest_abs = _realpath(dest)
+    if _save_filename(dest_abs):
+        raise SaveImportError("refuse_write", path=dest_abs)
+    roots = [_realpath(r) for r in candidate_roots()]
+    if source:
+        src = _realpath(source)
+        if os.path.lexists(src) and _under(dest_abs, src) and (os.path.isfile(src) or not os.path.isdir(src)):
+            raise SaveImportError("refuse_write", path=dest_abs)
+        if os.path.isdir(src):
+            roots.extend(_save_ancestors(src))
+            roots.append(_realpath(_save_dir(src)))
+        else:
+            roots.extend(_save_ancestors(os.path.dirname(src)))
+    parent = os.path.dirname(dest_abs)
+    if parent:
+        roots.extend(_save_ancestors(parent))
+    seen = set()
+    for root in roots:
+        key = os.path.normcase(root)
+        if key in seen or not os.path.isdir(root):
+            continue
+        seen.add(key)
+        if _under(dest_abs, root):
+            raise SaveImportError("refuse_write", path=dest_abs)
+    return dest_abs
+
+
+def _floor_reached(run):
+    floors = []
+    for fl in run.get("route") or []:
+        n = fl.get("floor") if isinstance(fl, dict) else None
+        if isinstance(n, int) and not isinstance(n, bool):
+            floors.append(n)
+    if floors:
+        return max(floors)
+    coords = run.get("visited_map_coords") or []
+    return len(coords) if isinstance(coords, list) else 0
+
+
+def _vitals(run):
+    for fl in reversed(run.get("route") or []):
+        for st in fl.get("stats") or []:
+            if isinstance(st, dict) and any(st.get(k) is not None for k in ("current_hp", "max_hp", "gold")):
+                return st.get("current_hp"), st.get("max_hp"), st.get("gold")
+    for p in run.get("players") or []:
+        if any(p.get(k) is not None for k in ("current_hp", "max_hp", "gold")):
+            return p.get("current_hp"), p.get("max_hp"), p.get("gold")
+    return None, None, None
+
+
+def _notable_card(card):
+    if card.get("upgraded"):
+        return True
+    ench = card.get("enchantment") or {}
+    if isinstance(ench, dict) and ench.get("id"):
+        return True
+    floor = card.get("floor")
+    return isinstance(floor, int) and not isinstance(floor, bool) and floor > 0
+
+
+def _card_brief(card, player):
+    item = {"id": card.get("id"), "upgraded": bool(card.get("upgraded")), "floor": card.get("floor")}
+    ench = card.get("enchantment") or {}
+    if isinstance(ench, dict) and ench.get("id"):
+        item["enchantment"] = ench["id"]
+        if ench.get("amount") is not None:
+            item["enchantment_amount"] = ench["amount"]
+    if player is not None:
+        item["player"] = player
+    return item
+
+
+def _relic_brief(relic, player):
+    item = {"id": relic.get("id"), "floor": relic.get("floor")}
+    if player is not None:
+        item["player"] = player
+    return item
+
+
+def _summarize_run(run):
+    players = [p for p in (run.get("players") or []) if isinstance(p, dict)]
+    multi = len(players) > 1
+    characters, character_ids = [], []
+    cards, relics = [], []
+    for p in players:
+        display = p.get("sim_character") or p.get("character")
+        if display:
+            characters.append(display)
+        if p.get("character"):
+            character_ids.append(p.get("character"))
+        pid = p.get("id") if multi else None
+        for c in p.get("deck") or []:
+            if isinstance(c, dict) and c.get("id"):
+                cards.append((c, pid))
+        for r in p.get("relics") or []:
+            if isinstance(r, dict) and r.get("id"):
+                relics.append((r, pid))
+    notable = [(c, pid) for c, pid in cards if _notable_card(c)]
+    shown = notable or cards
+    card_rows = [_card_brief(c, pid) for c, pid in shown[:SUMMARY_CARD_CAP]]
+
+    def _notable_relic(relic):
+        floor = relic.get("floor")
+        return isinstance(floor, int) and not isinstance(floor, bool) and floor > 0
+
+    relic_rows = [_relic_brief(r, pid) for r, pid in (
+        [(r, pid) for r, pid in relics if _notable_relic(r)]
+        + [(r, pid) for r, pid in relics if not _notable_relic(r)]
+    )[:SUMMARY_RELIC_CAP]]
+    picks = []
+    for fl in run.get("route") or []:
+        if not isinstance(fl, dict):
+            continue
+        for group in fl.get("picks") or []:
+            if not isinstance(group, dict):
+                continue
+            offered, picked = [], []
+            for c in group.get("cards") or []:
+                if not isinstance(c, dict) or not c.get("id"):
+                    continue
+                offered.append(c["id"])
+                if c.get("was_picked"):
+                    picked.append(c["id"])
+            if not offered:
+                continue
+            entry = {"floor": fl.get("floor"), "type": fl.get("type"), "picked": picked, "offered": offered}
+            if group.get("player_id") is not None:
+                entry["player"] = group["player_id"]
+            picks.append(entry)
+    hp, max_hp, gold = _vitals(run)
+    primary = players[0] if players else {}
+    return {
+        "ok": True,
+        "v": 1,
+        "read_only": True,
+        "kind": run.get("kind"),
+        "file": run.get("filename"),
+        "path": run.get("path"),
+        "seed": run.get("seed"),
+        "seed_source": run.get("seed_source"),
+        "character": primary.get("sim_character") or primary.get("character"),
+        "character_id": primary.get("character"),
+        "characters": characters,
+        "character_ids": character_ids,
+        "ascension": run.get("ascension"),
+        "floor_reached": _floor_reached(run),
+        "result": run.get("result"),
+        "schema_version": run.get("schema_version"),
+        "hp": hp,
+        "max_hp": max_hp,
+        "gold": gold,
+        "killed_by": run.get("killed_by_encounter") or run.get("killed_by_event"),
+        "acts": [a.get("id") for a in run.get("acts") or [] if isinstance(a, dict) and a.get("id")],
+        "highlights": {
+            "cards": card_rows,
+            "cards_truncated": len(shown) > SUMMARY_CARD_CAP,
+            "deck_size": len(cards),
+            "relics": relic_rows,
+            "relics_truncated": len(relics) > SUMMARY_RELIC_CAP,
+            "relic_count": len(relics),
+            "picks": picks[-SUMMARY_PICK_CAP:],
+            "picks_truncated": len(picks) > SUMMARY_PICK_CAP,
+        },
+        "warnings": [w.get("code") for w in run.get("warnings") or [] if isinstance(w, dict) and w.get("code")],
+    }
+
+
+def _summarize_folder(doc):
+    entries, failures = [], []
+    for e in doc.get("entries") or []:
+        if not isinstance(e, dict):
+            continue
+        if isinstance(e.get("run"), dict):
+            row = _summarize_run(e["run"])
+            row["role"] = e.get("role")
+            entries.append(row)
+        else:
+            err = e.get("error") or {}
+            failures.append({
+                "ok": False,
+                "read_only": True,
+                "file": e.get("file"),
+                "path": e.get("path"),
+                "role": e.get("role"),
+                "error": err.get("code") if isinstance(err, dict) else None,
+            })
+    return {
+        "ok": True,
+        "v": 1,
+        "read_only": True,
+        "kind": "folder",
+        "path": doc.get("path"),
+        "count": len(entries),
+        "entries": entries,
+        "failures": failures,
+        "warnings": [w.get("code") for w in doc.get("warnings") or [] if isinstance(w, dict) and w.get("code")],
+    }
+
+
+def summarize(doc):
+    """load_path / normalize 的结果 → 短摘要。不读盘、不写盘。"""
+    if not isinstance(doc, dict):
+        raise SaveImportError("not_object")
+    if doc.get("kind") == "folder" and "entries" in doc:
+        return _summarize_folder(doc)
+    if doc.get("kind") == "run" and isinstance(doc.get("run"), dict):
+        return _summarize_run(doc["run"])
+    if doc.get("kind") in ("run_history", "live_save") or "players" in doc or "route" in doc:
+        return _summarize_run(doc)
+    raise SaveImportError("unknown_shape")
+
+
+def _error_body(err):
+    body = {"ok": False, "read_only": True, "error": err.code}
+    for k, v in err.params.items():
+        if v is None or isinstance(v, (str, int, float, bool)):
+            body[k] = v
+    return body
+
+
+def summary_json(path):
+    """读 path，返回一行可解析的 JSON 文本。失败也是 JSON，并且不写盘。"""
+    try:
+        return json.dumps(summarize(load_path(path)), ensure_ascii=False)
+    except SaveImportError as e:
+        return json.dumps(_error_body(e), ensure_ascii=False)

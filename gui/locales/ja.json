@@ -733,6 +733,7 @@
  "imp.err.too_big": "ファイルが大きすぎます（上限 32MB）。",
  "imp.err.decode": "ファイルが UTF-8 でも UTF-16 でもありません。",
  "imp.err.dir_empty": "このフォルダーに .run も current_run.save もありません：{path}",
+ "imp.err.refuse_write": "セーブフォルダーには書き込みません：{path}",
  "imp.warn.gzip": "ファイルは gzip 圧縮された JSON だったので、メモリ上で展開しました。",
  "imp.warn.utf16": "ファイルは UTF-16 だったのでテキストとして読みました。",
  "imp.warn.bom": "UTF-8 BOM が付いていたので無視しました。",
