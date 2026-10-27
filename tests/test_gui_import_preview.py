@@ -1,5 +1,8 @@
 """#/import 和 #/preview 走的 HTTP 接口。夹具和内存桩，不需要本机游戏安装。"""
+import json
 import os
+import shutil
+import subprocess
 import sys
 import types
 
@@ -16,7 +19,16 @@ from sts2sim.engine.seedpreview import LIMITS, PUBLIC_KEYS  # noqa: E402
 FIX = os.path.join(os.path.dirname(__file__), "fixtures", "saves")
 HIST = os.path.join(FIX, "sample_history.run")
 LIVE = os.path.join(FIX, "sample_live.save")
+IMPORT_CLI = os.path.join(os.path.dirname(os.path.dirname(__file__)), "tools", "import_run.py")
 EN = {"x-lang": "en"}
+FIXTURE_BATCH = [{
+    "file": "sample_history.run",
+    "seed": "SAMPLESEED01",
+    "ascension": 3,
+    "character": "Ironclad",
+    "floors": 3,
+    "result": "lost",
+}]
 
 
 @pytest.fixture
@@ -84,6 +96,124 @@ def test_import_fixture_run_and_save_summaries(client):
     missing = _post_import(client, os.path.join(FIX, "no-such.run"))
     assert missing.status_code == 400
     assert missing.json()["detail"].startswith("Path not found")
+
+
+def _snapshot(root):
+    out = {}
+    for dirpath, dirnames, names in os.walk(root):
+        dirnames.sort()
+        for name in sorted(names):
+            path = os.path.join(dirpath, name)
+            with open(path, "rb") as fh:
+                out[os.path.relpath(path, root)] = fh.read()
+    return out
+
+
+def _cli_batch(path, lines=False):
+    """import_run.py --batch-summary 的标准输出，解析成对象列表。"""
+    cmd = [sys.executable, IMPORT_CLI, path, "--batch-summary"]
+    if lines:
+        cmd.append("--lines")
+    proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    assert proc.returncode == 0, proc.stderr
+    if lines:
+        return [json.loads(line) for line in proc.stdout.splitlines()]
+    return json.loads(proc.stdout)
+
+
+def _post_batch(client, path=None, lines=None, omit_path=False):
+    body = {}
+    if not omit_path:
+        body["path"] = path
+    if lines is not None:
+        body["lines"] = lines
+    return client.post("/api/import/batch", headers=EN, json=body)
+
+
+def test_import_batch_fixture_matches_cli(client):
+    """夹具目录的批量摘要和命令行 --batch-summary 是同一份数组。lines 仍是 JSON 数组。"""
+    before = _snapshot(FIX)
+    res = _post_batch(client, FIX)
+    assert res.status_code == 200, res.text
+    assert res.headers["content-type"].startswith("application/json")
+    assert res.text.lstrip().startswith("[")
+    rows = res.json()
+    assert rows == FIXTURE_BATCH
+    assert list(rows[0]) == ["file", "seed", "ascension", "character", "floors", "result"]
+    assert rows == _cli_batch(FIX)
+    assert all(row.get("file") != "current_run.save" for row in rows)
+    assert all(not str(row.get("file", "")).endswith(".save") for row in rows)
+
+    lined = _post_batch(client, FIX, lines=True)
+    assert lined.status_code == 200, lined.text
+    assert lined.headers["content-type"].startswith("application/json")
+    assert lined.text.lstrip().startswith("[")
+    assert lined.json() == _cli_batch(FIX, lines=True) == rows
+    assert _snapshot(FIX) == before
+
+
+def test_import_batch_skips_current_run_and_does_not_write(client, tmp_path):
+    """目录里的 current_run.save 不进数组；指到这个文件本身时仍和命令行一样列出。不改夹具字节。"""
+    fixtures = _snapshot(FIX)
+    saves = tmp_path / "saves"
+    hist = saves / "history"
+    hist.mkdir(parents=True)
+    shutil.copyfile(HIST, hist / "sample_history.run")
+    shutil.copyfile(LIVE, saves / "current_run.save")
+    shutil.copyfile(LIVE, saves / "current_run_mp.save")
+    before = _snapshot(saves)
+
+    got = _post_batch(client, str(saves))
+    assert got.status_code == 200, got.text
+    assert [row.get("file") for row in got.json()] == ["sample_history.run"]
+    assert got.json() == FIXTURE_BATCH
+    assert got.json() == _cli_batch(str(saves))
+    assert _snapshot(saves) == before
+
+    only = tmp_path / "only-current"
+    only.mkdir()
+    shutil.copyfile(LIVE, only / "current_run.save")
+    only_before = _snapshot(only)
+    skipped = _post_batch(client, str(only), lines=True)
+    assert skipped.status_code == 200, skipped.text
+    assert skipped.json() == []
+    assert skipped.json() == _cli_batch(str(only), lines=True)
+    assert _snapshot(only) == only_before
+
+    named = only / "current_run.save"
+    one = _post_batch(client, str(named))
+    assert one.status_code == 200, one.text
+    assert one.json() == _cli_batch(str(named))
+    assert one.json()[0]["file"] == "current_run.save"
+    assert one.json()[0]["seed"] == "LIVESEED0001"
+    assert "result" not in one.json()[0]
+    assert _snapshot(only) == only_before
+    assert _snapshot(FIX) == fixtures
+
+
+def test_import_batch_missing_path_and_empty_folder(client, tmp_path):
+    """缺路径、空目录和解析错误走 /api/import 同一种 HTTP 400，不返回命令行的 ok:false JSON。"""
+    missing = _post_batch(client, omit_path=True)
+    assert missing.status_code == 400
+    assert missing.json()["detail"].startswith("Path not found")
+    assert "error" not in missing.json()
+
+    blank = _post_batch(client, "   ")
+    assert blank.status_code == 400
+    assert blank.json()["detail"].startswith("Path not found")
+
+    absent = _post_batch(client, os.path.join(FIX, "no-such.run"), lines=True)
+    assert absent.status_code == 400
+    assert absent.json()["detail"].startswith("Path not found")
+
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    dire = _post_batch(client, str(empty))
+    assert dire.status_code == 400
+    assert dire.json()["detail"].startswith("No .run")
+    dire_lines = _post_batch(client, str(empty), lines=True)
+    assert dire_lines.status_code == 400
+    assert dire_lines.json()["detail"] == dire.json()["detail"]
 
 
 def _block_engine(monkeypatch):

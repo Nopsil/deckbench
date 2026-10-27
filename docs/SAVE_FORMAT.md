@@ -110,9 +110,11 @@ python tools/import_run.py path/to/saves/history --batch-summary --lines
 
 - `POST /api/import`，正文 `{"path": "..."}` 
 - `POST /api/import/upload`，表单字段 `file`
+- `POST /api/import/batch`，正文 `{"path": "..."}`，可选 `"lines": false`。和 `--batch-summary` 同一份 JSON 数组。`lines` 为 true 时仍是这个数组（每个对象对应 `--lines` 的一行），不是 NDJSON。找不到路径、空目录，以及其他 `SaveImportError`，是 HTTP 400。不写存档。
+  *`POST /api/import/batch` returns that JSON array. `lines: true` is still the array, not NDJSON. A missing path, an empty folder, and other `SaveImportError`s are HTTP 400. Read-only.*
 - `GET /api/saves/discover`
 
-测试：`tests/test_saveimport.py`。
+测试：`tests/test_saveimport.py`、`tests/test_gui_import_preview.py`。
 
 ## 种子预览 / Seed preview
 
