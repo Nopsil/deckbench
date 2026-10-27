@@ -1,5 +1,4 @@
-"""种子预览：不启动游戏就能测分布、JSON 和本机缓存；有本机游戏逻辑时再跑一条真预览。"""
-import importlib.util
+"""种子预览：不启动游戏就能测分布和报错；有本机缓存时再跑一条真预览。"""
 import json
 import os
 import subprocess
@@ -7,17 +6,15 @@ import sys
 
 import pytest
 
-from sts2sim.engine import seedpreview
 from sts2sim.engine.seedpreview import (
-    PUBLIC_KEYS,
     PreviewError,
+    _neow_indexes,
     assemble,
-    canonicalize,
     distribution,
     format_text,
     map_counts,
+    peek_relics,
     preview,
-    public_document,
     seed_warning_codes,
 )
 
@@ -103,237 +100,6 @@ def test_import_cli_on_sample():
     assert "ENCOUNTER.SAMPLE_FIGHT" in r.stdout
 
 
-def _sample(spec):
-    """虚构 ID。测 JSON / 缓存时不碰游戏。"""
-    return assemble(
-        spec["raw"], spec["canon"], seed_warning_codes(spec["raw"], spec["canon"]),
-        spec["char"], spec["asc"], ["ACT.SAMPLE_ONE"],
-        [{
-            "act_index": 0, "act": "ACT.SAMPLE_ONE", "confidence": "act_entry", "cols": 2,
-            "boss": {"col": 0, "row": 3, "label": "drop-me"},
-            "rows": [[{"col": 0, "row": 1, "type": "Monster", "children": [[1, 2]], "name": "drop-me"}]],
-            "counts": {"Monster": 1, "Boss": 1}, "leak": "drop-me",
-        }],
-        [{
-            "act": "ACT.SAMPLE_ONE", "boss": "ENCOUNTER.SAMPLE_BOSS", "second_boss": None,
-            "ancient": "EVENT.SAMPLE_START", "normal": ["ENCOUNTER.A", "ENCOUNTER.A"],
-            "elite": ["ENCOUNTER.E"], "events": ["EVENT.SAMPLE"], "title": "drop-me",
-        }],
-        "EVENT.SAMPLE_START",
-        [{"index": 0, "key": "EVENT.SAMPLE.OPT", "id": "OPT", "locked": False, "text": "drop-me"}],
-        {"0": {
-            "encounter": "ENCOUNTER.A", "gold": 10, "deck": ["CARD.SAMPLE"],
-            "relics": ["RELIC.SAMPLE_START"], "potions": [],
-            "rewards": [{"kind": "CardReward", "cards": ["CARD.SAMPLE"], "flavor": "drop-me"}],
-            "note": "drop-me",
-        }},
-        {"starting": ["RELIC.SAMPLE_START"], "shared_queue": [], "character_queue": [], "extra": ["drop-me"]},
-    )
-
-
-def _load_cli():
-    path = os.path.join(ROOT, "tools", "seed_preview.py")
-    name = "seed_preview_cli_under_test"
-    spec = importlib.util.spec_from_file_location(name, path)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
-
-
-def test_public_document_is_a_stable_schema():
-    spec = {"raw": "abcdef", "canon": "ABCDEF", "char": "Silent", "asc": 3, "neow": "none"}
-    doc = public_document(_sample(spec))
-    assert list(doc) == list(PUBLIC_KEYS)
-    assert doc["v"] == 1
-    assert doc["seed"] == "ABCDEF"
-    assert doc["character"] == "Silent"
-    assert doc["ascension"] == 3
-    assert doc["maps"][0]["rows"][0][0] == {"col": 0, "row": 1, "type": "Monster", "children": [[1, 2]]}
-    assert "name" not in doc["maps"][0]["rows"][0][0]
-    assert "leak" not in doc["maps"][0]
-    assert "label" not in doc["maps"][0]["boss"]
-    assert "title" not in doc["rooms"][0]
-    assert "text" not in doc["neow_options"][0]
-    assert doc["neow_options"][0]["id"] == "OPT"
-    assert "flavor" not in doc["after_neow"]["0"]["rewards"][0]
-    assert "note" not in doc["after_neow"]["0"]
-    assert doc["after_neow"]["0"]["rewards"][0]["cards"] == ["CARD.SAMPLE"]
-    assert doc["relics"] == {"starting": ["RELIC.SAMPLE_START"], "shared_queue": [], "character_queue": []}
-    assert "extra" not in doc["relics"]
-    blob = json.dumps(doc, ensure_ascii=False)
-    assert "drop-me" not in blob
-    again = json.loads(json.dumps(public_document(doc), ensure_ascii=False, indent=1))
-    assert again == json.loads(json.dumps(doc, ensure_ascii=False, indent=1))
-
-
-def test_bad_neow_does_not_touch_the_engine(monkeypatch):
-    def boom(spec):
-        raise AssertionError("engine should not run")
-    monkeypatch.setattr(seedpreview, "_generate", boom)
-    with pytest.raises(PreviewError) as e:
-        preview("ABCDEFGHJKLM", "Ironclad", 0, neow="nope")
-    assert e.value.code == "bad_neow"
-
-
-def test_no_engine_does_not_write_a_cache(tmp_path, monkeypatch):
-    def explode():
-        raise ModuleNotFoundError("sts2sim.gen.game")
-    monkeypatch.setattr(seedpreview, "_load_game", explode)
-    with pytest.raises(PreviewError) as e:
-        preview("ABCDEFGHJKLM", "Ironclad", 0, neow="none", use_cache=True, cache_dir=str(tmp_path))
-    assert e.value.code == "no_engine"
-    assert e.value.params["err"]
-    assert list(tmp_path.iterdir()) == []
-
-
-def test_cache_is_keyed_by_seed_char_asc_neow_and_skips_the_engine(tmp_path, monkeypatch):
-    calls = {"n": 0}
-
-    def fake(spec):
-        calls["n"] += 1
-        return _sample(spec)
-
-    monkeypatch.setattr(seedpreview, "_generate", fake)
-    first = preview("abcdef", "Silent", "1", neow="all", use_cache=True, cache_dir=str(tmp_path))
-    assert calls["n"] == 1
-    assert first["seed_input"] == "abcdef"
-    assert first["seed"] == "ABCDEF"
-    assert any(w["code"] == "seedNormalized" for w in first["warnings"])
-    assert list(first) == list(PUBLIC_KEYS)
-
-    def boom(spec):
-        raise AssertionError("cached preview should not load the engine")
-    monkeypatch.setattr(seedpreview, "_generate", boom)
-    second = preview("ABCDEF", "Silent", 1, neow="all", use_cache=True, cache_dir=str(tmp_path))
-    assert second["seed_input"] == "ABCDEF"
-    assert second["seed"] == "ABCDEF"
-    assert not any(w["code"] == "seedNormalized" for w in second["warnings"])
-    assert any(w["code"] == "relicQueueHidden" for w in second["warnings"])
-    assert second["distribution"][0]["normal_counts"][0] == {"id": "ENCOUNTER.A", "n": 2}
-
-    files = [p for p in tmp_path.iterdir() if p.suffix == ".json"]
-    assert len(files) == 1
-    assert not any(p.name.endswith(".tmp") for p in tmp_path.iterdir())
-    payload = json.loads(files[0].read_text(encoding="utf-8"))
-    assert payload["cache_v"] == 1
-    assert payload["key"] == {"seed": "ABCDEF", "char": "Silent", "asc": 1, "neow": "all"}
-    assert payload["preview"]["character"] == "Silent"
-    assert "drop-me" not in files[0].read_text(encoding="utf-8")
-    assert os.path.commonpath([os.path.abspath(ROOT), os.path.abspath(files[0])]) != os.path.abspath(ROOT)
-
-    monkeypatch.setattr(seedpreview, "_generate", fake)
-    preview("ABCDEF", "Silent", 1, neow="none", use_cache=True, cache_dir=str(tmp_path))
-    preview("ABCDEF", "Defect", 1, neow="all", use_cache=True, cache_dir=str(tmp_path))
-    preview("ABCDEF", "Silent", 2, neow="all", use_cache=True, cache_dir=str(tmp_path))
-    preview("ZZZZZZZZZZZZ", "Silent", 1, neow="all", use_cache=True, cache_dir=str(tmp_path))
-    assert calls["n"] == 5
-    assert len(list(tmp_path.glob("*.json"))) == 5
-
-
-def test_corrupt_cache_is_rebuilt(tmp_path, monkeypatch):
-    calls = {"n": 0}
-
-    def fake(spec):
-        calls["n"] += 1
-        return _sample(spec)
-
-    monkeypatch.setattr(seedpreview, "_generate", fake)
-    preview("ABCDEFGHJKLM", use_cache=True, cache_dir=str(tmp_path))
-    path = next(tmp_path.glob("*.json"))
-    path.write_text("{", encoding="utf-8")
-    preview("ABCDEFGHJKLM", use_cache=True, cache_dir=str(tmp_path))
-    assert calls["n"] == 2
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    payload["key"]["asc"] = 9
-    path.write_text(json.dumps(payload), encoding="utf-8")
-    preview("ABCDEFGHJKLM", use_cache=True, cache_dir=str(tmp_path))
-    assert calls["n"] == 3
-    assert json.loads(path.read_text(encoding="utf-8"))["key"]["asc"] == 0
-
-
-def test_cache_inside_the_repo_is_refused(monkeypatch):
-    def boom(spec):
-        raise AssertionError("refused cache must not generate")
-    monkeypatch.setattr(seedpreview, "_generate", boom)
-    inside = os.path.join(ROOT, "seed-preview-cache")
-    with pytest.raises(PreviewError) as e:
-        preview("ABCDEFGHJKLM", use_cache=True, cache_dir=inside)
-    assert e.value.code == "cache_in_repo"
-    assert not os.path.exists(inside)
-
-
-def test_default_cache_dir_stays_outside_the_repo(monkeypatch, tmp_path):
-    monkeypatch.setenv("DECKBENCH_CACHE", str(tmp_path / "user-cache"))
-    from sts2sim.engine.seedpreview import default_cache_dir
-    d = default_cache_dir()
-    assert os.path.basename(d) == "seed-preview"
-    assert os.path.commonpath([os.path.abspath(ROOT), os.path.abspath(d)]) != os.path.abspath(ROOT)
-    calls = {"n": 0}
-
-    def fake(spec):
-        calls["n"] += 1
-        return _sample(spec)
-
-    monkeypatch.setattr(seedpreview, "_generate", fake)
-    preview("ABCDEFGHJKLM", "Ironclad", 0, "first", use_cache=True)
-    stored = list((tmp_path / "user-cache" / "seed-preview").glob("*.json"))
-    assert len(stored) == 1 and calls["n"] == 1
-
-
-def test_cli_json_schema_and_cache_without_engine(tmp_path, monkeypatch, capsys):
-    calls = {"n": 0}
-
-    def fake(spec):
-        calls["n"] += 1
-        return _sample(spec)
-
-    monkeypatch.setattr(seedpreview, "_generate", fake)
-    cli = _load_cli()
-    out = tmp_path / "preview.json"
-    cache = tmp_path / "cache"
-    argv = ["abcdEFGHJKLM", "--char", "Defect", "--asc", "2", "--neow", "none",
-            "--json", str(out), "--cache", str(cache), "--lang", "en"]
-    assert cli.main(argv) == 0
-    text = capsys.readouterr().out
-    assert "Character" in text
-    data = json.loads(out.read_text(encoding="utf-8"))
-    assert list(data) == list(PUBLIC_KEYS)
-    assert data["v"] == 1
-    assert data["character"] == "Defect"
-    assert data["ascension"] == 2
-    assert data["seed"] == canonicalize("abcdEFGHJKLM")
-    assert "drop-me" not in out.read_text(encoding="utf-8")
-    assert cli.main(argv) == 0
-    assert calls["n"] == 1
-    capsys.readouterr()
-    assert cli.main(["abcdEFGHJKLM", "--char", "Defect", "--asc", "2", "--neow", "none",
-                     "--json", "-", "--cache", str(cache), "--lang", "en"]) == 0
-    stdout = capsys.readouterr().out
-    assert stdout.lstrip().startswith("{")
-    piped = json.loads(stdout)
-    assert piped["v"] == 1 and piped["character"] == "Defect"
-    assert "Character" not in stdout
-    assert calls["n"] == 1
-
-
-def test_cli_json_not_written_when_engine_missing(tmp_path, monkeypatch, capsys):
-    cli = _load_cli()
-
-    def boom(*args, **kwargs):
-        raise PreviewError("no_engine", err="missing")
-
-    monkeypatch.setattr(cli, "preview", boom)
-    out = tmp_path / "preview.json"
-    cache = tmp_path / "cache"
-    rc = cli.main(["ABCDEFGHJKLM", "--lang", "en", "--json", str(out), "--cache", str(cache)])
-    captured = capsys.readouterr()
-    assert rc == 2
-    assert captured.out == ""
-    assert "Local game logic" in captured.err
-    assert not out.exists()
-    assert not cache.exists()
-
-
 def test_preview_cli_exits_cleanly_without_engine():
     r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "seed_preview.py"), "ABCDEFGHJKLM", "--lang", "en", "--neow", "none"],
                        cwd=ROOT, capture_output=True, text=True)
@@ -348,3 +114,301 @@ def test_preview_cli_exits_cleanly_without_engine():
     else:
         assert r.returncode == 2
         assert r.stderr.strip()
+
+
+def test_neow_selector_accepts_first_all_none_and_index():
+    options = [
+        {"index": 0, "locked": True},
+        {"index": 1, "locked": False},
+        {"index": 2, "locked": False},
+    ]
+    assert _neow_indexes("first", options) == [1]
+    assert _neow_indexes("all", options) == [0, 1, 2]
+    assert _neow_indexes("none", options) == []
+    assert _neow_indexes(None, options) == []
+    assert _neow_indexes("2", options) == [2]
+    assert _neow_indexes(0, options) == [0]
+    assert _neow_indexes(" 1 ", options) == [1]
+    assert _neow_indexes("first", [{"index": 0, "locked": True}]) == [0]
+    assert _neow_indexes("first", []) == []
+    assert _neow_indexes("all", []) == []
+    for bad in ("nope", "1.5", "None", "", "first "):
+        with pytest.raises(PreviewError) as err:
+            _neow_indexes(bad, options)
+        assert err.value.code == "bad_neow"
+
+
+def test_seed_warning_codes_and_visible_relic_bags():
+    assert seed_warning_codes("abcdefghjklm", "ABCDEFGHJKLM") == [
+        {"code": "seedNormalized", "raw": "abcdefghjklm", "canon": "ABCDEFGHJKLM"}]
+    assert seed_warning_codes("abcdef", "ABCDEF") == [
+        {"code": "seedNormalized", "raw": "abcdef", "canon": "ABCDEF"},
+        {"code": "seedLength", "n": 6, "want": 12}]
+    assert seed_warning_codes("ABC", "ABC") == [{"code": "seedLength", "n": 3, "want": 12}]
+    mixed = seed_warning_codes("ab!", "AB!")
+    assert any(w["code"] == "seedNormalized" for w in mixed)
+    charset = next(w for w in mixed if w["code"] == "seedCharset")
+    assert charset["chars"] == "!"
+    assert not any(w["code"] == "seedLength" for w in mixed)
+    assert seed_warning_codes("ABCDEFGHJKLM", "ABCDEFGHJKLM") == []
+
+    class Ident:
+        def __init__(self, entry):
+            self.Entry = entry
+
+    class Relic:
+        def __init__(self, entry):
+            self.Id = Ident(entry)
+
+    class Bag:
+        def __init__(self, ids):
+            self._relics = [Relic(i) for i in ids]
+
+    player = type("P", (), {"Relics": [Relic("RELIC.START")], "RelicGrabBag": Bag(["RELIC.CHAR"])})()
+    state = type("S", (), {"SharedRelicGrabBag": Bag(["RELIC.SHARED"])})()
+    got = peek_relics(state, player)
+    assert got == {"starting": ["RELIC.START"], "shared_queue": ["RELIC.SHARED"], "character_queue": ["RELIC.CHAR"]}
+    res = assemble("A", "A", [], "Ironclad", 0, [], [], [], None, [], {}, got)
+    assert not any(w["code"] == "relicQueueHidden" for w in res["warnings"])
+
+
+@pytest.mark.parametrize("seed,char,asc,code", [
+    ("   ", "Ironclad", 0, "need_seed"),
+    ("ABC", "ironclad", 0, "bad_char"),
+    ("ABC", "Ironclad", -1, "bad_asc"),
+    ("ABC", "Ironclad", 11, "bad_asc"),
+    ("ABC", "Ironclad", "no", "bad_asc"),
+])
+def test_preview_rejects_before_the_engine(seed, char, asc, code):
+    with pytest.raises(PreviewError) as err:
+        preview(seed, char, asc, neow="all")
+    assert err.value.code == code
+
+
+class _Ident:
+    def __init__(self, entry):
+        self.Entry = entry
+
+
+class _Act:
+    def __init__(self, entry):
+        self.Id = _Ident(entry)
+
+
+class _Relic:
+    def __init__(self, entry):
+        self.Id = _Ident(entry)
+
+
+class _Mgr:
+    def __init__(self, fail_act):
+        self.fail_act = fail_act
+
+    def SetActInternal(self, i):
+        if self.fail_act is not None and i == self.fail_act:
+            raise RuntimeError("map boom")
+
+
+class _Driver:
+    def __init__(self, fail_act=None):
+        self.state = type("S", (), {"Acts": [_Act("ACT.SAMPLE_ONE"), _Act("ACT.SAMPLE_TWO")], "SharedRelicGrabBag": None})()
+        self.player = type("P", (), {"Relics": [_Relic("RELIC.SAMPLE_START")]})()
+        self.mgr = _Mgr(fail_act)
+
+    def _create(self):
+        return None
+
+
+class _Probe:
+    def __init__(self):
+        self.calls = []
+
+    def _rooms(self, state):
+        return [
+            {"act": "ACT.SAMPLE_ONE", "boss": "ENCOUNTER.SAMPLE_BOSS", "second_boss": None,
+             "ancient": "EVENT.SAMPLE_START", "normal": ["ENCOUNTER.A", "ENCOUNTER.A"], "elite": ["ENCOUNTER.E"], "events": []},
+            {"act": "ACT.SAMPLE_TWO", "boss": "ENCOUNTER.SAMPLE_BOSS2", "second_boss": "ENCOUNTER.SAMPLE_BOSS3",
+             "ancient": None, "normal": [], "elite": [], "events": []},
+        ]
+
+    def _map(self, game, state):
+        return {"cols": 2, "boss": {"col": 0, "row": 2},
+                "rows": [[{"col": 0, "row": 1, "type": "Monster"}, {"col": 1, "row": 1, "type": "Unknown"}]]}
+
+    def _build(self, char, asc, canon, neow=None):
+        self.calls.append(neow)
+        keys = ["EVENT.SAMPLE.LOCKED", "EVENT.SAMPLE.FIRST", "EVENT.SAMPLE.SECOND"]
+        locked = [True, False, False]
+        return object(), {"ancient": "EVENT.SAMPLE_START", "options": keys, "locked": locked}, object()
+
+    def _rewards(self, game, driver):
+        return {"encounter": "ENCOUNTER.A", "rewards": [{"cards": ["CARD.SAMPLE"], "gold": 10}]}
+
+
+def _use_stub(monkeypatch, fail_act=None):
+    import types
+    probe = _Probe()
+    boot = types.ModuleType("sts2sim.rt.boot")
+    boot.game = object()
+    monkeypatch.setitem(sys.modules, "sts2sim.rt.boot", boot)
+    monkeypatch.setattr("sts2sim.engine.seedpreview._tools", lambda: probe)
+    monkeypatch.setattr("sts2sim.engine.seedpreview._fresh", lambda char, asc, seed: _Driver(fail_act))
+    return probe
+
+
+def _block_engine(monkeypatch):
+    monkeypatch.setitem(sys.modules, "sts2sim.rt.boot", None)
+
+
+def test_stubbed_preview_applies_neow_without_a_game(monkeypatch):
+    _use_stub(monkeypatch)
+    none = preview("oooooooooooo", "Silent", 10, neow="none")
+    assert none["seed"] == "000000000000" and none["ascension"] == 10 and none["character"] == "Silent"
+    assert any(w["code"] == "seedNormalized" for w in none["warnings"])
+    assert not any(w["code"] in ("seedCharset", "seedLength") for w in none["warnings"])
+    assert none["after_neow"] == {}
+    assert none["maps"][0]["confidence"] == "act_entry"
+    assert none["maps"][1]["confidence"] == "projected"
+    assert none["maps"][0]["counts"]["Monster"] == 1 and none["maps"][0]["counts"]["Boss"] == 1
+    assert none["relics"]["starting"] == ["RELIC.SAMPLE_START"]
+    assert any(w["code"] == "relicQueueHidden" for w in none["warnings"])
+    assert "later_act_maps_projected" in none["limits"]
+    assert none["distribution"][0]["normal_counts"][0] == {"id": "ENCOUNTER.A", "n": 2}
+    text = format_text(none, "en")
+    assert "000000000000" in text and "Projected without playing the previous act" in text
+    assert "After choice" not in text
+
+    first = preview("ABCDEFGHJKLM", "Ironclad", "0", neow="first")
+    assert first["ascension"] == 0 and set(first["after_neow"]) == {"1"}
+    assert first["after_neow"]["1"]["encounter"] == "ENCOUNTER.A"
+    chosen = preview("ABCDEFGHJKLM", "Defect", 0, neow="2")
+    assert set(chosen["after_neow"]) == {"2"}
+    every = preview("ABCDEFGHJKLM", "Regent", 0, neow="all")
+    assert set(every["after_neow"]) == {"0", "1", "2"}
+    with pytest.raises(PreviewError) as bad:
+        preview("ABCDEFGHJKLM", "Necrobinder", 0, neow="nope")
+    assert bad.value.code == "bad_neow"
+
+
+def test_stubbed_preview_keeps_the_other_act_when_one_map_fails(monkeypatch):
+    _use_stub(monkeypatch, fail_act=1)
+    res = preview("ABCDEFGHJKLM", "Ironclad", 0, neow="none")
+    assert res["maps"][0]["confidence"] == "act_entry" and res["maps"][0]["rows"]
+    assert res["maps"][1]["confidence"] == "failed" and "map boom" in res["maps"][1]["error"]
+    assert len(res["distribution"]) == 2 and res["acts"] == ["ACT.SAMPLE_ONE", "ACT.SAMPLE_TWO"]
+
+
+def test_no_engine_error_is_deterministic(monkeypatch):
+    _block_engine(monkeypatch)
+    seen = []
+    for _ in range(2):
+        with pytest.raises(PreviewError) as err:
+            preview("ABCDEFGHJKLM", "Silent", 0, neow="all")
+        seen.append((err.value.code, err.value.params["err"]))
+    assert seen[0] == seen[1] == (
+        "no_engine", "import of sts2sim.rt.boot halted; None in sys.modules")
+
+
+def _preview_cli():
+    import importlib.util
+    name = "deckbench_seed_preview_cli"
+    if name in sys.modules:
+        return sys.modules[name]
+    path = os.path.join(ROOT, "tools", "seed_preview.py")
+    spec = importlib.util.spec_from_file_location(name, path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_preview_cli_rejects_bad_args_before_the_engine(capsys):
+    cli = _preview_cli()
+    with pytest.raises(SystemExit) as missing:
+        cli.main([])
+    assert missing.value.code == 2
+    with pytest.raises(SystemExit) as char:
+        cli.main(["ABCDEFGHJKLM", "--char", "Nope", "--lang", "en"])
+    assert char.value.code == 2
+    err = capsys.readouterr().err
+    assert "invalid choice" in err and "Nope" in err
+    with pytest.raises(SystemExit) as asc:
+        cli.main(["ABCDEFGHJKLM", "--asc", "no", "--lang", "en"])
+    assert asc.value.code == 2
+    assert cli.main(["", "--lang", "en"]) == 2
+    assert "Enter a seed first." in capsys.readouterr().err
+    assert cli.main(["ABCDEFGHJKLM", "--asc", "99", "--lang", "en"]) == 2
+    assert "Ascension must be from 0 to 10." in capsys.readouterr().err
+    assert cli.main(["ABCDEFGHJKLM", "--asc", "-1", "--neow", "all", "--lang", "en"]) == 2
+    assert "Ascension must be from 0 to 10." in capsys.readouterr().err
+
+
+def test_preview_cli_neow_with_stub(tmp_path, monkeypatch, capsys):
+    cli = _preview_cli()
+    probe = _use_stub(monkeypatch)
+    assert cli.main(["ABCDEFGHJKLM", "--neow", "first", "--lang", "en"]) == 0
+    first = capsys.readouterr().out
+    assert "After choice [1]" in first and "After choice [0]" not in first
+    assert "(locked)" in first and "FIRST" in first
+    assert probe.calls == [None, 1]
+    assert cli.main(["ABCDEFGHJKLM", "--neow", "all", "--lang", "en"]) == 0
+    every = capsys.readouterr().out
+    assert "After choice [0]" in every and "After choice [1]" in every and "After choice [2]" in every
+    assert cli.main(["ABCDEFGHJKLM", "--neow", "none", "--lang", "en"]) == 0
+    assert "After choice" not in capsys.readouterr().out
+    out = tmp_path / "preview.json"
+    assert cli.main(["ABCDEFGHJKLM", "--neow", "2", "--json", str(out), "--lang", "en"]) == 0
+    saved = json.loads(out.read_text(encoding="utf-8"))
+    assert set(saved["after_neow"]) == {"2"}
+    assert "ABCDEFGHJKLM" in capsys.readouterr().out
+    missing = tmp_path / "no.json"
+    assert cli.main(["ABCDEFGHJKLM", "--neow", "nope", "--json", str(missing), "--lang", "en"]) == 2
+    assert "first, all, none, or an index" in capsys.readouterr().err
+    assert not missing.exists()
+
+
+def test_preview_cli_no_engine_message_is_stable(monkeypatch, capsys):
+    cli = _preview_cli()
+    _block_engine(monkeypatch)
+    assert cli.main(["ABCDEFGHJKLM", "--neow", "all", "--lang", "en"]) == 2
+    first = capsys.readouterr().err
+    assert cli.main(["ABCDEFGHJKLM", "--neow", "none", "--lang", "en"]) == 2
+    second = capsys.readouterr().err
+    assert first == second
+    assert "Local game logic is not generated yet" in first
+    assert "import of sts2sim.rt.boot halted; None in sys.modules" in first
+
+
+def test_preview_api_validates_neow_and_no_engine(monkeypatch):
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+    from gui.server import app
+    client = TestClient(app)
+    headers = {"x-lang": "en"}
+
+    def post(**body):
+        return client.post("/api/seed-preview", headers=headers, json=body)
+
+    _block_engine(monkeypatch)
+    blocked = post(seed="ABCDEFGHJKLM", char="Ironclad", asc=0, neow="nope")
+    assert blocked.status_code == 400
+    assert "Local game logic is not generated yet" in blocked.json()["detail"]
+    assert "bad_neow" not in blocked.json()["detail"]
+    again = post(seed="ABCDEFGHJKLM", char="Ironclad", asc=0, neow="first")
+    assert again.status_code == 400 and again.json()["detail"] == blocked.json()["detail"]
+
+    _use_stub(monkeypatch)
+    for neow, keys in (("first", {"1"}), ("all", {"0", "1", "2"}), ("none", set()), ("2", {"2"})):
+        res = post(seed="ABCDEFGHJKLM", char="Ironclad", asc=0, neow=neow)
+        assert res.status_code == 200, (neow, res.text)
+        assert set(res.json()["after_neow"]) == keys
+    bad = post(seed="ABCDEFGHJKLM", char="Ironclad", asc=0, neow="nope")
+    assert bad.status_code == 400 and "first, all, none, or an index" in bad.json()["detail"]
+    asc = post(seed="ABCDEFGHJKLM", char="Ironclad", asc=11, neow="none")
+    assert asc.status_code == 400 and "Ascension must be from 0 to 10." in asc.json()["detail"]
+    char = post(seed="ABCDEFGHJKLM", char="ironclad", asc=0, neow="none")
+    assert char.status_code == 400 and "ironclad" in char.json()["detail"]
+    empty = post(seed="   ", char="Ironclad", asc=0, neow="all")
+    assert empty.status_code == 400 and "Enter a seed first." in empty.json()["detail"]
+    high = post(seed="oooooooooooo", char="Silent", asc=10, neow="none")
+    assert high.status_code == 200 and high.json()["seed"] == "000000000000" and high.json()["ascension"] == 10

@@ -7,8 +7,8 @@ import zipfile
 import pytest
 
 from sts2sim.dllmod.extract import parse_sources
-from sts2sim.dllmod.metadata import read_assembly
-from sts2sim.dllmod.package import DllModError, import_path
+from sts2sim.dllmod.metadata import AssemblyInfo, read_assembly
+from sts2sim.dllmod.package import DllModError, _to_mod, import_installed, import_path, list_installed
 from sts2sim.modfmt import schema as S
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -223,6 +223,339 @@ def test_editor_payload_keeps_limits_off_the_saved_mod(tmp_path):
     assert view["_dll"]["cards"] >= 3 and view["_dll"]["translated"] == 0
     assert view["_check"]["problems"] and view["_check"]["warnings"]
     assert "_dll_report" not in view and "_dll" in view
+
+
+ILSPY = os.path.join(FIX, "ilspy")
+_SPEC_FIELDS = (
+    "status", "kind", "cost", "type", "rarity", "target", "keywords", "tags", "vars",
+    "upgrade_vars", "upgrade_cost", "effects", "triggers", "stack", "power_type", "show",
+)
+
+
+def test_authored_source_matches_ilspy_fixture():
+    assert _specs(FIX) == _specs(ILSPY)
+    specs, regs, ordinal = _specs(FIX)
+    assert ordinal is False
+    assert [cls for _pool, cls in regs] == ["NotebookStrike", "FieldKit", "UnreadNote"]
+    assert set(specs) == {"NotebookStrike", "FieldKit", "UnreadNote", "SteadyPower", "PocketRuler"}
+    strike = specs["NotebookStrike"]
+    assert strike["status"] == "translated"
+    assert "hits" not in strike["effects"][0]
+    assert strike["effects"] == [{"op": "damage", "amount": "Damage"}]
+    assert strike["upgrade_vars"] == {"Damage": 9}
+    kit = specs["FieldKit"]
+    assert kit["keywords"] == ["Exhaust"] and kit["upgrade_vars"] == {"Block": 9}
+    assert "Cards" not in kit["upgrade_vars"]
+    assert specs["UnreadNote"]["status"] == "partial" and specs["UnreadNote"]["effects"] == []
+    assert specs["SteadyPower"]["triggers"] == [{"on": "turn_start", "do": [{"op": "block", "amount": "Block"}]}]
+    assert specs["PocketRuler"]["rarity"] == "Starter"
+    assert specs["PocketRuler"]["triggers"][0]["do"] == [{"op": "block", "amount": 4}]
+    for name, spec in specs.items():
+        assert set(_SPEC_FIELDS) <= set(spec)
+
+
+@pytest.mark.parametrize("fn", [
+    "NotebookStrike.cs", "FieldKit.cs", "UnreadNote.cs", "SteadyPower.cs", "PocketRuler.cs", "ModEntry.cs",
+])
+def test_each_ilspy_fixture_file_parses_alone(fn):
+    specs, regs, ordinal = parse_sources({fn: _text(os.path.join(ILSPY, fn))})
+    assert ordinal is False
+    if fn == "ModEntry.cs":
+        assert specs == {}
+        assert regs == [
+            ("NotebookCardPool", "NotebookStrike"),
+            ("NotebookCardPool", "FieldKit"),
+            ("NotebookCardPool", "UnreadNote"),
+        ]
+        return
+    cls = fn[:-3]
+    assert list(specs) == [cls] and regs == []
+    spec = specs[cls]
+    if cls == "UnreadNote":
+        assert spec["status"] == "partial" and spec["effects"] == []
+        assert (spec["type"], spec["rarity"], spec["cost"], spec["target"]) == ("Skill", "Rare", 0, "Self")
+    else:
+        assert spec["status"] == "translated"
+        assert spec["effects"] or spec["triggers"]
+
+
+def _yaml(sources, refs=("sts2",), deps=()):
+    specs, regs, ordinal = parse_sources(sources)
+    info = AssemblyInfo("SyntheticMod", list(refs), [
+        {"name": n, "namespace": "SyntheticMod", "base": "CardModel", "kind": specs[n]["kind"], "abstract": False}
+        for n in specs
+    ], [])
+    mod, report = _to_mod({"id": "SyntheticMod", "name": "Synthetic Mod", "dependencies": list(deps)},
+                          info, specs, regs, ordinal, {}, True, None)
+    return specs, mod, report
+
+
+def test_fixture_yaml_leaves_the_branch_blank():
+    files = {fn: _text(os.path.join(ILSPY, fn)) for fn in os.listdir(ILSPY) if fn.endswith(".cs")}
+    _specs_map, mod, report = _yaml(files)
+    assert report["mode"] == "decompiled"
+    assert report["pools"] == [
+        {"pool": "NotebookCardPool", "class": "NotebookStrike", "vanilla": None},
+        {"pool": "NotebookCardPool", "class": "FieldKit", "vanilla": None},
+        {"pool": "NotebookCardPool", "class": "UnreadNote", "vanilla": None},
+    ]
+    assert any("not executed" in x["en"].lower() for x in report["limitations"])
+    assert not any("guessed" in x["en"].lower() for x in report["limitations"])
+    by_id = {c["id"]: c for c in mod["cards"]}
+    strike = by_id["NOTEBOOK_STRIKE"]
+    assert strike["pool"] is False and strike["type"] == "Attack" and strike["target"] == "AnyEnemy"
+    assert strike["effects"] == [{"op": "damage", "amount": "Damage"}]
+    assert "hits" not in strike["effects"][0]
+    assert strike["upgrade"]["vars"] == {"Damage": 9}
+    kit = by_id["FIELD_KIT"]
+    assert kit["pool"] is True and "Exhaust" in kit["keywords"]
+    assert kit["effects"] == [{"op": "block", "amount": "Block"}, {"op": "draw", "n": "Cards"}]
+    assert kit["upgrade"]["vars"] == {"Block": 9}
+    note = by_id["UNREAD_NOTE"]
+    assert note["effects"] == [] and note["type"] == "Skill" and note["rarity"] == "Rare" and note["cost"] == 0
+    noted = next(n for n in report["notes"] if n["where"] == "UNREAD_NOTE")
+    assert "left blank" in noted["en"] and "always happens" in noted["en"]
+    power = next(p for p in mod["powers"] if p["id"] == "STEADY_POWER")
+    assert power["type"] == "Buff" and power["stack"] == "Counter"
+    assert power["triggers"][0]["on"] == "turn_start" and power["vars"]["Block"] == 2
+    relic = next(r for r in mod["relics"] if r["id"] == "POCKET_RULER")
+    assert relic["pool"] is False and relic["rarity"] == "Starter"
+    assert relic["triggers"][0]["do"] == [{"op": "block", "amount": 4}]
+    problems, _warnings = S.validate(mod, fullrun=False)
+    assert not problems
+
+
+_STRAIGHT = r'''
+public class Mix : CardModel {
+    protected override IEnumerable<DynamicVar> CanonicalVars => new[] {
+        new DamageVar(6m, 0), new EnergyVar(1), new DynamicVar("Power", 3m)
+    };
+    public Mix() : base(1, CardType.Attack, CardRarity.Common, TargetType.AllEnemies) {}
+    protected override HashSet<CardKeyword> CanonicalKeywords => new HashSet<CardKeyword> {
+        CardKeyword.Ethereal, CardKeyword.Retain, CardKeyword.NotARealOne
+    };
+    protected override HashSet<CardTag> CanonicalTags => new HashSet<CardTag> { CardTag.Strike, CardTag.Other };
+    protected override async Task OnPlay(PlayerChoiceContext c, CardPlay p) {
+        await DamageCmd.Attack(DynamicVars.Damage.BaseValue).WithHitCount(3).Execute(c);
+        await PlayerCmd.GainEnergy(DynamicVars.Energy.BaseValue);
+        await PlayerCmd.LoseEnergy(1);
+        await CardPileCmd.Draw(c, 2);
+        await CreatureCmd.Heal(Owner.Creature, 5m);
+        await PowerCmd.Apply<StrengthPower>(c, cardPlay.Target, DynamicVars["Power"].BaseValue, null, false);
+    }
+    protected override void OnUpgrade() {
+        DynamicVars.Damage.UpgradeValueBy(2m);
+        EnergyCost.UpgradeBy(-1);
+    }
+}
+public class Hidden : CardModel {
+    public Hidden() : base(1, CardType.Skill, CardRarity.Common, TargetType.Self, false) {}
+    protected override async Task OnPlay(PlayerChoiceContext c, CardPlay p) {
+        await CreatureCmd.GainBlock(Owner, 3m, null);
+    }
+}
+public class Rand : CardModel {
+    public Rand() : base(1, CardType.Attack, CardRarity.Common, TargetType.RandomEnemy) {}
+    protected override async Task OnPlay(PlayerChoiceContext c, CardPlay p) {
+        await DamageCmd.Attack(4m).TargetingAll().Execute(c);
+    }
+}
+public class EndPow : PowerModel {
+    public override async Task AfterTurnEnd(PlayerChoiceContext c, CombatSide side) {
+        await CreatureCmd.GainBlock(Owner, 2m, null);
+    }
+}
+'''
+
+
+def test_synthetic_straight_line_effects_become_yaml():
+    _specs_map, mod, report = _yaml({"mix.cs": _STRAIGHT})
+    mix = next(c for c in mod["cards"] if c["id"] == "MIX")
+    assert mix["keywords"] == ["Ethereal", "Retain"]
+    assert mix["tags"] == ["Strike"]
+    assert mix["target"] == "AllEnemies" and mix["pool"] is True
+    assert mix["vars"] == {"Damage": 6, "Energy": 1, "Power": 3}
+    assert mix["effects"] == [
+        {"op": "damage", "amount": "Damage", "hits": 3, "target": "all"},
+        {"op": "energy", "n": "Energy"},
+        {"op": "energy", "n": -1},
+        {"op": "draw", "n": 2},
+        {"op": "heal", "amount": 5},
+        {"op": "apply", "power": "STRENGTH", "amount": "Power", "target": "target"},
+    ]
+    assert mix["upgrade"]["vars"] == {"Damage": 8} and mix["upgrade"]["cost"] == 0
+    hidden = next(c for c in mod["cards"] if c["id"] == "HIDDEN")
+    assert hidden["pool"] is False and hidden["effects"] == [{"op": "block", "amount": 3}]
+    rand = next(c for c in mod["cards"] if c["id"] == "RAND")
+    assert rand["target"] == "RandomEnemy"
+    assert rand["effects"] == [{"op": "damage", "amount": 4, "target": "all"}]
+    power = next(p for p in mod["powers"] if p["id"] == "END_POW")
+    assert power["triggers"] == [{"on": "turn_end", "do": [{"op": "block", "amount": 2}]}]
+    problems, _warnings = S.validate(mod, fullrun=False)
+    assert not problems
+    assert report["mode"] == "decompiled"
+
+
+_PARTIAL = r'''
+public class Branched : CardModel {
+    public Branched() : base(1, CardType.Skill, CardRarity.Common, TargetType.Self) {}
+    protected override async Task OnPlay(PlayerChoiceContext c, CardPlay p) {
+        await DamageCmd.Attack(6m).Execute(c);
+        if (Owner != null) { await CreatureCmd.GainBlock(Owner, 4m, null); }
+    }
+}
+public class Bare : CardModel {
+    public Bare() : base(2, CardType.Power, CardRarity.Uncommon, TargetType.Self) {}
+}
+public class BadUp : CardModel {
+    protected override IEnumerable<DynamicVar> CanonicalVars => new[] { new DamageVar(6m, 0) };
+    public BadUp() : base(1, CardType.Attack, CardRarity.Common, TargetType.AnyEnemy) {}
+    protected override async Task OnPlay(PlayerChoiceContext c, CardPlay p) {
+        await DamageCmd.Attack(DynamicVars.Damage.BaseValue).Execute(c);
+    }
+    protected override void OnUpgrade() {
+        DynamicVars.Missing.UpgradeValueBy(1m);
+    }
+}
+public class NumKw : CardModel {
+    public NumKw() : base(1, CardType.Skill, CardRarity.Common, TargetType.Self) {}
+    protected override HashSet<CardKeyword> CanonicalKeywords => new HashSet<CardKeyword> { (CardKeyword)3, CardKeyword.Exhaust };
+    protected override async Task OnPlay(PlayerChoiceContext c, CardPlay p) {
+        await CreatureCmd.GainBlock(Owner, 4m, null);
+    }
+}
+'''
+
+
+def test_partial_cards_do_not_guess_branches_or_keyword_numbers():
+    specs, _regs, ordinal = parse_sources({"partial.cs": _PARTIAL})
+    assert ordinal is True
+    assert specs["Branched"]["status"] == "partial" and specs["Branched"]["effects"] == []
+    assert specs["Bare"]["status"] == "partial" and specs["Bare"]["effects"] == []
+    assert specs["BadUp"]["status"] == "partial"
+    assert specs["BadUp"]["effects"] == [{"op": "damage", "amount": "Damage"}]
+    assert specs["BadUp"]["upgrade_vars"] == {} and specs["BadUp"]["upgrade_cost"] is None
+    assert specs["NumKw"]["keywords"] == ["Exhaust"]
+    _specs_map, mod, report = _yaml({"partial.cs": _PARTIAL})
+    notes = {n["where"]: n["en"] for n in report["notes"]}
+    assert "always happens" in notes["BRANCHED"] and "left blank" in notes["BRANCHED"]
+    assert next(c for c in mod["cards"] if c["id"] == "BRANCHED")["effects"] == []
+    assert "recognized are kept" in notes["BAD_UP"]
+    assert next(c for c in mod["cards"] if c["id"] == "BAD_UP")["effects"] == [{"op": "damage", "amount": "Damage"}]
+    assert next(c for c in mod["cards"] if c["id"] == "NUM_KW")["keywords"] == ["Exhaust"]
+    assert any("not guessed" in x["en"] for x in report["limitations"])
+
+
+_CAST = r'''
+public class NotebookStrike : CardModel {
+    public NotebookStrike() : base(1, CardType.Attack, CardRarity.Basic, TargetType.AnyEnemy) {}
+    protected override async Task OnPlay(PlayerChoiceContext c, CardPlay p) {
+        await DamageCmd.Attack(6m).Execute(c);
+    }
+}
+public class Tonic : PotionModel {
+    public Tonic() : base(0, CardType.Skill, CardRarity.Common, TargetType.Self) {}
+    protected override async Task OnUse(PlayerChoiceContext c) {
+        await CreatureCmd.Heal(Owner.Creature, 7m);
+    }
+}
+public class PocketRuler : RelicModel {
+    public override RelicRarity Rarity => RelicRarity.Starter;
+    public override async Task BeforeCombat(PlayerChoiceContext c) {
+        await CreatureCmd.GainBlock(Owner.Creature, 4m, null);
+    }
+}
+public class NotebookHero : CharacterModel {
+    public override int StartingHp => 72;
+    public override int MaxEnergy => 3;
+    public override int StartingGold { get { return 99; } }
+    public override IEnumerable<CardModel> StartingDeck => new NotebookStrike[] { new NotebookStrike(), new NotebookStrike() };
+}
+public static class ModEntry {
+    public static void Initialize() {
+        ModHelper.AddModelToPool<IroncladCardPool, NotebookStrike>();
+        ModHelper.AddModelToPool<NotebookCardPool, Tonic>();
+    }
+}
+'''
+
+
+def test_potion_character_and_vanilla_pool_yaml():
+    specs, mod, report = _yaml({"cast.cs": _CAST})
+    assert specs["NotebookHero"]["starting_deck"] == ["NotebookStrike", "NotebookStrike"]
+    assert specs["NotebookHero"]["hp"] == 72 and specs["NotebookHero"]["energy"] == 3
+    assert specs["Tonic"]["effects"] == [{"op": "heal", "amount": 7}]
+    hero = mod["meta"]["characters"]["NOTEBOOK_HERO"]
+    assert hero["hp"] == 72 and hero["energy"] == 3 and hero["gold"] == 99
+    assert hero["starting_deck"] == ["NOTEBOOK_STRIKE×2"]
+    assert hero["relics"] == ["POCKET_RULER"] and hero["class"] == "NotebookHero"
+    tonic = next(p for p in mod["potions"] if p["id"] == "TONIC")
+    assert tonic["effects"] == [{"op": "heal", "amount": 7}] and tonic["target"] == "Self"
+    assert report["pools"] == [
+        {"pool": "IroncladCardPool", "class": "NotebookStrike", "vanilla": "Ironclad"},
+        {"pool": "NotebookCardPool", "class": "Tonic", "vanilla": None},
+    ]
+    problems, _warnings = S.validate(mod, fullrun=False)
+    assert not problems
+
+
+def test_metadata_import_does_not_decompile(tmp_path, monkeypatch):
+    folder = tmp_path / "SyntheticMod"
+    folder.mkdir()
+    (folder / "SyntheticMod.dll").write_bytes(_dll_bytes())
+    (folder / "SyntheticMod.json").write_text(json.dumps({
+        "id": "SyntheticMod", "name": "Synthetic Mod", "has_dll": True, "dependencies": []}), encoding="utf-8")
+
+    def boom(*_a, **_k):
+        raise AssertionError("decompile should not run")
+
+    monkeypatch.setattr("sts2sim.dllmod.package._decompile", boom)
+    mod, report = import_path(str(folder), decompile=False)
+    assert report["mode"] == "metadata"
+    assert report["cards"] and all(c["status"] == "inventory" for c in report["cards"])
+    assert all(c["type"] is None for c in mod["cards"])
+    problems, _warnings = S.validate(mod, fullrun=False)
+    assert problems
+
+
+@pytest.mark.parametrize("name", ["sts2.dll", "GodotSharp.dll", "0Harmony.dll"])
+def test_game_assemblies_are_rejected_by_name(tmp_path, name):
+    path = tmp_path / name
+    path.write_bytes(b"not the game")
+    with pytest.raises(DllModError) as err:
+        import_path(str(path), decompile=False)
+    assert err.value.key == "err.dllGame"
+
+
+def test_unreadable_and_ambiguous_packages_are_rejected(tmp_path, monkeypatch):
+    monkeypatch.setattr("sts2sim.gamedata.find_dll", lambda game_dir=None: None)
+    assert list_installed() == []
+    with pytest.raises(DllModError) as missing:
+        import_installed("Anything")
+    assert missing.value.key == "err.dllNone"
+    with pytest.raises(DllModError) as bad_id:
+        import_installed("../sts2")
+    assert bad_id.value.key == "err.dllNone"
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    with pytest.raises(DllModError) as none:
+        import_path(str(empty), decompile=False)
+    assert none.value.key == "err.dllNone"
+    folder = tmp_path / "Broken"
+    folder.mkdir()
+    (folder / "Broken.dll").write_bytes(b"MZ" + b"\x00" * 80)
+    (folder / "Broken.json").write_text(json.dumps({
+        "id": "Broken", "name": "Broken", "has_dll": True, "dependencies": []}), encoding="utf-8")
+    with pytest.raises(DllModError) as read:
+        import_path(str(folder), decompile=False)
+    assert read.value.key == "err.dllRead"
+    zpath = tmp_path / "two.zip"
+    with zipfile.ZipFile(zpath, "w") as z:
+        z.writestr("m/A.dll", _dll_bytes())
+        z.writestr("m/B.dll", _dll_bytes())
+    with pytest.raises(DllModError) as many:
+        import_path(str(zpath), decompile=False)
+    assert many.value.key == "err.dllMany"
 
 
 def test_decompile_real_fixture_when_ilspy_exists(tmp_path):

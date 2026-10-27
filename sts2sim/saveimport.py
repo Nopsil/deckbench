@@ -16,6 +16,7 @@ import gzip
 import json
 import os
 import re
+import zlib
 
 MAX_BYTES = 32 * 1024 * 1024
 MAX_FILES = 200
@@ -546,7 +547,8 @@ def _decode(data):
     if data.startswith(b"\x1f\x8b"):
         try:
             data = gzip.decompress(data)
-        except OSError as e:
+        except (OSError, EOFError, zlib.error) as e:
+            # 截断的 gzip 头会抛 EOFError，坏的 deflate 流会抛 zlib.error。都不是能读的存档。
             raise SaveImportError("not_json", detail=str(e)) from e
         warnings.append({"code": "gzip"})
     if data.startswith(b"\xff\xfe") or data.startswith(b"\xfe\xff"):
