@@ -108,6 +108,11 @@ Linux/macOS: see [docs/DEVELOPER.md](docs/DEVELOPER.md).
 In **New test → Full runs**, fill in **Game seed** with the seed shown in the game (for example `7F3K9Q2ZB8MA`). The AI then plays just that one run and records every decision, which you can look through on the results page.
 Lowercase letters, and the letters O and I, are converted to uppercase and the digits 0 and 1 automatically, just like the game does. Command line: `python tools/batch.py --char Silent --seed 7F3K9Q2ZB8MA --log-dir steps`.
 
+## Seed preview
+
+Open **Seed preview** on the left. Enter the seed from the game, a character and an ascension, and you immediately see the act 1 map, the order of normal fights, elites and bosses in each act, and the rewards that are already fixed (starting relics, Neow options, and the rewards of the first normal fight after each option). The AI does not play the run, which makes it useful for picking a seed and planning a route.
+Command line: `python tools/seed_probe.py 7F3K9Q2ZB8MA --char Ironclad --asc 0`. Card and encounter names are read from your own game install in the UI language.
+
 ## Make a mod without code (Mod editor)
 
 Open **Mod editor** on the left. Fill in forms for a character (HP, energy, starting deck, starting relic), cards (pick effects from a menu, such as Deal damage, Apply a power or Draw cards, or use a template), powers and relics (when → what). **Check** points out problems in plain language.

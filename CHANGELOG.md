@@ -1,5 +1,12 @@
 # 更新日志 / Changelog
 
+## 未发布（0.1.5） / Unreleased (0.1.5)
+
+- **种子预览**：给一个游戏种子（加上角色和进阶），不用让 AI 打完整一局，就能看到第 1 幕地图、每一幕普通战 / 精英战 / 首领的出场顺序，以及开局就定下来的奖励（初始遗物、起始牌组、Neow 选项、每个选项之后第一场普通战斗的卡牌 / 金币 / 药水 / 遗物）。用来挑种子、规划路线。后面几幕的地图、宝箱和商店要看实际怎么走，这里不假装已经知道。图形界面左侧「种子预览」；命令行 `python tools/seed_probe.py <种子> --char Ironclad --asc 0`（`--lang zhs|en|ja|ko`，`--neow none` 可以不展开第一场奖励）；接口 `GET` / `POST /api/seed-preview`。
+  *Seed preview: given a game seed, plus character and ascension, see the act 1 map, the order of normal fights, elites and the boss in each act, and the rewards fixed at the start (starting relics, starting deck, Neow options, and the cards / gold / potion / relic from the first normal fight after each option) without an AI playing the run. For picking seeds and planning routes. Later maps, chests and shops depend on the route, and the preview does not invent them. GUI: Seed preview. CLI: `python tools/seed_probe.py <seed> --char Ironclad --asc 0` (`--lang zhs|en|ja|ko`, `--neow none` skips the first-fight rewards). API: `GET` / `POST /api/seed-preview`.*
+- 名字按当前界面语言从你自己的游戏安装读取（没有该语言就回退英文、中文，最后显示 ID），仍然不随项目分发任何游戏文本。四种界面语言都有这一页。
+  *Names are read from your own install in the current UI language (falling back to English, then Chinese, then the ID). No game text is shipped. The page exists in all four UI languages.*
+
 ## 未发布（0.1.4） / Unreleased (0.1.4)
 
 - **界面多语言**：图形界面支持简体中文、English、日本語、한국어。第一次打开跟着系统语言走（中文 → 简体中文，日语 → 日本語，韩语 → 한국어，其他 → English），左下角随时切换，选择保存在数据目录的 `settings.json`。按钮、提示、报告图表、运行日志、错误信息都会翻译；卡牌、角色、遭遇的名字按所选语言从你自己的游戏安装读（游戏里没有该语言就依次回退英文、中文，最后显示 ID），仍然不随项目分发任何游戏文本。战斗实验的完整 report.md（旧版战斗模拟器生成）暂时只有中文。

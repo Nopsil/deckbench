@@ -49,6 +49,13 @@ class SettingsReq(BaseModel):
     lang: str
 
 
+class SeedPreviewReq(BaseModel):
+    seed: str
+    char: str = "Ironclad"
+    asc: int = 0
+    neow: str = "all"
+
+
 class TitleReq(BaseModel):
     title: str
 
@@ -66,6 +73,28 @@ def catalog(refresh: bool = False, lang: str | None = None):
         return backend.catalog(refresh, lang=lang if lang in i18n.LANGS else None)
     except Exception as e:  # noqa
         raise HTTPException(500, str(e))
+
+
+def _seed_preview(seed, char, asc, neow, lang):
+    """种子预览：不跑完整一局。语言跟界面（请求头 x-lang，或 ?lang=）。"""
+    from sts2sim.engine.seedpreview import PreviewError, preview
+    use = lang if lang in i18n.LANGS else i18n.current()
+    if lang in i18n.LANGS:
+        i18n.set_request_lang(lang)
+    try:
+        return preview(seed, char, asc, neow, use)
+    except PreviewError as e:
+        raise HTTPException(e.http, T(e.key, **e.kw))
+
+
+@app.get("/api/seed-preview")
+def seed_preview_get(seed: str, char: str = "Ironclad", asc: int = 0, neow: str = "all", lang: str | None = None):
+    return _seed_preview(seed, char, asc, neow, lang)
+
+
+@app.post("/api/seed-preview")
+def seed_preview_post(req: SeedPreviewReq, lang: str | None = None):
+    return _seed_preview(req.seed, req.char, req.asc, req.neow, lang)
 
 
 @app.get("/api/styles")

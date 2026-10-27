@@ -116,6 +116,13 @@ $env:DECKBENCH_GAME_DIR = "D:\SteamLibrary\steamapps\common\Slay the Spire 2"
 
 *Type a seed from the game into "Game seed" in New test → Full runs: the AI plays just that run and records every decision. Lowercase, O and I are normalized like the game does. CLI: `--seed` and `--log-dir`.*
 
+## 种子预览 / Seed preview
+
+左侧 **「种子预览」**：填游戏里的种子、角色和进阶，马上看到第 1 幕地图、每一幕普通战 / 精英战 / 首领按什么顺序出现，以及开局就定了的奖励（初始遗物、Neow 选项、每个选项之后第一场普通战斗的奖励）。不用等 AI 把整局打完，方便挑种子、规划路线。
+命令行：`python tools/seed_probe.py 7F3K9Q2ZB8MA --char Ironclad --asc 0`。卡牌和遭遇的名字从你自己的游戏安装按界面语言读取。
+
+*Open **Seed preview** on the left, enter a seed, character and ascension, and you get the act 1 map, the order of normal fights, elites and bosses, and the rewards fixed at the start (starting relics, Neow options, and the first normal fight's rewards after each option). The AI does not play the run, so you can pick a seed and plan a route. CLI: `python tools/seed_probe.py 7F3K9Q2ZB8MA --char Ironclad --asc 0`. Card and encounter names are read from your own install in the UI language.*
+
 ## 不写代码做 mod（模组编辑器） / Make a mod without code (Mod editor)
 
 左侧 **「模组编辑器」**：填表做一个角色（生命、能量、起始牌组、初始遗物）、卡牌（效果从菜单里选：造成伤害、施加能力、抽牌……或常用模板）、能力和遗物（「什么时候 → 做什么」），按 **「检查」** 会用大白话指出问题。

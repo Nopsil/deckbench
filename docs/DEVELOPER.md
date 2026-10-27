@@ -103,6 +103,11 @@ PYTHONPATH=. .venv/bin/python tools/batch.py --char Claude --asc 10 --n 100 --ag
 
 带搜索的 AI（`strong`、`search`、`learned-search`、`learned-boss`、`planner-search`、`modai-boss`）用 `os.fork()` 给游戏状态拍快照，只能在 Linux/macOS 上用。
 
+种子预览（不跑完整一局）：`python tools/seed_probe.py <种子> --char Ironclad --asc 0 [--neow all|none|序号] [--lang zhs|en|ja|ko] [--json out.json]`。
+打印第 1 幕地图、每一幕普通/精英/首领的出场顺序、开局遗物和 Neow、以及（默认）每个 Neow 选项之后第一场普通战斗的奖励。
+图形界面是「种子预览」页；HTTP 是 `GET /api/seed-preview?seed=&char=&asc=&neow=` 和同样字段的 `POST`。名字从本机安装读。
+*Seed preview (no full run): `python tools/seed_probe.py <seed> …`. Act 1 map, encounter order, opening rewards. GUI page Seed preview; `GET`/`POST /api/seed-preview`.*
+
 其他工具：`tools/ab_card.py`（同种子单卡 A/B：`--force`、`--replace`、`--variant`、`--base-variant`…）、`tools/boss_bench.py`（首领战基准）、
 `tools/tune_cma.py`（CMA-ES 自我对局调参 → `data/ai_weights.json`）、`tools/imitate.py`（模仿学习 → `data/imitation_model.json`）、
 `tools/trace_run.py`（单局逐步追踪）、`tools/ai_eval.sh` / `tools/ai_summary.py`（AI 对比）。Gym 接口：`from sts2sim.engine.gym import Sts2Env`（见模块文档字符串）。

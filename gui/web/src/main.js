@@ -9,12 +9,14 @@ import Report from './pages/Report.vue'
 import AB from './pages/AB.vue'
 import History from './pages/History.vue'
 import ModEditor from './pages/ModEditor.vue'
+import SeedPreview from './pages/SeedPreview.vue'
 
 const router = createRouter({
   history: createWebHashHistory(),
   routes: [
     { path: '/', redirect: '/new' },
     { path: '/new', component: NewTest, meta: { key: 'new' } },
+    { path: '/preview', component: SeedPreview, meta: { key: 'preview' } },
     { path: '/run/:id?', component: Running, meta: { key: 'run' } },
     { path: '/report/:id?', component: Report, meta: { key: 'report' } },
     { path: '/ab', component: AB, meta: { key: 'ab' } },
