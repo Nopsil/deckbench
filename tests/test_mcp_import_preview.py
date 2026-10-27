@@ -1,4 +1,4 @@
-"""MCP 的导入摘要和种子预览：不启动游戏，用存档夹具和种子预览的桩。
+"""MCP 的导入摘要、目录批量摘要和种子预览：不启动游戏，用存档夹具和种子预览的桩。
 
 没装 mcp 时，注册检查会跳过；函数本身不依赖这个包。
 """
@@ -66,6 +66,135 @@ def test_import_save_matches_summary_and_cli(capsys):
     live = json.loads(mcp.import_save(LIVE))
     assert live["ok"] is True and live["seed"] == "LIVESEED0001"
     assert live["kind"] == "live_save"
+
+
+def _tree_bytes(root):
+    out = {}
+    for dirpath, dirnames, names in os.walk(root):
+        dirnames.sort()
+        for name in sorted(names):
+            path = os.path.join(dirpath, name)
+            with open(path, "rb") as fh:
+                out[os.path.relpath(path, root)] = fh.read()
+    return out
+
+
+def test_import_history_batch_matches_cli_and_does_not_write(tmp_path, capsys):
+    mcp = _mcp()
+    cli = _import_cli()
+    saves = tmp_path / "profile" / "saves"
+    hist = saves / "history"
+    hist.mkdir(parents=True)
+    (hist / "sample.run").write_bytes(open(HIST, "rb").read())
+    (hist / "bad.run").write_text("not-json", encoding="utf-8")
+    (hist / "notes.txt").write_text("ignore", encoding="utf-8")
+    (saves / "current_run.save").write_bytes(open(LIVE, "rb").read())
+    (saves / "progress.save").write_text("{}", encoding="utf-8")
+    before = _tree_bytes(saves)
+    fixture_before = {HIST: open(HIST, "rb").read(), LIVE: open(LIVE, "rb").read()}
+
+    assert cli.main([str(saves), "--batch-summary"]) == 0
+    array_text = capsys.readouterr().out
+    assert mcp.import_history_batch(str(saves)) == array_text
+    assert mcp.import_history_batch(str(hist), lines=False) == array_text
+    rows = json.loads(array_text)
+    assert rows == [
+        {"file": "bad.run", "error": "not_json"},
+        {
+            "file": "sample.run",
+            "seed": "SAMPLESEED01",
+            "ascension": 3,
+            "character": "Ironclad",
+            "floors": 3,
+            "result": "lost",
+        },
+    ]
+    assert list(rows[1]) == ["file", "seed", "ascension", "character", "floors", "result"]
+    assert list(rows[0]) == ["file", "error"]
+    assert "highlights" not in array_text
+    assert "LIVESEED" not in array_text
+    assert "current_run.save" not in array_text
+
+    assert cli.main([str(saves), "--batch-summary", "--lines"]) == 0
+    lines_text = capsys.readouterr().out
+    assert mcp.import_history_batch(str(hist), lines=True) == lines_text
+    assert [json.loads(line) for line in lines_text.splitlines()] == rows
+    assert lines_text.endswith("\n") and lines_text.count("\n") == len(rows)
+
+    assert cli.main([HIST, "--batch-summary"]) == 0
+    one = capsys.readouterr().out
+    assert mcp.import_history_batch(HIST) == one
+    assert json.loads(one)[0]["result"] == "lost" and "highlights" not in one
+
+    assert cli.main([LIVE, "--batch-summary"]) == 0
+    live = capsys.readouterr().out
+    assert mcp.import_history_batch(LIVE) == live
+    live_row = json.loads(live)[0]
+    assert live_row["seed"] == "LIVESEED0001" and "result" not in live_row
+    assert list(live_row) == ["file", "seed", "ascension", "character", "floors"]
+
+    assert _tree_bytes(saves) == before
+    assert open(HIST, "rb").read() == fixture_before[HIST]
+    assert open(LIVE, "rb").read() == fixture_before[LIVE]
+
+
+def test_import_history_batch_errors_match_cli(tmp_path, capsys, monkeypatch):
+    mcp = _mcp()
+    cli = _import_cli()
+
+    missing = tmp_path / "nope"
+    assert cli.main([str(missing), "--batch-summary", "--lang", "en"]) == 2
+    captured = capsys.readouterr()
+    assert captured.out
+    assert mcp.import_history_batch(str(missing)) == captured.out
+    assert mcp.import_history_batch(str(missing), lines=True) == captured.out
+    body = json.loads(captured.out)
+    assert body["ok"] is False and body["read_only"] is True and body["error"] == "not_found"
+    assert not missing.exists()
+
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    assert cli.main([str(empty), "--batch-summary"]) == 2
+    empty_out = capsys.readouterr().out
+    assert mcp.import_history_batch(str(empty)) == empty_out
+    assert json.loads(empty_out)["error"] == "dir_empty"
+    assert list(empty.iterdir()) == []
+
+    only = tmp_path / "only-live"
+    only.mkdir()
+    live_bytes = open(LIVE, "rb").read()
+    (only / "current_run.save").write_bytes(live_bytes)
+    assert cli.main([str(only), "--batch-summary"]) == 0
+    blank = capsys.readouterr().out
+    assert mcp.import_history_batch(str(only)) == blank
+    assert json.loads(blank) == []
+    assert cli.main([str(only), "--batch-summary", "--lines"]) == 0
+    assert capsys.readouterr().out == ""
+    assert mcp.import_history_batch(str(only), lines=True) == ""
+    assert (only / "current_run.save").read_bytes() == live_bytes
+
+    bad = tmp_path / "bad.run"
+    bad.write_bytes(b"\x00\x01")
+    before_bad = bad.read_bytes()
+    assert cli.main([str(bad), "--batch-summary", "--lines", "--lang", "en"]) == 2
+    err = capsys.readouterr().out
+    assert mcp.import_history_batch(str(bad), lines=True) == err
+    assert json.loads(err)["error"] == "not_json" and json.loads(err)["read_only"] is True
+    assert bad.read_bytes() == before_bad
+
+    cap = tmp_path / "capped" / "history"
+    cap.mkdir(parents=True)
+    (cap / "a.run").write_bytes(open(HIST, "rb").read())
+    (cap / "b.run").write_bytes(open(HIST, "rb").read())
+    monkeypatch.setattr("sts2sim.saveimport.MAX_FILES", 1)
+    assert cli.main([str(cap), "--batch-summary"]) == 0
+    capped = capsys.readouterr().out
+    assert mcp.import_history_batch(str(cap)) == capped
+    capped_rows = json.loads(capped)
+    assert len(capped_rows) == 2
+    assert capped_rows[0]["file"] == "a.run" and capped_rows[0]["seed"] == "SAMPLESEED01"
+    assert capped_rows[1] == {"error": "truncated", "n": 1}
+    assert list(capped_rows[1]) == ["error", "n"]
 
 
 def test_import_save_folder_and_errors_stay_json(tmp_path):
@@ -172,8 +301,17 @@ def test_server_registers_preview_and_import_only_stays_import(monkeypatch):
     mcp = _mcp()
     play = mcp.build()
     tools = {t.name: t for t in play._tool_manager.list_tools()}
-    for name in ("new_run", "import_save", "seed_preview", "list_styles", "act"):
-        assert name in tools
+    names = [t.name for t in play._tool_manager.list_tools()]
+    for name in ("new_run", "import_save", "import_history_batch", "seed_preview", "list_styles", "act"):
+        assert name in names
+    i = names.index("import_save")
+    assert names[i:i + 3] == ["import_save", "import_history_batch", "seed_preview"]
+    batch_params = tools["import_history_batch"].parameters
+    assert batch_params["required"] == ["path"]
+    assert set(batch_params["properties"]) >= {"path", "lines"}
+    assert batch_params["properties"]["lines"].get("type") == "boolean"
+    assert "batch-summary" in tools["import_history_batch"].description
+    assert "result" in tools["import_history_batch"].description
     params = tools["seed_preview"].parameters
     assert params["required"] == ["seed"]
     assert set(params["properties"]) >= {"seed", "character", "ascension", "neow", "cache", "cache_dir"}
@@ -191,7 +329,17 @@ def test_server_registers_preview_and_import_only_stays_import(monkeypatch):
     assert list(preview) == list(PUBLIC_KEYS)
     saved = json.loads(_tool_text(asyncio.run(play.call_tool("import_save", {"path": HIST}))))
     assert saved["seed"] == "SAMPLESEED01" and saved["ok"] is True
+    batched = _tool_text(asyncio.run(play.call_tool("import_history_batch", {"path": HIST})))
+    assert batched == mcp.import_history_batch(HIST)
+    assert json.loads(batched)[0]["seed"] == "SAMPLESEED01" and "highlights" not in batched
+    lined = _tool_text(asyncio.run(play.call_tool("import_history_batch", {"path": HIST, "lines": True})))
+    assert lined == mcp.import_history_batch(HIST, lines=True)
+    assert json.loads(lined)["result"] == "lost"
 
     only = mcp.build_import()
-    assert [t.name for t in only._tool_manager.list_tools()] == ["import_save"]
+    only_names = [t.name for t in only._tool_manager.list_tools()]
+    assert only_names == ["import_save", "import_history_batch"]
+    assert "new_run" not in only_names and "seed_preview" not in only_names
     assert only._resource_manager.list_resources() == []
+    only_text = _tool_text(asyncio.run(only.call_tool("import_history_batch", {"path": HIST, "lines": True})))
+    assert only_text == mcp.import_history_batch(HIST, lines=True)
