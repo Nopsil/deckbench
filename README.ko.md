@@ -110,6 +110,22 @@ Linux/macOS는 [docs/DEVELOPER.md](docs/DEVELOPER.md)를 참고하세요.
 「새 테스트 → 풀런 일괄」에서 **「게임 시드 지정」** 칸에 게임에 표시되는 시드(예: `7F3K9Q2ZB8MA`)를 넣으면, AI가 그 한 판만 플레이하면서 매 단계 무엇을 골랐는지 기록합니다. 기록은 결과 페이지에서 볼 수 있습니다.
 소문자, 알파벳 O와 I는 게임 규칙대로 자동으로 대문자, 숫자 0과 1로 바뀝니다. 명령줄: `python tools/batch.py --char Silent --seed 7F3K9Q2ZB8MA --log-dir steps`.
 
+## 0.1.5 기능 써 보기 / Try 0.1.5 features
+
+저장소 루트에서 실행합니다. 릴리스 노트는 [docs/RELEASE_0.1.5.md](docs/RELEASE_0.1.5.md)입니다 (중국어·영어. GitHub Release 본문으로 그대로 쓸 수 있습니다).
+
+```bash
+python tools/import_run.py tests/fixtures/saves/sample_history.run --lang en
+python tools/seed_preview.py 7F3K9Q2ZB8MA --char Ironclad --asc 0 --neow first
+python tools/import_dll_mod.py --list
+python tools/import_dll_mod.py "/path/to/Slay the Spire 2/mods/MyMod" --out mods/my_mod
+```
+
+- 첫 줄은 런 기록을 읽기 전용으로 엽니다. 샘플은 가상 ID라 게임이 필요 없습니다. 본인 `history/*.run` 또는 `current_run.save`로 바꾸면 됩니다. 화면은 `#/import`이고, 파일 하나를 바로 열려면 `#/import?path=`입니다.
+- 둘째 줄은 AI가 한 판을 끝까지 돌리지 않고 맵, 조우 순서, 시작 선택지를 보여 줍니다. 설치된 게임에서 데이터를 이미 만들어 둔 상태여야 합니다. 2막 이후는 추정입니다. 화면은 `#/preview`, 시드를 넣으려면 `#/preview?seed=`입니다.
+- 뒤의 두 줄은 게임에 이미 설치된 모드(매니페스트 JSON + DLL)를 YAML로 읽습니다. DLL은 실행하지 않습니다. 화면은 **「모드 편집기 → 게임 모드 가져오기」**입니다.
+- 영상용 시드를 `mentor-full`로 고를 때: 공식 패키지에서 고를 수 있지만 spire-mentor 자체는 들어 있지 않습니다. 프로그램 옆에 `mentor.local.json`(`site`, `py`, `python`)을 두고, `python`은 `sts2_rs`를 빌드한 인터프리터로 가리키세요. 폴백이 거의 100%인 승률은 쓰지 마세요. 자세한 내용은 [docs/DEVELOPER.md](docs/DEVELOPER.md).
+
 ## 실제 런 가져오기
 
 왼쪽 **「런 가져오기」**에서 끝난 런(`history/*.run`)이나 진행 중 세이브(`current_run.save`)를 읽기 전용으로 엽니다. 시드, 승천, 지나간 방, 각 층에서 고른 카드, 유물, 덱을 볼 수 있습니다. 세이브는 바꾸지 않습니다.

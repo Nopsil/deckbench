@@ -118,6 +118,24 @@ $env:DECKBENCH_GAME_DIR = "D:\SteamLibrary\steamapps\common\Slay the Spire 2"
 
 *Type a seed from the game into "Game seed" in New test → Full runs: the AI plays just that run and records every decision. Lowercase, O and I are normalized like the game does. CLI: `--seed` and `--log-dir`.*
 
+## 试 0.1.5 的功能 / Try 0.1.5 features
+
+在仓库根目录。发布说明（可直接贴进 GitHub Release）见 [docs/RELEASE_0.1.5.md](docs/RELEASE_0.1.5.md)。
+
+```bash
+python tools/import_run.py tests/fixtures/saves/sample_history.run --lang en
+python tools/seed_preview.py 7F3K9Q2ZB8MA --char Ironclad --asc 0 --neow first
+python tools/import_dll_mod.py --list
+python tools/import_dll_mod.py "/path/to/Slay the Spire 2/mods/MyMod" --out mods/my_mod
+```
+
+- 第一行只读打开一局记录。示例文件用虚构 ID，不需要游戏；换成你的 `history/*.run` 或 `current_run.save` 即可。界面 `#/import`，直接打开一份存档用 `#/import?path=`。
+- 第二行不打完整的一局，先看地图、遭遇队列和开局选项。需要已经从你的游戏生成本机数据。第 2 幕及以后是投影。界面 `#/preview`，带种子用 `#/preview?seed=`。
+- 后两行把已经装好的游戏 mod（清单 JSON + DLL）读成 YAML。DLL 不执行。界面在「模组编辑器 → 导入游戏 mod」。
+- 要用 `mentor-full` 挑录像种子：官方安装包可以接上，但不附带 spire-mentor。在程序旁边放 `mentor.local.json`（`site`、`py`、`python`），`python` 指向构建 `sts2_rs` 的解释器。回退接近 100% 时不要用那次胜率。见 [docs/DEVELOPER.md](docs/DEVELOPER.md)。
+
+*From the repo root. Release notes: [docs/RELEASE_0.1.5.md](docs/RELEASE_0.1.5.md). The first command reads a run (the sample needs no game). The second previews a seed without a full AI run (needs local data). The last two turn an installed mod DLL into YAML without executing it. GUI: `#/import`, `#/import?path=`, `#/preview`, `#/preview?seed=`. `mentor-full` in the official package still needs your own spire-mentor build via `mentor.local.json`.*
+
 ## 导入真游戏的一局 / Import a real run
 
 左侧 **「导入对局」**：只读打开游戏存下来的一局（打完的 `history/*.run`，或正在打的 `current_run.save`）。能看种子、进阶、走过的房间、每一层选了哪张牌、遗物和牌组。不会改你的存档。

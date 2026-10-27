@@ -110,6 +110,22 @@ Linux/macOS の場合は [docs/DEVELOPER.md](docs/DEVELOPER.md) を参照して�
 「新規テスト → フルラン一括」で **「ゲームのシード指定」** に、ゲーム内に表示されるシード（例：`7F3K9Q2ZB8MA`）を入力すると、AI はその 1 ランだけをプレイし、各ステップで何を選んだかを記録します。記録は結果ページで確認できます。
 小文字、英字の O と I は、ゲームと同じルールで自動的に大文字、数字の 0 と 1 に変換されます。コマンドラインの場合：`python tools/batch.py --char Silent --seed 7F3K9Q2ZB8MA --log-dir steps`。
 
+## 0.1.5 の機能を試す / Try 0.1.5 features
+
+リポジトリのルートで実行します。リリースノートは [docs/RELEASE_0.1.5.md](docs/RELEASE_0.1.5.md)（中国語・英語。GitHub Release の本文にそのまま使えます）。
+
+```bash
+python tools/import_run.py tests/fixtures/saves/sample_history.run --lang en
+python tools/seed_preview.py 7F3K9Q2ZB8MA --char Ironclad --asc 0 --neow first
+python tools/import_dll_mod.py --list
+python tools/import_dll_mod.py "/path/to/Slay the Spire 2/mods/MyMod" --out mods/my_mod
+```
+
+- 1 行目はラン記録を読み取り専用で開きます。サンプルは架空の ID で、ゲームは不要です。自分の `history/*.run` か `current_run.save` に差し替えてください。画面は `#/import`。ファイルを直接開くときは `#/import?path=`。
+- 2 行目は AI にフルランをプレイさせず、マップ・遭遇の並び・開始時の選択肢を見ます。自分のインストールからデータを生成済みである必要があります。アクト 2 以降は投影です。画面は `#/preview`。シード付きは `#/preview?seed=`。
+- 後半の 2 行は、ゲームに入っている MOD（マニフェスト JSON + DLL）を YAML にします。DLL は実行しません。画面は **「MODエディター → ゲームMODを読み込む」**。
+- 録画用シードを `mentor-full` で選ぶとき：公式パッケージから選べますが、spire-mentor 自体は同梱されません。アプリの横に `mentor.local.json`（`site`、`py`、`python`）を置き、`python` は `sts2_rs` をビルドした Python に向けてください。フォールバックがほぼ 100% の勝率は使わないでください。詳しくは [docs/DEVELOPER.md](docs/DEVELOPER.md)。
+
 ## 実際のランを読み込む
 
 左の **「ランを読み込む」** で、終わったラン（`history/*.run`）か進行中のセーブ（`current_run.save`）を読み取り専用で開けます。シード、アセンション、通った部屋、各階で選んだカード、レリック、デッキが見えます。セーブは変更しません。

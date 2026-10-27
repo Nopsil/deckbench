@@ -110,6 +110,22 @@ Linux/macOS: see [docs/DEVELOPER.md](docs/DEVELOPER.md).
 In **New test → Full runs**, fill in **Game seed** with the seed shown in the game (for example `7F3K9Q2ZB8MA`). The AI then plays just that one run and records every decision, which you can look through on the results page.
 Lowercase letters, and the letters O and I, are converted to uppercase and the digits 0 and 1 automatically, just like the game does. Command line: `python tools/batch.py --char Silent --seed 7F3K9Q2ZB8MA --log-dir steps`.
 
+## Try 0.1.5 features
+
+From the repo root. The release notes (suitable as a GitHub Release body) are in [docs/RELEASE_0.1.5.md](docs/RELEASE_0.1.5.md).
+
+```bash
+python tools/import_run.py tests/fixtures/saves/sample_history.run --lang en
+python tools/seed_preview.py 7F3K9Q2ZB8MA --char Ironclad --asc 0 --neow first
+python tools/import_dll_mod.py --list
+python tools/import_dll_mod.py "/path/to/Slay the Spire 2/mods/MyMod" --out mods/my_mod
+```
+
+- The first line reads one run, read-only. The sample file uses fictional IDs and needs no game; point it at your own `history/*.run` or `current_run.save` instead. GUI: `#/import`, or `#/import?path=` to open one file.
+- The second line shows the map, encounter queues and opening choices without a full AI run. It needs the data generated from your install. Act 2 and later are projections. GUI: `#/preview`, or `#/preview?seed=`.
+- The last two lines turn a mod already installed in the game (manifest JSON + DLL) into YAML. The DLL is not executed. In the app: **Mod editor → Import game mod**.
+- To screen recording seeds with `mentor-full`: the official package can run it, and does not ship spire-mentor. Put `mentor.local.json` next to the app (`site`, `py`, `python`). `python` is the interpreter that built `sts2_rs`. Do not use a win rate when fallback is about 100%. See [docs/DEVELOPER.md](docs/DEVELOPER.md).
+
 ## Import a real run
 
 Open **Import run** on the left. It reads a finished `history/*.run` or the in-progress `current_run.save` from your own game folder: seed, ascension, rooms visited, which card you picked on each floor, relics and the deck. It does not modify the save.
