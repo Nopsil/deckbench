@@ -160,7 +160,8 @@ def _to_mod(manifest, info, specs, regs, ordinal, loc, decompiled, dec_err):
         entry = E.scream(name)
         title = _loc_name(loc, entry) or E.pretty(name)
         text = _loc_text(loc, entry)
-        nz, ne = E.note_pair(spec["status"], ordinal and spec["status"] != "inventory", kind)
+        kept = bool(spec.get("effects") or spec.get("triggers"))
+        nz, ne = E.note_pair(spec["status"], ordinal and spec["status"] != "inventory", kind, kept)
         if spec["status"] != "translated" or (ordinal and kind == "card" and spec.get("type") is None):
             notes.append({"where": entry, "zhs": nz, "en": ne})
         if kind == "card":

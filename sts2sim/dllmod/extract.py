@@ -646,7 +646,7 @@ def _deck(body):
     return names
 
 
-def note_pair(status, ordinal, kind):
+def note_pair(status, ordinal, kind, kept=False):
     if status == "inventory":
         return ("只从 DLL 的类型表读到了这个类，没有读到方法体。费用、类型和效果都还不能拿来测试。",
                 "Only the class was read from DLL metadata, not its method body. Cost, type and effects are not safe to test yet.")
@@ -655,11 +655,15 @@ def note_pair(status, ordinal, kind):
         bits_z.append("构造函数里的类型、稀有度或目标被反编译成了数字，没有拿来猜测。")
         bits_e.append("Type, rarity or target was decompiled as a number and was not guessed.")
     if status == "partial":
-        bits_z.append("有认不出的代码（分支或还不支持的命令）。为了不把「有时发动」写成「每次都发动」，没把握的效果留空。")
-        bits_e.append("Some code was not recognized (a branch or a command DeckBench does not map yet). Uncertain effects were left blank so a conditional effect is not imported as if it always happens.")
+        if kept:
+            bits_z.append("认得出的直线效果已经留下。其余的分支或还没对应的命令留空，没有当成每次都发动。")
+            bits_e.append("Straight-line effects that were recognized are kept. Anything else (a branch or a command DeckBench does not map yet) was left blank, and was not imported as if it always happens.")
+        else:
+            bits_z.append("有认不出的代码（分支或还不支持的命令）。为了不把「有时发动」写成「每次都发动」，没把握的效果留空。")
+            bits_e.append("Some code was not recognized (a branch or a command DeckBench does not map yet). Uncertain effects were left blank so a conditional effect is not imported as if it always happens.")
     elif status == "translated":
         bits_z.append("费用、类型和直线效果已导入。")
         bits_e.append("Cost, type and straight-line effects were imported.")
     if not bits_z:
         return ("", "")
-    return ("".join(bits_z), "".join(bits_e))
+    return ("".join(bits_z), " ".join(bits_e))

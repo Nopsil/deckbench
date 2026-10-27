@@ -183,6 +183,32 @@ def test_rejects_the_game_assembly_and_ambiguous_zips(tmp_path):
     assert em.value.key == "err.dllMany"
 
 
+def test_import_dll_route_returns_editor_mod(tmp_path):
+    pytest.importorskip("fastapi")
+    httpx = pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+    from gui.server import app
+    zpath = tmp_path / "one.zip"
+    with zipfile.ZipFile(zpath, "w") as z:
+        z.writestr("SyntheticMod/SyntheticMod.dll", _dll_bytes())
+        z.writestr("SyntheticMod/SyntheticMod.json", json.dumps({
+            "id": "SyntheticMod", "name": "Synthetic Mod", "has_dll": True, "dependencies": []}))
+    with TestClient(app) as client:
+        up = client.post("/api/modeditor/import-dll", files={"file": ("one.zip", zpath.read_bytes(), "application/zip")},
+                         headers={"x-lang": "en"})
+        assert up.status_code == 200, up.text
+        body = up.json()
+        assert body["_dll"]["name"] == "Synthetic Mod"
+        assert body["_dll"]["cards"] >= 3
+        assert any("not executed" in w["en"].lower() for w in body["_check"]["warnings"])
+        bad = client.post("/api/modeditor/import-dll", files={"file": ("x.zip", b"not a zip", "application/zip")},
+                          headers={"x-lang": "en"})
+        assert bad.status_code == 400 and "zip" in bad.json()["detail"].lower()
+        listed = client.get("/api/modeditor/installed")
+        assert listed.status_code == 200 and isinstance(listed.json(), list)
+    del httpx
+
+
 def test_editor_payload_keeps_limits_off_the_saved_mod(tmp_path):
     pytest.importorskip("fastapi")
     folder = tmp_path / "SyntheticMod"
@@ -215,3 +241,6 @@ def test_decompile_real_fixture_when_ilspy_exists(tmp_path):
     # 没有游戏引用时枚举是数字，不能被猜成 Attack
     if strike["type"] is None:
         assert any("number" in x["en"].lower() or "guess" in x["en"].lower() for x in report["limitations"])
+        by_id = {n["where"]: n["en"] for n in report["notes"]}
+        assert "are kept" in by_id["FIELD_KIT"]
+        assert "left blank" in by_id["UNREAD_NOTE"]
