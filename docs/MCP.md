@@ -29,9 +29,14 @@ python tools/mcp_server.py --http --port 8765   # streamable-HTTP → http://127
 | `get_log(last)` / `export_log()` | 决策日志；导出 decisions.jsonl + replay.md |
 | `list_runs()` / `open_run(run_id)` | 列出 / 重新打开以前的局 |
 | `import_save(path)` | 只读导入一个 `.run` / `current_run.save` / 存档目录，返回 JSON 摘要（`seed`、`character`、`ascension`、`floor_reached`、`highlights.cards`、`highlights.relics`；目录是 `kind: folder`）。不开始模拟，不写存档。失败也是 JSON（`ok: false`） |
+| `import_history_batch(path, lines=false)` | 只读扫描存档目录或单个记录，返回和 `python tools/import_run.py <目录> --batch-summary` 相同的稳定 JSON。默认一个数组；`lines` 为 true 时每局一行（`--lines`）。键顺序：`file`、`seed`、`ascension`、`character`、`floors`，有胜负或放弃才有 `result`（`won` / `lost` / `abandoned`）。读不开的 history 文件带 `error` 码，不中断。目录里的 `current_run.save` 不进结果。不写存档。失败也是 JSON（`ok: false`） |
 | `seed_preview(seed, character, ascension, neow, cache, cache_dir)` | 不打一局。返回和 `tools/seed_preview.py --json -` 相同的稳定 v1 JSON。`neow`：`first`（默认，第一个没锁的）/ `all` / `none` / 序号文本（如 `"2"`），是选择器本身。`cache` 可选，把同一份 JSON 留在本机（目录不能在仓库里）。参数不合法或没有本机游戏逻辑时返回 `{"ok": false, "error": ...}`，不编地图 |
 
-`import_save` 和 `python tools/import_run.py <path> --summary` 是同一份摘要（`sts2sim/saveimport.py` 的 `summarize`；命令行多缩进，对象相同）。没有本机游戏数据时，对战服务仍会退出；改跑 `python tools/mcp_server.py --import-only`（只有 `import_save`）或上面的命令行。
+`import_save` 和 `python tools/import_run.py <path> --summary` 是同一份摘要（`sts2sim/saveimport.py` 的 `summarize`；命令行多缩进，对象相同）。没有本机游戏数据时，对战服务仍会退出；改跑 `python tools/mcp_server.py --import-only`（`import_save` 和 `import_history_batch`，没有对战工具，也没有 `seed_preview`）或上面的命令行。
+
+`import_history_batch` 和 `python tools/import_run.py <目录> --batch-summary` 是同一份文本（行来自 `sts2sim/saveimport.py` 的 `batch_summary`；`lines=true` 对应 `--lines`）。它不带 `import_save` 那种牌和遗物要点。路径不存在或目录里没有对局文件时，返回 `{"ok": false, "read_only": true, "error": "..."}`。
+
+*`import_history_batch` is the same JSON as `python tools/import_run.py <folder> --batch-summary`. `lines` true prints one object per line. It does not start a run and does not write into saves. `--import-only` exposes this tool next to `import_save`.*
 
 `seed_preview` 只在对战服务器上（需要已经生成本机游戏逻辑，和 `new_run` 一样）。成功时没有 `ok` 字段，就是那份 v1 文档：`v`、`seed_input`、`seed`、`warnings`、`character`、`ascension`、`acts`、`maps`、`rooms`、`distribution`、`ancient`、`neow_options`、`after_neow`、`relics`、`limits`。可选 `cache=true` 按规范化种子、角色、进阶和 `neow` 选择器写入 `cache_dir`（空着则用 `DECKBENCH_CACHE/seed-preview`），不进仓库。
 
