@@ -316,11 +316,35 @@ def _statements(body):
     return [s for s in stmts if s and s not in ("{", "}")]
 
 
+def _strip_coalesce_throw(stmt):
+    """ilspy 常把空值写成 `x ?? throw new ...`。这不是分支，效果仍然每次都执行。"""
+    s = stmt
+    while True:
+        m = re.search(r"\?\?\s*throw\b", s)
+        if not m:
+            return s
+        j = m.end()
+        while j < len(s) and s[j].isspace():
+            j += 1
+        if s.startswith("new", j):
+            j += 3
+            while j < len(s) and s[j].isspace():
+                j += 1
+            while j < len(s) and (s[j].isalnum() or s[j] in "._"):
+                j += 1
+            while j < len(s) and s[j].isspace():
+                j += 1
+            if j < len(s) and s[j] == "(":
+                j = _paren_end(s, j)
+        s = s[:m.start()] + s[j:]
+
+
 def _controlled(stmt):
     s = re.sub(r"\?\.", "", stmt)
+    s = _strip_coalesce_throw(s)
     if "?" in s:
         return True
-    return bool(_CONTROL.search(stmt))
+    return bool(_CONTROL.search(s))
 
 
 def _call(flat, name):
@@ -353,6 +377,8 @@ def _effect(stmt):
                 eff["hits"] = hits
         if "AllEnemies" in rest or "TargetingAll" in rest:
             eff["target"] = "all"
+        elif "RandomEnemy" in rest or "TargetingRandom" in rest or "RandomOpponents" in rest:
+            eff["target"] = "random"
         return eff
     args, _rest = _call(f, "CreatureCmd.GainBlock")
     if args is not None:
@@ -615,10 +641,12 @@ def _parse_type(t, kind):
         rarity = _enum_in(body, "RelicRarity") or rarity
         if rarity not in RARITY_NAMES:
             rarity = None
-    header_ok = kind not in ("card", "potion") or (type_name and rarity and target and cost is not None)
+    header_ok = kind != "card" or (type_name and rarity and target and cost is not None)
     if kind == "card" and not header_ok:
         partial = True
     if kind in ("power", "relic") and not triggers:
+        partial = True
+    if kind == "potion" and not effects:
         partial = True
     status = "partial" if partial or not header_ok else "translated"
     if kind == "card" and play_name and _member(body, play_name) is None and not effects:
@@ -641,8 +669,15 @@ def _deck(body):
     member = _member(body, "StartingDeck")
     if not member:
         return []
-    names = re.findall(r"Card\s*<\s*([A-Za-z_][A-Za-z0-9_]*)\s*>", member)
-    names += re.findall(r"\bnew\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(", member)
+    skip = {"Card", "CardModel", "List", "HashSet"}
+    names = []
+    for m in re.finditer(
+        r"(?:(?:Card|From)\s*<\s*([A-Za-z_][A-Za-z0-9_]*)\s*>|\bnew\s+([A-Za-z_][A-Za-z0-9_]*)\s*\()",
+        member,
+    ):
+        name = m.group(1) or m.group(2)
+        if name and name not in skip:
+            names.append(name)
     return names
 
 

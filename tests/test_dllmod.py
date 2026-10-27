@@ -13,6 +13,7 @@ from sts2sim.modfmt import schema as S
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIX = os.path.join(ROOT, "tests", "fixtures", "dllmod")
+EXTRA = os.path.join(FIX, "extra")
 
 
 def _text(path):
@@ -244,3 +245,187 @@ def test_decompile_real_fixture_when_ilspy_exists(tmp_path):
         by_id = {n["where"]: n["en"] for n in report["notes"]}
         assert "are kept" in by_id["FIELD_KIT"]
         assert "left blank" in by_id["UNREAD_NOTE"]
+
+
+def test_extra_source_and_ilspy_cover_supported_ops():
+    for folder in (EXTRA, os.path.join(EXTRA, "ilspy")):
+        specs, _regs, ordinal = _specs(folder)
+        assert not ordinal
+        wind = specs["SecondWind"]
+        assert wind["status"] == "translated"
+        assert wind["vars"] == {"Energy": 1, "Heal": 4}
+        assert wind["effects"] == [{"op": "energy", "n": "Energy"}, {"op": "heal", "amount": "Heal"}]
+        tap = specs["TripleTap"]
+        assert tap["effects"] == [{"op": "damage", "amount": "Damage", "hits": 3}]
+        sweep = specs["WideSweep"]
+        assert sweep["target"] == "AllEnemies"
+        assert sweep["effects"] == [{"op": "damage", "amount": "Damage", "target": "all"}]
+        coin = specs["CoinToss"]
+        assert coin["effects"] == [{"op": "damage", "amount": "Damage", "target": "random"}]
+        cheap = specs["CheapInk"]
+        assert cheap["upgrade_cost"] == 0 and cheap["effects"] == [{"op": "block", "amount": 5}]
+        tax = specs["TaxingThought"]
+        assert tax["effects"] == [{"op": "energy", "n": -1}]
+        sticky = specs["StickyMemo"]
+        assert sticky["keywords"] == ["Ethereal", "Retain"] and sticky["tags"] == ["Strike"]
+        flex = specs["FlexPencil"]
+        assert flex["effects"] == [{"op": "apply", "power_class": "StrengthPower", "amount": 2}]
+        hidden = specs["HiddenNote"]
+        assert hidden["show"] is False and hidden["effects"] == [{"op": "damage", "amount": 4}]
+        guard = specs["NullGuard"]
+        assert guard["status"] == "translated" and guard["effects"] == [{"op": "block", "amount": 4}]
+        late = specs["LateFee"]
+        assert late["triggers"] == [{"on": "turn_end", "do": [{"op": "block", "amount": 2}]}]
+        shop = specs["ShopBookmark"]
+        assert shop["rarity"] == "Shop"
+        assert shop["triggers"] == [{"on": "turn_end", "do": [{"op": "energy", "n": 1}]}]
+        salve = specs["SalveVial"]
+        assert salve["status"] == "translated" and salve["effects"] == [{"op": "heal", "amount": 6}]
+        scribe = specs["Scribe"]
+        assert (scribe["hp"], scribe["energy"], scribe["gold"]) == (70, 3, 99)
+        assert scribe["starting_deck"] == ["TripleTap", "TripleTap", "SecondWind", "StickyMemo"]
+
+
+def test_extra_round_trips_through_yaml():
+    specs, _regs, ordinal = _specs(EXTRA)
+    from sts2sim.dllmod.metadata import AssemblyInfo
+    from sts2sim.dllmod.package import _to_mod
+    info = AssemblyInfo("SyntheticMod", ["sts2"], [
+        {"name": n, "namespace": "SyntheticMod", "base": "", "kind": specs[n]["kind"], "abstract": False}
+        for n in specs
+    ], [])
+    mod, report = _to_mod({"id": "SyntheticMod", "name": "Synthetic Mod", "dependencies": []},
+                          info, specs, [], ordinal, {}, True, None)
+    assert report["mode"] == "decompiled"
+    again = S.load_mod_files(S.dump_mod_dir(mod))
+    problems, _w = S.validate(again, fullrun=False)
+    assert not problems
+    wind = next(c for c in again["cards"] if c["id"] == "SECOND_WIND")
+    assert [e["op"] for e in wind["effects"]] == ["energy", "heal"]
+    coin = next(c for c in again["cards"] if c["id"] == "COIN_TOSS")
+    assert coin["effects"][0]["target"] == "random"
+    flex = next(c for c in again["cards"] if c["id"] == "FLEX_PENCIL")
+    assert flex["effects"][0]["power"] == "STRENGTH" and "power_class" not in flex["effects"][0]
+    hidden = next(c for c in again["cards"] if c["id"] == "HIDDEN_NOTE")
+    assert hidden["pool"] is False
+    cheap = next(c for c in again["cards"] if c["id"] == "CHEAP_INK")
+    assert cheap["upgrade"]["cost"] == 0
+    salve = next(p for p in again["potions"] if p["id"] == "SALVE_VIAL")
+    assert salve["effects"] == [{"op": "heal", "amount": 6}]
+    late = next(p for p in again["powers"] if p["id"] == "LATE_FEE")
+    assert late["triggers"][0]["on"] == "turn_end"
+    shop = next(r for r in again["relics"] if r["id"] == "SHOP_BOOKMARK")
+    assert shop["rarity"] == "Shop"
+    scribe = again["characters"]["SCRIBE"]
+    assert scribe["hp"] == 70 and "TRIPLE_TAP×2" in scribe["starting_deck"]
+    assert "STICKY_MEMO" in scribe["starting_deck"]
+
+
+def test_random_targeting_is_not_imported_as_single_target():
+    src = """
+    public sealed class Coin : CardModel {
+        public Coin() : base(1, CardType.Attack, CardRarity.Common, TargetType.AnyEnemy) {}
+        protected override async Task OnPlay(PlayerChoiceContext c, CardPlay p) {
+            await DamageCmd.Attack(9m).TargetingRandomOpponents(c.CombatState).Execute(c);
+        }
+    }
+    """
+    specs, _regs, ordinal = parse_sources({"a.cs": src})
+    assert not ordinal
+    assert specs["Coin"]["effects"] == [{"op": "damage", "amount": 9, "target": "random"}]
+
+
+def test_null_coalescing_throw_is_not_a_branch():
+    src = """
+    public sealed class Guard : CardModel {
+        public Guard() : base(1, CardType.Skill, CardRarity.Common, TargetType.Self) {}
+        protected override async Task OnPlay(PlayerChoiceContext c, CardPlay p) {
+            await CreatureCmd.GainBlock(Owner.Creature ?? throw new InvalidOperationException(), 4m, p);
+        }
+    }
+    """
+    specs, _regs, _ordinal = parse_sources({"a.cs": src})
+    assert specs["Guard"]["status"] == "translated"
+    assert specs["Guard"]["effects"] == [{"op": "block", "amount": 4}]
+
+
+def test_null_coalesce_to_another_value_stays_blank():
+    src = """
+    public sealed class Maybe : CardModel {
+        public Maybe() : base(1, CardType.Skill, CardRarity.Common, TargetType.Self) {}
+        protected override async Task OnPlay(PlayerChoiceContext c, CardPlay p) {
+            await CreatureCmd.GainBlock(Owner.Creature ?? other, 4m, p);
+        }
+    }
+    """
+    specs, _regs, _ordinal = parse_sources({"a.cs": src})
+    assert specs["Maybe"]["status"] == "partial" and specs["Maybe"]["effects"] == []
+
+
+def test_starting_deck_reads_card_from_generic():
+    src = """
+    public sealed class Hero : CharacterModel {
+        public override IEnumerable<CardModel> StartingDeck => new[] {
+            new TripleTap(), Card.From<NotebookStrike>(), new Card<FieldKit>()
+        };
+    }
+    """
+    specs, _regs, _ordinal = parse_sources({"a.cs": src})
+    assert specs["Hero"]["starting_deck"] == ["TripleTap", "NotebookStrike", "FieldKit"]
+
+
+def test_potion_without_card_ctor_translates_heal():
+    src = """
+    public sealed class Salve : PotionModel {
+        protected override async Task OnUse(PlayerChoiceContext c) {
+            await CreatureCmd.Heal(Owner.Creature, 6m);
+        }
+    }
+    """
+    specs, _regs, _ordinal = parse_sources({"a.cs": src})
+    assert specs["Salve"]["status"] == "translated"
+    assert specs["Salve"]["effects"] == [{"op": "heal", "amount": 6}]
+
+
+def test_foreach_and_unknown_commands_still_blank_the_method():
+    src = """
+    public sealed class Loop : CardModel {
+        public Loop() : base(1, CardType.Skill, CardRarity.Rare, TargetType.Self) {}
+        protected override async Task OnPlay(PlayerChoiceContext c, CardPlay p) {
+            foreach (var e in c.CombatState.Enemies)
+                await CreatureCmd.GainBlock(Owner.Creature, 1m, p);
+        }
+    }
+    public sealed class Custom : CardModel {
+        public Custom() : base(1, CardType.Skill, CardRarity.Rare, TargetType.Self) {}
+        protected override async Task OnPlay(PlayerChoiceContext c, CardPlay p) {
+            await CreatureCmd.GainBlock(Owner.Creature, 4m, p);
+            await MysteryCmd.DoThing(c);
+        }
+    }
+    """
+    specs, _regs, _ordinal = parse_sources({"a.cs": src})
+    assert specs["Loop"]["status"] == "partial" and specs["Loop"]["effects"] == []
+    assert specs["Custom"]["status"] == "partial" and specs["Custom"]["effects"] == []
+
+
+def test_decompile_true_without_ilspy_stays_metadata(tmp_path, monkeypatch):
+    from sts2sim import gamedata
+    monkeypatch.setattr(gamedata, "_find_ilspy", lambda: (None, None))
+    folder = tmp_path / "SyntheticMod"
+    folder.mkdir()
+    (folder / "SyntheticMod.dll").write_bytes(_dll_bytes())
+    (folder / "SyntheticMod.json").write_text(json.dumps({
+        "id": "SyntheticMod", "name": "Synthetic Mod", "has_dll": True, "dependencies": []}), encoding="utf-8")
+    mod, report = import_path(str(folder), decompile=True)
+    assert report["mode"] == "metadata"
+    assert report["decompile_error"]
+    ids = {c["id"] for c in mod["cards"]}
+    assert "NOTEBOOK_STRIKE" in ids
+    problems, _w = S.validate(mod, fullrun=False)
+    assert problems
+
+
+def test_list_installed_is_empty_without_a_game():
+    from sts2sim.dllmod.package import list_installed
+    assert list_installed(game_dir=str(os.path.join(FIX, "no-such-install"))) == []
