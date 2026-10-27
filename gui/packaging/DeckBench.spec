@@ -34,6 +34,7 @@ def scan_stdlib_imports(root):
 
 hidden = scan_stdlib_imports(SIM) + [
     "gui.worker", "gui.server", "gui.backend", "gui.jobs", "gui.metrics", "gui.modpatch", "gui.i18n",
+    "dnfile", "pefile",
     "multiprocessing.pool", "multiprocessing.popen_spawn_win32", "importlib.util", "statistics", "csv", "zlib",
     "uvicorn.logging", "uvicorn.loops.auto", "uvicorn.protocols.http.auto", "uvicorn.protocols.http.h11_impl",
     "uvicorn.protocols.websockets.auto", "uvicorn.lifespan.on", "multipart", "python_multipart",

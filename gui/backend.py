@@ -159,7 +159,7 @@ class LocalPythonBackend(SimBackend):
         self._catalog = None
 
     def capabilities(self, lang=None):
-        return {"batch": True, "combat": True, "yaml_mods": True, "dll_mods": False,
+        return {"batch": True, "combat": True, "yaml_mods": True, "dll_mods": False, "dll_import": True,
                 "engine": i18n.t("backend.engine", lang)}
 
     # ---------------- 目录：角色、AI、变体、卡牌、实验预设、mod

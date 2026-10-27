@@ -267,6 +267,7 @@ spire-mentor 已经实现了这些牌，但 `state_from_dict` 查牌 id 时只�
 
 ```
 sts2sim/gamedata.py  首次运行：找安装、本机反编译+转译、缓存绑定与校验
+sts2sim/dllmod/      读作者自己的 mod DLL，转成 YAML（不执行；见 docs/DLL_MODS.md）
 sts2sim/gen/         只有 __init__.py：从本机缓存加载 game.py（仓库里没有生成代码）
 sts2sim/rt/          转译代码的运行时（C#/LINQ 语义、少量手写覆盖）
 sts2sim/engine/      整局驱动、Gym 接口、AI（heuristic / strong / learned / planner / search / imitation / mentor 桥接）
@@ -324,6 +325,8 @@ powershell -ExecutionPolicy Bypass -File gui\packaging\audit.ps1 -Path <工作�
 ## 已知限制 / Known limitations
 
 - 模拟结果只适合在同一套假设下横向比较，不是真实胜率。
+- 作者自己的游戏 mod DLL 可以导入成 YAML（[DLL_MODS.md](DLL_MODS.md)），不能在模拟器里直接执行：模拟器是本机转译的 Python，不是游戏的 .NET + Godot 宿主，Harmony 补丁不会打到 Python 上。
+  *An author's game mod DLL can be imported as YAML ([DLL_MODS.md](DLL_MODS.md)). It cannot be executed inside the simulator: the simulator is the local Python translation, not the game's .NET + Godot host, so Harmony patches do not apply.*
 - 首次生成需要 .NET 9 SDK + ilspycmd；转译器针对 v0.111 系列验证过，游戏大版本更新后可能需要更新转译器/补丁（`tools/cs2py_*.py`、`tools/cs_patches.py`、`sts2sim/rt/patches.py`）。
 - Windows 上没有 fork，带搜索的 AI 不可用；`tools/batch.py` 命令行只支持 Linux/macOS。
 - 图形界面第一次生成数据时（1–2 分钟）只有一个「请稍候」提示框，没有进度条。

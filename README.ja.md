@@ -114,6 +114,8 @@ Linux/macOS の場合は [docs/DEVELOPER.md](docs/DEVELOPER.md) を参照して�
 **「テスト」** からワンクリックでフルラン一括、または 1 枚 A/B（同じシードで 初期デッキ と 初期デッキ＋このカード を比較）を実行できます。zip の読み込み・書き出しで共有もできます。
 同じ YAML ファイルは `mods/` に置けばコマンドラインでも動きます：`python tools/batch.py --mod mods/my_mod --char MyHero --agent modai`。形式の説明は [docs/MODDING.md](docs/MODDING.md)（中国語・英語）。
 
+ゲームに入っている MOD を、先に YAML で書き直す必要はありません。**MODエディター**の **「ゲームMODを読み込む」** で、その MOD の zip（マニフェスト JSON + DLL）を選ぶか、ゲームの `mods/` にある一覧から選びます。読めたカードはフォームになります。DLL は実行しません。制限は [docs/DLL_MODS.md](docs/DLL_MODS.md)。
+
 ## AI アシスタントに 1 手ずつプレイさせる（MCP）
 
 Claude や Cursor など MCP に対応した AI アシスタントを使っているなら、シミュレーターの中で実際に 1 ラン遊ばせることができます。盤面を見て、選択肢を選び、理由を書き、やり直しもできます。最後に操作リストを書き出せるので、同じシードで実際のゲームをその通りにプレイできます。

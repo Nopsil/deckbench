@@ -288,7 +288,7 @@
  "err.onlyUserMods": "只能删除自己上传的 mod",
  "err.badLang": "不支持的语言",
  "backend.name": "内置 Python 模拟器",
- "backend.engine": "本机转译引擎（整局，版本取自你的安装）+ YAML 战斗模拟器",
+ "backend.engine": "本机转译引擎（整局，版本取自你的安装）+ YAML 战斗模拟器。游戏 mod 的 DLL 可以导入成这份 YAML，不会被执行。",
  "backend.cardsFailed": "读取卡牌列表失败：",
  "agent.heuristic.name": "启发式（快）",
  "agent.heuristic.desc": "贪心逐动作模拟，最快；整局默认",
@@ -653,5 +653,16 @@
  "log.mentorAllFallback": "战斗决策全部回退到了学习版 AI。不要拿这次结果做种子筛选（见 docs/DEVELOPER.md）。",
  "log.mentorPpoFallback": "局外 PPO 选择全部回退。多半是构建 sts2_rs 时写死的网络路径上没有模型。不要拿这次结果做种子筛选。",
  "style.unknown": "没有这个打法风格：{id}",
- "style.incompatible": "打法风格「{style}」不能配 AI「{agent}」，请换一个学习版 / 通用 AI / 强 AI"
+ "style.incompatible": "打法风格「{style}」不能配 AI「{agent}」，请换一个学习版 / 通用 AI / 强 AI",
+ "me.importDll": "导入游戏 mod",
+ "me.dllHint": "已经做好的游戏 mod，用「导入游戏 mod」把它的清单 JSON 和 DLL 读进来。认得出的牌会变成表，DLL 不会被执行。说明见 docs/DLL_MODS.md。",
+ "me.installedPh": "游戏目录里的 mod",
+ "me.dllImported": "已读入「{name}」：{cards} 张牌，其中 {translated} 张有效果。看完提示再按保存。",
+ "err.dllGame": "这是游戏自己的文件（{name}）。请指向你的 mod，不要指向游戏的 DLL。",
+ "err.dllNone": "没有找到 mod 的 DLL。游戏 mod 文件夹里应有清单 JSON（含 id 和 has_dll）和同名 DLL。",
+ "err.dllMany": "这个压缩包里有不止一个 mod（{ids}）。一次导入一个。",
+ "err.dllRead": "读不了这个 DLL（{err}）。没有执行它。",
+ "err.dllEmpty": "这个 DLL 里没有卡牌、能力、遗物、药水或角色类。",
+ "err.dllTooBig": "文件太大（最大 80 MB）。",
+ "err.dllNeedReader": "读 mod DLL 需要 dnfile。请按 requirements.txt 装好依赖后再试。"
 }
