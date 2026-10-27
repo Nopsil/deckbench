@@ -19,7 +19,9 @@ $names = @('game.py', 'game_report.json', 'game_report_skipped.tsv', 'undefined.
   'manifest.json', 'DO_NOT_REDISTRIBUTE.txt', 'current.json')
 foreach ($f in $all) {
   if ($names -contains $f.Name) { Hit "forbidden name" $f }
-  if ($f.Extension -in '.pck', '.cs', '.csproj') { Hit "forbidden type $($f.Extension)" $f }
+  if ($f.Extension -in '.pck', '.cs', '.csproj', '.onnx') { Hit "forbidden type $($f.Extension)" $f }
+  if ($f.Name -eq 'champions.toml') { Hit "spire-mentor ppo config" $f }
+  if ($f.FullName -match '[\\/]sts2_rs[\\/]|[\\/]sts2_hint[\\/]') { Hit "spire-mentor package" $f }
   if ($f.Name -match '^(eng|zhs)_(cards|monsters|relics|powers|potions|encounters|characters|acts)\.json$') { Hit "spire-codex data" $f }
   if ($f.FullName -match '\\(spire-codex|sts2-beta-src|sts2-src|decompiled|stubs|legacy|vanilla|testcache|deckbench\\[0-9a-f]{16})\\') { Hit "forbidden folder" $f }
 }

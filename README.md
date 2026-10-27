@@ -38,6 +38,8 @@
 - **测你自己的 mod**：内置示例 mod（Claude娘，原创内容），也可以上传自己写的 YAML mod 跑战斗测试。
 - **图形界面，全在本机**：点选参数、一键运行、实时进度、图表报告、历史记录，不联网也不上传任何东西。
 - **四种界面语言**：简体中文、English、日本語、한국어。第一次打开跟着系统语言走，左下角随时可以切换（会记住你的选择）；卡牌、角色、敌人的名字也跟着切换，从你自己的游戏安装里读。
+- **导入真游戏的一局**：只读打开存档里的对局记录，看种子、路线、选牌和遗物。
+- **种子预览**：给一个种子，不打完整的一局，先看地图、怪物分布和开局奖励。
 
 *Win rate and floors reached for full runs at any ascension; death causes; same-seed single-card A/B tests; test your own mods; a local desktop app with charts and history (nothing is uploaded).*
 
@@ -105,9 +107,9 @@ $env:DECKBENCH_GAME_DIR = "D:\SteamLibrary\steamapps\common\Slay the Spire 2"
 
 - **「通用 AI（推荐，模组角色也能用）」**：大多数情况推荐用它。选牌、休息、商店交给一个小网络，它只看通用数值（费用、伤害、格挡、稀有度……），不认具体卡名，所以**你自己做的模组角色也能用**。速度和学习版一样（每局 1–2 秒），Windows 可用。我们的测试里它比学习版平均多走 1–4 层。
 - **「学习版 AI」**：上一版的推荐，速度一样，可以拿来对照。
-- **「spire-mentor 整局 AI」两项**：最强，但要你自己另外构建第三方的 spire-mentor，只支持 5 个原版角色，详见 [docs/DEVELOPER.md](docs/DEVELOPER.md)。
+- **「spire-mentor 整局 AI」两项**：原版 5 个角色上更强，适合种子筛选。官方安装包里就能选，但**不附带** spire-mentor，需要你自己构建，并在程序旁边放 `mentor.local.json`（打包版还要把 `python` 指到构建它的 Python）。没配好时这两项是灰的。详见 [docs/DEVELOPER.md](docs/DEVELOPER.md)。
 
-*"通用 AI" (modai, recommended) uses a small network that only looks at generic numbers (cost, damage, block, rarity…), not card names, so it works for your own mod characters too; same speed as the learned AI, works on Windows. The spire-mentor agents are stronger but need the external spire-mentor and support vanilla characters only.*
+*"通用 AI" (modai, recommended) uses a small network that only looks at generic numbers, so it works for mod characters too and on Windows. The spire-mentor agents are stronger on the 5 base-game characters and can be selected in the official package once you point them at your own build; they are not bundled.*
 
 ## 用游戏里的种子 / Play a real game seed
 
@@ -116,13 +118,29 @@ $env:DECKBENCH_GAME_DIR = "D:\SteamLibrary\steamapps\common\Slay the Spire 2"
 
 *Type a seed from the game into "Game seed" in New test → Full runs: the AI plays just that run and records every decision. Lowercase, O and I are normalized like the game does. CLI: `--seed` and `--log-dir`.*
 
+## 导入真游戏的一局 / Import a real run
+
+左侧 **「导入对局」**：只读打开游戏存下来的一局（打完的 `history/*.run`，或正在打的 `current_run.save`）。能看种子、进阶、走过的房间、每一层选了哪张牌、遗物和牌组。不会改你的存档。
+命令行：`python tools/import_run.py <文件或文件夹>`。文件在哪、两种 JSON 差在哪，见 [docs/SAVE_FORMAT.md](docs/SAVE_FORMAT.md)。
+
+*The **Import run** page reads a finished `history/*.run` or an in-progress `current_run.save` from your own install: seed, ascension, route, card picks, relics and deck. Read-only. CLI: `python tools/import_run.py`. Paths and the two JSON shapes: docs/SAVE_FORMAT.md.*
+
+## 先看种子再决定打不打 / Preview a seed
+
+左侧 **「种子预览」**：填游戏里的种子（以及角色、进阶），不让 AI 把整局打完，先看每一幕的地图、普通怪/精英/首领怎么排、开局选项和第一场普通战斗的奖励。适合挑录像用的种子、先想路线。第 2 幕往后的地图是投影，第 1 幕可以拿游戏截图对照。
+命令行：`python tools/seed_preview.py <种子> --char Ironclad --asc 0`。需要已经从你的游戏生成本机数据。
+
+*The **Seed preview** page shows each act's map, the normal/elite/boss queues, opening choices and the first fight's rewards for a game seed, without playing the run. Act 2+ maps are projections; check act 1 against a screenshot. CLI: `python tools/seed_preview.py`. Needs data generated from your install.*
+
 ## 不写代码做 mod（模组编辑器） / Make a mod without code (Mod editor)
 
 左侧 **「模组编辑器」**：填表做一个角色（生命、能量、起始牌组、初始遗物）、卡牌（效果从菜单里选：造成伤害、施加能力、抽牌……或常用模板）、能力和遗物（「什么时候 → 做什么」），按 **「检查」** 会用大白话指出问题。
 然后在 **「试跑」** 里一键跑整局批量，或者做单卡 A/B（同一批种子，起始牌组 vs 起始牌组 + 这张牌）。可以导入 / 导出 zip 和别人交换。
 同样的 YAML 文件也能直接放进 `mods/` 用命令行跑：`python tools/batch.py --mod mods/my_mod --char MyHero --agent modai`。格式说明见 [docs/MODDING.md](docs/MODDING.md)。
 
-*The **Mod editor** page: build a character, cards (effects picked from a menu or templates), powers and relics (when → what) with forms; **Check** explains problems in plain language; **Test** runs a full-run batch or a one-card A/B with one click; import/export zip. The same YAML runs from the command line with `--mod`. Format: docs/MODDING.md.*
+已经装在游戏里的 mod 不用先手写 YAML：**模组编辑器**里按 **「导入游戏 mod」**，选那个 mod 的 zip（清单 JSON + DLL），或从下拉框选游戏 `mods/` 里的一份。认得出的牌会变成表，DLL 不会被执行。限制见 [docs/DLL_MODS.md](docs/DLL_MODS.md)。
+
+*The **Mod editor** page: build a character, cards (effects picked from a menu or templates), powers and relics (when → what) with forms; **Check** explains problems in plain language; **Test** runs a full-run batch or a one-card A/B with one click; import/export zip. The same YAML runs from the command line with `--mod`. Format: docs/MODDING.md. A mod already installed in the game can be imported with **Import game mod** (manifest JSON + DLL). The DLL is not executed. Limits: docs/DLL_MODS.md.*
 
 ## 让 AI 助手一步一步打（MCP） / Let an AI assistant play (MCP)
 
@@ -172,8 +190,8 @@ $env:DECKBENCH_GAME_DIR = "D:\SteamLibrary\steamapps\common\Slay the Spire 2"
 ## 进阶 / Advanced
 
 - [docs/DEVELOPER.md](docs/DEVELOPER.md)：命令行批量运行（全部参数）、首次生成的内部原理、可选的 spire-mentor AI、旧版战斗模拟器、目录结构、测试（含 Linux/macOS 命令）。
-- 可选的更强 AI：自己构建第三方 [spire-mentor](https://github.com/tfriedel/spire-mentor) 后，可以用 `mentor-full`（它的 MCTS 打战斗 + PPO 网络做局外决策，只支持 5 个原版角色）。spire-mentor 不随本项目分发；它在 v0.111 的 19 张新牌（SIDESTEP 等）上有一个已知的读取问题，我们提供了一个很小的本地补丁。详见 [docs/DEVELOPER.md](docs/DEVELOPER.md#可选spire-mentor更强的-ai--optional-spire-mentor)。
-  *Optional stronger AI: build the third-party spire-mentor yourself to use `mentor-full` (vanilla characters only). It is not shipped with DeckBench; a known upstream loader bug for 19 v0.111 cards (SIDESTEP etc.) has a small local patch. See docs/DEVELOPER.md.*
+- 可选的更强 AI：自己构建第三方 [spire-mentor](https://github.com/tfriedel/spire-mentor) 后，官方安装包里就可以选 `mentor-full` / `mentor-full-ev`（MCTS 打战斗，PPO 做局外决策，只支持 5 个原版角色），不用重编 DeckBench。spire-mentor 不随本项目分发；Windows 打包版要把 `mentor.local.json` 的 `python` 指到构建 `sts2_rs` 的解释器。它在 v0.111 的 19 张新牌（SIDESTEP 等）上有一个已知的读取问题，我们提供了一个很小的本地补丁。冒烟和打包注意见 [docs/DEVELOPER.md](docs/DEVELOPER.md#可选spire-mentor更强的-ai--optional-spire-mentor)。
+  *Optional stronger AI: after you build spire-mentor yourself, the official package can run `mentor-full` / `mentor-full-ev` (vanilla characters only) without rebuilding DeckBench. It is not shipped here; the Windows package needs `mentor.local.json` `python` set to the interpreter that built `sts2_rs`. A known upstream loader bug for 19 v0.111 cards (SIDESTEP etc.) has a small local patch. Smoke steps and packaging rules: docs/DEVELOPER.md.*
 - [docs/MODDING.md](docs/MODDING.md)：用 YAML + Python 写自己的 mod（卡牌、能力、遗物、卡组、实验）。
 - [gui/README.md](gui/README.md)：图形界面的结构和打包。
 - [CONTRIBUTING.md](CONTRIBUTING.md)：贡献须知（不接受任何游戏内容）。

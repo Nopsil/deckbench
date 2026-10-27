@@ -132,18 +132,36 @@ PYTHONPATH=. .venv/bin/python tools/batch.py --char Claude --asc 10 --n 100 --ag
   读不到时这些事件回退到 learned。可选覆盖：`DECKBENCH_GAME_PCK=<.pck 路径>`，或 `DECKBENCH_GAME_LOC_ENG` / `DECKBENCH_GAME_LOC_ZHS` 指向含 `events.json` 等表的目录。
   *`mentor-full-ev` reads the English event option text from your own install's `.pck` at runtime (memory only, never written or shipped); without it those events fall back to the learned AI.*
 
-**配置 / Setup**：设置两个环境变量指向你自己构建的 spire-mentor：
+**配置 / Setup**：三种写法都可以。环境变量覆盖 json，json 覆盖 `mentor/` 目录。官方安装包**不包含**这些文件；没有配置时界面里两项是灰的。
+
+1. 环境变量（改完要重新启动 DeckBench）：
 
 ```bash
 # Linux/macOS
 export DECKBENCH_MENTOR_SITE=/path/to/venv/lib/python3.13/site-packages   # 装了 sts2_rs 的 site-packages
 export DECKBENCH_MENTOR_PY=/path/to/spire-mentor/sts2-pycli/python        # 它的 sts2_hint 包所在目录
+export DECKBENCH_MENTOR_PYTHON=/path/to/venv/bin/python                    # 打包版必填；源码版建议填
 ```
 ```powershell
 # Windows PowerShell
 $env:DECKBENCH_MENTOR_SITE = "C:\path\to\venv\Lib\site-packages"
 $env:DECKBENCH_MENTOR_PY = "C:\path\to\spire-mentor\sts2-pycli\python"
+$env:DECKBENCH_MENTOR_PYTHON = "C:\path\to\venv\Scripts\python.exe"
 ```
+
+2. `mentor.local.json`（仓库根目录、exe 旁边，或数据目录 `gui/.data` / exe 旁的 `data`）。相对路径相对 json 文件本身。此文件已 gitignore，不要放进发布 zip。
+
+```json
+{
+  "site": "C:\\path\\to\\venv\\Lib\\site-packages",
+  "py": "C:\\path\\to\\spire-mentor\\sts2-pycli\\python",
+  "python": "C:\\path\\to\\venv\\Scripts\\python.exe"
+}
+```
+
+3. 程序目录下的 `mentor/`：`mentor/site/sts2_rs/`、`mentor/py/sts2_hint/`，可选 `mentor/python.txt`（一行，指向 python.exe）。这个目录同样不要放进发布 zip。
+
+`python` 必须是**构建 sts2_rs 的那个 CPython**（`python.exe`，不要用 `pythonw.exe`）。源码运行时不填也能用当前解释器；**Windows 打包版必须填**，见下面「打包版」。
 
 **`mentor-full` 的 PPO 网络**：它们在 spire-mentor 仓库的 `sts2-pycli/data/ppo/`（`champions.toml` + 每角色的 `.onnx`）。
 `sts2_rs` 按**编译时**的路径找它们：`<构建时的 sts2-rs 目录>/../sts2-pycli/data/ppo`。所以请在完整的 spire-mentor 克隆里构建，构建后不要移动或删除这个目录。
@@ -151,9 +169,40 @@ $env:DECKBENCH_MENTOR_PY = "C:\path\to\spire-mentor\sts2-pycli\python"
 上游另有 `STS2_RUNAI_PPO=<model.onnx>` 只能指定一个网络（所有角色共用），一般不需要。
 *The PPO networks live in spire-mentor's `sts2-pycli/data/ppo/`; `sts2_rs` locates them via its compile-time path `<sts2-rs>/../sts2-pycli/data/ppo`, so build inside a full checkout and keep that directory in place. If they are missing, the Rust panic is caught and non-combat decisions fall back to the learned AI.*
 
-**图形界面 / GUI**：设置好上面两个环境变量后再启动 DeckBench，「新建测试 → 整局批量 → AI」里的「spire-mentor 整局 AI（外部）」才能选；没配置时是灰的，并显示提示。
-Windows 上回退时不使用搜索（没有 `os.fork()`）。打包版 exe 能否加载你自己构建的 `sts2_rs` 取决于构建环境（abi3，Python ≥ 3.11），属于实验功能；加载失败会全部回退到 learned。
-*In the GUI, the "spire-mentor" agent is enabled only when both variables are set before launch; otherwise it is greyed out with a hint. Loading your own `sts2_rs` from the packaged exe is experimental; on failure everything falls back to the learned AI.*
+**图形界面 / GUI**：「新建测试 → 整局批量 → AI」里有「spire-mentor 整局 AI（外部）」和「spire-mentor 整局 AI＋事件」。目录齐了才能选；没配置时是灰的，并写明缺什么。打包版还要能找到 `python`，否则同样是灰的（提示里会要 `DECKBENCH_MENTOR_PYTHON`）。
+只支持原版 5 个角色。选了模组角色会在日志里提醒：局外决策回退到学习版。Windows 上回退时不使用搜索（没有 `os.fork()`）。
+库完全加载失败时，这一次运行会**停下来**并写明原因，不会再静默整局改用学习版（认不出的单张牌 / 单次决策仍然回退，日志里有回退比例）。
+*In the GUI both agents are listed under New test → Full runs. They stay greyed out until the directories exist; the packaged app also stays greyed out until `python` points at the interpreter that built `sts2_rs`. Mod characters are warned in the log. If the library fails to import, the run stops instead of silently scoring the learned AI; unknown individual cards still fall back, and the log prints the fallback rate.*
+
+**打包版（不用自己重编 DeckBench）/ Windows package, no DeckBench rebuild**：
+`DeckBench.exe` 是 PyInstaller 打出来的，加载不了你用 maturin 编的 `sts2_rs`（解释器不是同一个）。官方 zip **仍然不附带** spire-mentor 的代码、`.pyd`、ONNX 或数据。要用这个 AI 做种子筛选：
+
+1. 自己按 spire-mentor 的说明构建 `sts2_rs`（在完整克隆里构建，好让它按编译路径找到 `sts2-pycli/data/ppo`）。不要把构建结果打进 DeckBench 的 zip，也不要发给别人。
+2. 在 exe 旁边放上面的 `mentor.local.json`，`python` 指向该 venv 的 `python.exe`。
+3. 重新打开 DeckBench。界面会用那个 Python 跑 `sim/gui` 里的工作进程（打包脚本会把我们自己的 `gui/*.py` 放到 `sim/gui`，所以玩家不用再编一次 DeckBench）。游戏缓存仍在 `%LOCALAPPDATA%\deckbench`，和双击 exe 共用。
+4. 选原版角色、`mentor-full` 或 `mentor-full-ev`。跑完看日志：战斗回退比例、以及 `PPO 网络/回退`。回退接近 100% 时不要拿这批胜率做筛选（网络没找到，或牌不认识）。
+
+*The packaged exe cannot load a maturin-built `sts2_rs`. The zip still ships none of spire-mentor. Point `mentor.local.json` at your venv's `python.exe`; the app then runs our worker (`sim/gui`, copied at package time) under that interpreter. Shared cache: `%LOCALAPPDATA%\deckbench`. If the log shows ~100% fallback, do not use the win rate for seed screening.*
+
+**冒烟 / Smoke**（先确认加载，再打 1 局；没有配置时第一步就应失败，退出码 2）：
+
+```bash
+# Linux/macOS，仓库根目录
+PYTHONPATH=. python -m sts2sim.engine.mentor_paths
+PYTHONPATH=. python tools/batch.py --char Ironclad --asc 0 --n 1 --procs 1 --agent mentor-full-ev --seed 7F3K9Q2ZB8MA
+```
+```powershell
+# Windows 源码，或官方 zip 解压后的文件夹（把路径换成你的）
+$env:PYTHONPATH = "D:\DeckBench\sim"          # 源码则是仓库根，例如 D:\deckbench
+$env:STS2SIM_ROOT = $env:PYTHONPATH
+$env:DECKBENCH_MENTOR_SITE = "C:\spire-mentor\.venv\Lib\site-packages"
+$env:DECKBENCH_MENTOR_PY = "C:\spire-mentor\sts2-pycli\python"
+& "C:\spire-mentor\.venv\Scripts\python.exe" -m sts2sim.engine.mentor_paths
+& "C:\spire-mentor\.venv\Scripts\python.exe" -m gui.worker batch --char Ironclad --asc 0 --n 1 --procs 1 --agent mentor-full-ev --game-seed 7F3K9Q2ZB8MA --out "$env:TEMP\mentor-smoke.jsonl"
+```
+
+`mentor_paths` 打印 `import: ok` 且退出码 0 才算接上。接着那一局的日志里应有 mentor 决策数，以及 PPO 的「网络/回退」次数；网络侧不应全是 0。`tools/batch.py` 仍只支持 Linux/macOS（用了 `SIGALRM`）；Windows 用上面的 `python -m gui.worker`，或直接在界面里把局数设成 1。
+*Smoke: `python -m sts2sim.engine.mentor_paths` must print `import: ok` and exit 0. Then one Ironclad run; the log should show mentor decisions and non-zero PPO net counts. `tools/batch.py` stays Linux/macOS-only; on Windows use `python -m gui.worker` or one run in the GUI.*
 
 **已知上游问题：v0.111 的 19 张新牌（SIDESTEP 等）/ Known upstream bug: 19 v0.111 cards**
 spire-mentor 已经实现了这些牌，但 `state_from_dict` 查牌 id 时只查 `CardId::all()`（v0.107.1 的牌表），漏了 `CardId::V0111_ONLY`，
@@ -214,13 +263,34 @@ spire-mentor 已经实现了这些牌，但 `state_from_dict` 查牌 id 时只�
 - 召唤不生成新敌人；少数敌人能力只记层数；随机数和游戏不同，同种子出招不会逐招一致（分布和约束一致）。
 - 启发式 AI 是贪心的，不会为下回合规划；需要先铺引擎的组合可以换束搜索 AI（`--agent beam`）。
 
+## 导入对局记录、预览种子 / Import a run, preview a seed
+
+格式、路径和已知缺口见 [SAVE_FORMAT.md](SAVE_FORMAT.md)。两条命令都不携带游戏文件。
+
+```bash
+# 不需要游戏。夹具 ID 是虚构的。
+python tools/import_run.py tests/fixtures/saves/sample_history.run --lang en
+python tools/import_run.py --discover
+
+# 需要已经生成本机游戏逻辑（python -m sts2sim.gamedata setup）。不打战斗。
+python tools/seed_preview.py 7F3K9Q2ZB8MA --char Silent --asc 0 --neow first --lang en
+```
+
+图形界面多了「导入对局」和「种子预览」。接口：`POST /api/import`、`POST /api/import/upload`、`GET /api/saves/discover`、`POST /api/seed-preview`。导入页认 `#/import?path=`，预览页认 `#/preview?seed=`。
+*The GUI adds Import run and Seed preview. Import works without the game; seed preview needs the locally generated game logic and does not play combats. `#/import?path=` and `#/preview?seed=` open those pages with a value filled in.*
+
+种子预览的界面和接口采用「导入对局 + 种子预览」那一版（每一幕地图、投影标记、遗物队列、`POST /api/seed-preview`），没有改用更早那一版只画第 1 幕、并把名字从本机安装填进预览正文的页面。`tools/seed_probe.py` 保持原样：`sts2sim/engine/seedpreview.py` 和 MCP（`tools/sim_session.py`）都调用它的 `_map` / `_rooms` / `render_map`。把它收成对 `seedpreview` 的薄封装会和预览模块互相导入。
+*The seed-preview UI and API are the save-import version (every act, projection labels, relic queues, `POST /api/seed-preview`), not the earlier act-1-only page that filled names from the local install. `tools/seed_probe.py` stays as it is: `seedpreview` and MCP (`tools/sim_session.py`) call its `_map` / `_rooms` / `render_map`. Turning it into a thin wrapper around `seedpreview` would import in a circle.*
+
 ## 目录结构 / Layout
 
 ```
 sts2sim/gamedata.py  首次运行：找安装、本机反编译+转译、缓存绑定与校验
+sts2sim/dllmod/      读作者自己的 mod DLL，转成 YAML（不执行；见 docs/DLL_MODS.md）
 sts2sim/gen/         只有 __init__.py：从本机缓存加载 game.py（仓库里没有生成代码）
 sts2sim/rt/          转译代码的运行时（C#/LINQ 语义、少量手写覆盖）
-sts2sim/engine/      整局驱动、Gym 接口、AI（heuristic / strong / learned / planner / search / imitation / mentor 桥接）
+sts2sim/engine/      整局驱动、Gym 接口、AI；seedpreview.py 种子预览（不打战斗）
+sts2sim/saveimport.py  只读解析对局记录 / 进行中存档（不写盘、不解密）
 sts2sim/*.py         旧版 YAML 战斗模拟器（core、cards、powers、enemies、runner、report…）
 mods/                示例 mod：Claude娘 v3.4（YAML）、v3.5（整局引擎）
 tools/               转译器 cs2py_*、解析器、batch.py、调参 tune_cma.py、A/B 工具
@@ -238,7 +308,8 @@ tests/               单元测试
 .venv\Scripts\python -m pytest -q tests     # Windows
 ```
 
-- 不需要游戏：`tests/test_gamedata.py`（找安装、缓存绑定/拒绝加载、仓库里没有生成代码）。
+- 不需要游戏：`tests/test_gamedata.py`（找安装、缓存绑定/拒绝加载、仓库里没有生成代码）、`tests/test_saveimport.py`（虚构的对局 JSON）、`tests/test_seedpreview.py` 里不启动引擎的部分。
+- 种子预览的真生成：有本机缓存时 `tests/test_seedpreview.py` 会跑 `preview()`；没有就只检查「缺少引擎」的报错。
 - 需要本机生成的缓存（没有时自动 skip）：`test_engine.py`、`test_ai_upgrade.py`、`test_claude_v35.py`、`test_status_damage.py`。
 - 需要旧版模拟器的本机数据（spire-codex JSON + `mods/vanilla/`，没有时不收集）：`test_claude.py`、`test_intents.py`、`test_shensu.py`。
 - 图形界面端到端：`gui/tests_e2e.py`（Playwright，先 `python -m gui.app --serve --port 8765`）。
@@ -269,10 +340,14 @@ powershell -ExecutionPolicy Bypass -File gui\packaging\audit.ps1 -Path <工作�
   它生成的 `game.py` 与 SDK 版 ilspycmd 生成的逐字节一致。
 - 第三方声明：`gui/packaging/THIRD-PARTY-NOTICES.txt` + `gui/packaging/notices/`，打包时一起放进 zip。
 - 打包版参数：`DeckBench.exe --game-dir <游戏目录>`（之后会记住）、`--browser`、`--serve --port N`；环境变量 `DECKBENCH_NO_DIALOG=1` 关闭弹窗（自动化测试用）。
+- `sim/gui`：我们自己的界面 Python（不含 `web/`、不含 `packaging/`），给玩家本机的 CPython 跑 `mentor-full` / `mentor-full-ev`。不要把 `sts2_rs`、`sts2_hint`、`.onnx`、`champions.toml` 或 `mentor.local.json` 放进 zip。`audit.ps1` 会拒收这些路径和扩展名。
+  *`sim/gui` is our own UI code so the player's CPython can run the mentor agents. Do not put `sts2_rs`, `sts2_hint`, `.onnx`, `champions.toml` or `mentor.local.json` in the zip; `audit.ps1` rejects them.*
 
 ## 已知限制 / Known limitations
 
 - 模拟结果只适合在同一套假设下横向比较，不是真实胜率。
+- 作者自己的游戏 mod DLL 可以导入成 YAML（[DLL_MODS.md](DLL_MODS.md)），不能在模拟器里直接执行：模拟器是本机转译的 Python，不是游戏的 .NET + Godot 宿主，Harmony 补丁不会打到 Python 上。
+  *An author's game mod DLL can be imported as YAML ([DLL_MODS.md](DLL_MODS.md)). It cannot be executed inside the simulator: the simulator is the local Python translation, not the game's .NET + Godot host, so Harmony patches do not apply.*
 - 首次生成需要 .NET 9 SDK + ilspycmd；转译器针对 v0.111 系列验证过，游戏大版本更新后可能需要更新转译器/补丁（`tools/cs2py_*.py`、`tools/cs_patches.py`、`sts2sim/rt/patches.py`）。
 - Windows 上没有 fork，带搜索的 AI 不可用；`tools/batch.py` 命令行只支持 Linux/macOS。
 - 图形界面第一次生成数据时（1–2 分钟）只有一个「请稍候」提示框，没有进度条。

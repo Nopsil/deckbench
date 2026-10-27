@@ -1,0 +1,48 @@
+{
+  "schema_version": 16,
+  "ascension": 0,
+  "game_mode": "standard",
+  "platform_type": "steam",
+  "start_time": 1779600000,
+  "run_time": 120,
+  "build_id": "test-build",
+  "current_act_index": 0,
+  "pre_finished_room": null,
+  "rng": {"seed": "LIVESEED0001", "counters": {"up_front": 4}},
+  "visited_map_coords": [{"col": 2, "row": 1}, {"col": 1, "row": 2}],
+  "acts": [
+    {
+      "id": "ACT.SAMPLE_ONE",
+      "rooms": {"normal": ["ENCOUNTER.SAMPLE_FIGHT"]},
+      "saved_map": {
+        "points": [
+          {"coord": {"col": 2, "row": 1}, "point_type": "Monster", "children": [{"col": 1, "row": 2}]},
+          {"coord": {"col": 1, "row": 2}, "point_type": "Elite", "children": [{"col": 1, "row": 3}]},
+          {"coord": {"col": 1, "row": 3}, "point_type": "Boss", "children": []}
+        ]
+      }
+    }
+  ],
+  "modifiers": [{"id": "MODIFIER.SAMPLE"}],
+  "players": [
+    {
+      "net_id": 7,
+      "character_id": "CHARACTER.SILENT",
+      "current_hp": 54,
+      "max_hp": 70,
+      "gold": 140,
+      "deck": [{"id": "CARD.SAMPLE_DEFEND", "floor_added_to_deck": 0}],
+      "relics": [{"id": "RELIC.SAMPLE_RING", "floor_added_to_deck": 0}],
+      "potions": []
+    }
+  ],
+  "map_point_history": [
+    [
+      {
+        "map_point_type": "monster",
+        "player_stats": [{"player_id": 7, "current_hp": 54, "max_hp": 70, "current_gold": 140}],
+        "rooms": [{"model_id": "ENCOUNTER.SAMPLE_FIGHT", "turns_taken": 3, "room_type": "Monster"}]
+      }
+    ]
+  ]
+}

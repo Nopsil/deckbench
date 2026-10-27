@@ -6,6 +6,9 @@
         <n-button @click="newMod"><template #icon><n-icon :component="FilePlus" /></template>{{ t('me.new') }}</n-button>
         <n-button @click="$refs.zip.click()"><template #icon><n-icon :component="FileImport" /></template>{{ t('me.import') }}</n-button>
         <input ref="zip" type="file" accept=".zip" style="display:none" @change="importZip" />
+        <n-button @click="$refs.dll.click()"><template #icon><n-icon :component="Package" /></template>{{ t('me.importDll') }}</n-button>
+        <input ref="dll" type="file" accept=".zip" style="display:none" @change="importDll" />
+        <n-select v-if="installed.length" class="opener" :value="installedPick" :options="installedOptions" :placeholder="t('me.installedPh')" @update:value="importInstalled" />
         <n-button :disabled="!savedName" tag="a" :href="savedName ? '/api/modeditor/export/' + savedName : undefined"><template #icon><n-icon :component="FileExport" /></template>{{ t('me.export') }}</n-button>
         <div class="sp"></div>
         <span v-if="mod && dirty" class="chip acc">{{ t('me.unsaved') }}</span>
@@ -13,6 +16,7 @@
         <n-button type="primary" :disabled="!mod" :loading="busy === 'save'" @click="save()"><template #icon><n-icon :component="DeviceFloppy" /></template>{{ t('me.save') }}</n-button>
       </div>
       <div v-if="mod && mod.readonly" class="hint ro">{{ t('me.readonly') }}</div>
+      <div class="hint">{{ t('me.dllHint') }}</div>
     </div>
 
     <div v-if="!mod" class="panel empty"><div class="big">{{ t('me.empty') }}</div></div>
@@ -274,7 +278,7 @@ const test = _reactive({ char: null, n: 100, asc: 0, agent: 'modai', card: null,
 import { computed, h, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NButton, NCheckbox, NCheckboxGroup, NIcon, NInput, NInputNumber, NSelect, NSlider, NSwitch, NTabs, NTabPane, NTag, useDialog, useMessage } from 'naive-ui'
-import { FilePlus, FileImport, FileExport, DeviceFloppy, ListCheck, Plus, Trash, Copy, PlayerPlay, Scale } from '@vicons/tabler'
+import { FilePlus, FileImport, FileExport, DeviceFloppy, ListCheck, Plus, Trash, Copy, PlayerPlay, Scale, Package } from '@vicons/tabler'
 import yaml from 'js-yaml'
 import ModEffects from '../components/ModEffects.vue'
 import ModTriggers from '../components/ModTriggers.vue'
@@ -287,6 +291,9 @@ const message = useMessage()
 const dialog = useDialog()
 const schema = ref(null)
 const mods = ref([])
+const installed = ref([])
+const installedPick = ref(null)
+const installedOptions = computed(() => installed.value.map((m) => ({ value: m.id, label: m.version ? m.name + ' ' + m.version : m.name })))
 const busy = ref('')
 const q = ref('')
 const newVar = ref('')
@@ -347,6 +354,7 @@ function fixup(m) {
 function setMod(m, saved) {
   loading = true
   delete m._check
+  delete m._dll
   mod.value = fixup(m)
   savedName.value = saved
   sel.card = 0; sel.power = 0; sel.relic = 0
@@ -386,6 +394,15 @@ async function newMod() {
   dirty.value = true
   tab.value = 'char'
 }
+function showImported(m, dll) {
+  const chk = m._check
+  openId.value = null
+  setMod(m, null)
+  nextTick(() => { dirty.value = true })
+  result.value = chk && (chk.problems.length || chk.warnings.length) ? chk : null
+  if (dll) message.success(t('me.dllImported', dll), { duration: 8000 })
+  else message.success(t('me.imported', { name: m.name }))
+}
 async function importZip(ev) {
   const f = ev.target.files[0]
   ev.target.value = ''
@@ -393,16 +410,32 @@ async function importZip(ev) {
   const form = new FormData()
   form.append('file', f)
   try {
-    const m = await api.upload('/api/modeditor/import', form)
-    const chk = m._check
-    openId.value = null
-    setMod(m, null)
-    nextTick(() => { dirty.value = true })
-    result.value = chk && (chk.problems.length || chk.warnings.length) ? chk : null
-    message.success(t('me.imported', { name: m.name }))
+    showImported(await api.upload('/api/modeditor/import', form))
   } catch (e) { message.error(e.message, { duration: 8000 }) }
 }
-async function loadMods() { mods.value = await api.get('/api/modeditor/mods') }
+async function importDll(ev) {
+  const f = ev.target.files[0]
+  ev.target.value = ''
+  if (!f || !(await confirmDiscard())) return
+  const form = new FormData()
+  form.append('file', f)
+  try {
+    const m = await api.upload('/api/modeditor/import-dll', form)
+    showImported(m, m._dll)
+  } catch (e) { message.error(e.message, { duration: 8000 }) }
+}
+async function importInstalled(id) {
+  installedPick.value = null
+  if (!id || !(await confirmDiscard())) return
+  try {
+    const m = await api.post('/api/modeditor/import-installed', { id })
+    showImported(m, m._dll)
+  } catch (e) { message.error(e.message, { duration: 8000 }) }
+}
+async function loadMods() {
+  mods.value = await api.get('/api/modeditor/mods')
+  try { installed.value = await api.get('/api/modeditor/installed') } catch (e) { installed.value = [] }
+}
 
 // ---------------------------------------------------------------- 保存 / 检查
 function payload() { return { mod: JSON.parse(JSON.stringify(mod.value)), old_name: savedName.value } }

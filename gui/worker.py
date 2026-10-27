@@ -39,6 +39,7 @@ def _one_safe(args):
     from sts2sim.engine.run import play_run
     A = batch.AGENT
     hooks = [batch.force_cards_hook(A["force"], A.get("replace", ()))] if A.get("force") or A.get("replace") else []
+    ag = None
     try:
         ag = batch.wrap_log(batch.build_agent(seed), char, asc, seed)
         r = play_run(char, asc, seed, agent=ag, setup_hooks=hooks)
@@ -46,6 +47,8 @@ def _one_safe(args):
     except Exception:
         import traceback
         d = {"victory": False, "floor": -1, "act": 0, "path": [], "combats": [], "error": traceback.format_exc()[-2000:]}
+    if ag is not None and getattr(ag, "mstats", None):
+        d["mstats"] = ag.mstats
     d["seed"] = seed
     d["char"] = char
     d["asc"] = asc
@@ -80,6 +83,15 @@ def cmd_batch(a):
     if cfg["mods"]:
         batch._check_mods(cfg["mods"], a.char, cfg["variant"])   # 格式有错：大白话报错并退出（不开子进程）
     T = i18n.t
+    if str(a.agent).startswith("mentor"):
+        from sts2sim.engine import mentor_paths as MP
+        err = MP.import_error()
+        if err:
+            safe = str(err).replace("{", "(").replace("}", ")")
+            print(T("log.mentorUnavailable", err=safe), flush=True)
+            sys.exit(2)
+        if a.char not in MP.VANILLA:
+            print(T("log.mentorVanilla", char=a.char), flush=True)
     none = T("common.none")
     seeds = T("log.seed", s=jobs[0][2]) if a.game_seed else T("log.seedRange", a=f"R{a.start}", b=f"R{a.start + a.n - 1}")
     print(T("log.batchStart", char=a.char, asc=a.asc, n=len(jobs), seeds=seeds, agent=a.agent, variant=a.variant or none,
@@ -109,6 +121,15 @@ def cmd_batch(a):
     wins = sum(bool(r.get("victory")) for r in res)
     errs = sum(1 for r in res if r.get("error"))
     print(T("log.batchDone", wins=wins, n=len(res), errs=errs, secs=f"{dt:.1f}"), flush=True)
+    if str(a.agent).startswith("mentor"):
+        from sts2sim.engine.mentor_paths import mstats_line
+        info = mstats_line(res)
+        if info:
+            print(T("log.mentorStats", ok=info["ok"], fb=info["fb"], pct=info["pct"], ppo=info["ppo"]), flush=True)
+            if info["ok"] == 0 and info["fb"] > 0:
+                print(T("log.mentorAllFallback"), flush=True)
+            if info["ppo_net"] == 0 and info["ppo_fb"] > 0:
+                print(T("log.mentorPpoFallback"), flush=True)
     emit("DONE", {"secs": dt, "out": a.out})
 
 

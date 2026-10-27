@@ -1,11 +1,12 @@
 # DeckBench Windows 打包（PyInstaller onedir + 自带反编译器）。在仓库根目录或任意位置运行：
 #   powershell -ExecutionPolicy Bypass -File gui\packaging\build.ps1 -Work "D:\build\deckbench" -Py "<venv>\Scripts\python.exe" -Decompiler "<ilspycmd-host 发布目录>"
-# 只打包 git 跟踪的文件（不会带上本机生成的游戏数据）；构建后请运行 audit.ps1 检查。
+# 只打包 git 跟踪的文件（不会带上本机生成的游戏数据，也不会带上 mentor.local.json / mentor/）。
+# sim/gui 会一并放进 zip，供玩家自己的 Python 跑 mentor-full；构建后请运行 audit.ps1 检查。
 param(
   [string]$Work = "",
   [string]$Py = "",
   [string]$Decompiler = "",
-  [string]$Version = "0.1.4"
+  [string]$Version = "0.1.5"
 )
 $ErrorActionPreference = "Stop"
 $Repo = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
@@ -32,11 +33,19 @@ New-Item -ItemType Directory -Force $src, $sim | Out-Null
 $files = & git -C $Repo ls-files
 foreach ($f in $files) {
   $rel = $f -replace '/', '\'
-  if ($f -match '^(sts2sim|mods|tools|data|experiments)/') { $dst = Join-Path $sim $rel }
-  elseif ($f -match '^gui/' -and $f -notmatch '^gui/(packaging|web)/') { $dst = Join-Path $src $rel }
+  $dests = @()
+  if ($f -match '^(sts2sim|mods|tools|data|experiments)/') { $dests += (Join-Path $sim $rel) }
+  elseif ($f -match '^gui/' -and $f -notmatch '^gui/(packaging|web)/') {
+    $dests += (Join-Path $src $rel)
+    # sim/gui：打包版用玩家自己的 Python 跑 mentor-full 工作进程（exe 里的解释器加载不了 sts2_rs）。
+    # 只复制我们的界面代码，不含 web 源码、不含 packaging，也不含任何 spire-mentor 文件。
+    $dests += (Join-Path $sim $rel)
+  }
   else { continue }
-  New-Item -ItemType Directory -Force (Split-Path $dst -Parent) | Out-Null
-  Copy-Item (Join-Path $Repo $rel) $dst
+  foreach ($dst in $dests) {
+    New-Item -ItemType Directory -Force (Split-Path $dst -Parent) | Out-Null
+    Copy-Item (Join-Path $Repo $rel) $dst
+  }
 }
 Copy-Item -Recurse (Join-Path $Repo "gui\web\dist") (Join-Path $src "gui\web\dist")
 foreach ($f in "launcher.py", "DeckBench.spec", "icon.ico") { Copy-Item (Join-Path $PSScriptRoot $f) $src }

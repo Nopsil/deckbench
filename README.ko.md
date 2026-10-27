@@ -38,6 +38,8 @@ Slay the Spire 2 모드 제작자와 플레이어를 위한 비공식 밸런스 
 - **직접 만든 모드 테스트**: 예시 모드(Claude娘, 오리지널 콘텐츠)가 들어 있고, 직접 만든 YAML 모드를 올려서 전투 테스트를 돌릴 수도 있습니다.
 - **그래픽 화면, 모든 작업은 내 PC에서**: 클릭으로 설정, 버튼 한 번으로 실행, 실시간 진행 상황, 그래프 보고서, 기록 보기까지. 인터넷에 연결하지 않고 아무것도 업로드하지 않습니다.
 - **4가지 언어**: 한국어, English, 简体中文, 日本語. 프로그램 안에서 바꿀 수 있고, 카드·캐릭터·적 이름도 설치된 게임에서 같은 언어로 읽어 옵니다.
+- **실제 런 가져오기**: 끝난 런이나 진행 중 세이브를 읽기 전용으로 열어 시드, 경로, 카드 선택, 유물을 봅니다.
+- **시드 미리보기**: 시드를 넣으면 한 판을 끝까지 돌리지 않고 맵, 적 분포, 초반 보상을 봅니다.
 
 ## 시작하기 (Windows)
 
@@ -101,18 +103,30 @@ Linux/macOS는 [docs/DEVELOPER.md](docs/DEVELOPER.md)를 참고하세요.
 
 - **「범용 AI (추천, 모드 캐릭터도 사용 가능)」**: 대부분의 경우 이걸 추천합니다. 카드 선택, 휴식처, 상점은 작은 신경망이 맡는데, 비용·피해량·방어도·희귀도 같은 일반적인 수치만 보고 개별 카드 이름은 모릅니다. 그래서 **직접 만든 모드 캐릭터에도 쓸 수 있습니다**. 속도는 학습형 AI와 같고(한 판에 1~2초) Windows에서도 됩니다. 저희 테스트에서는 학습형 AI보다 평균 1~4층 더 갔습니다.
 - **「학습형 AI」**: 이전 버전의 추천 AI입니다. 속도가 같아서 비교용으로 쓸 수 있습니다.
-- **「spire-mentor 풀런 AI」 두 가지**: 가장 강하지만, 서드파티 프로그램인 spire-mentor를 직접 빌드해야 하고 기본 캐릭터 5명만 지원합니다. 자세한 내용은 [docs/DEVELOPER.md](docs/DEVELOPER.md)를 참고하세요.
+- **「spire-mentor 풀런 AI」 두 가지**: 기본 캐릭터 5명에서는 더 강해서 시드 가리기에 맞습니다. 공식 패키지 목록에 있지만 spire-mentor 자체는 들어 있지 않습니다. 직접 빌드하고 프로그램 옆에 `mentor.local.json` 을 두세요 (Windows 패키지는 `python` 을 그 빌드에 쓴 Python 으로 가리켜야 합니다). 설정 전에는 회색입니다. 자세한 내용은 [docs/DEVELOPER.md](docs/DEVELOPER.md).
 
 ## 게임 시드로 돌려 보기
 
 「새 테스트 → 풀런 일괄」에서 **「게임 시드 지정」** 칸에 게임에 표시되는 시드(예: `7F3K9Q2ZB8MA`)를 넣으면, AI가 그 한 판만 플레이하면서 매 단계 무엇을 골랐는지 기록합니다. 기록은 결과 페이지에서 볼 수 있습니다.
 소문자, 알파벳 O와 I는 게임 규칙대로 자동으로 대문자, 숫자 0과 1로 바뀝니다. 명령줄: `python tools/batch.py --char Silent --seed 7F3K9Q2ZB8MA --log-dir steps`.
 
+## 실제 런 가져오기
+
+왼쪽 **「런 가져오기」**에서 끝난 런(`history/*.run`)이나 진행 중 세이브(`current_run.save`)를 읽기 전용으로 엽니다. 시드, 승천, 지나간 방, 각 층에서 고른 카드, 유물, 덱을 볼 수 있습니다. 세이브는 바꾸지 않습니다.
+명령줄: `python tools/import_run.py <파일 또는 폴더>`. 파일이 어디 있는지, JSON이 두 가지인 이유는 [docs/SAVE_FORMAT.md](docs/SAVE_FORMAT.md)(중국어·영어)를 보세요.
+
+## 시드를 먼저 보기
+
+왼쪽 **「시드 미리보기」**에 게임 시드(캐릭터, 승천도 함께)를 넣으면, AI가 한 판을 끝까지 돌리지 않아도 각 막의 맵, 일반/엘리트/보스 순서, 시작 선택지, 첫 일반 전투의 보상을 볼 수 있습니다. 영상용 시드를 고르거나 경로를 짤 때 씁니다. 2막 이후 맵은 추정이고, 1막은 게임 스크린샷과 비교할 수 있습니다.
+명령줄: `python tools/seed_preview.py <시드> --char Ironclad --asc 0`. 설치된 게임에서 데이터를 이미 생성해 둔 상태여야 합니다.
+
 ## 코드 없이 모드 만들기 (모드 편집기)
 
 왼쪽 **「모드 편집기」**에서 캐릭터(체력, 에너지, 시작 덱, 시작 유물), 카드(효과는 메뉴에서 선택: 피해 주기, 파워 부여, 카드 뽑기… 또는 템플릿), 파워와 유물(「언제 → 무엇을」)을 양식으로 만들 수 있습니다. **「검사」**를 누르면 문제를 쉬운 말로 알려 줍니다.
 **「테스트」**에서 클릭 한 번으로 전체 런 일괄 실행이나 카드 하나 A/B(같은 시드로 시작 덱 vs 시작 덱+이 카드)를 돌릴 수 있습니다. zip 가져오기/내보내기로 공유할 수 있습니다.
 같은 YAML 파일은 `mods/`에 넣으면 명령줄에서도 동작합니다: `python tools/batch.py --mod mods/my_mod --char MyHero --agent modai`. 형식 설명은 [docs/MODDING.md](docs/MODDING.md)(중국어·영어).
+
+게임에 이미 설치된 모드를 먼저 YAML로 다시 쓸 필요는 없습니다. **모드 편집기**에서 **「게임 모드 가져오기」**로 그 모드의 zip(매니페스트 JSON + DLL)을 고르거나, 게임 `mods/`에 있는 목록에서 고르세요. 읽힌 카드는 양식이 됩니다. DLL은 실행하지 않습니다. 제한은 [docs/DLL_MODS.md](docs/DLL_MODS.md).
 
 ## AI 비서에게 한 수씩 플레이시키기 (MCP)
 
@@ -152,7 +166,7 @@ Steam에 게임이 설치되어 있는지 확인한 다음, 위에서 설명한 
 ## 더 알아보기
 
 - [docs/DEVELOPER.md](docs/DEVELOPER.md): 명령줄 일괄 실행(전체 옵션), 첫 데이터 생성의 내부 원리, 선택 사항인 spire-mentor AI, 구버전 전투 시뮬레이터, 폴더 구조, 테스트(Linux/macOS 명령 포함).
-- 선택 사항인 더 강한 AI: 서드파티 [spire-mentor](https://github.com/tfriedel/spire-mentor)를 직접 빌드하면 `mentor-full`을 쓸 수 있습니다(전투는 MCTS, 전투 밖 결정은 PPO 신경망이 담당하며 기본 캐릭터 5명만 지원). spire-mentor는 이 프로젝트에 포함되어 있지 않습니다. v0.111에서 추가된 새 카드 19장(SIDESTEP 등)을 읽을 때 알려진 문제가 있어서, 작은 로컬 패치를 제공합니다. 자세한 내용은 [docs/DEVELOPER.md](docs/DEVELOPER.md#可选spire-mentor更强的-ai--optional-spire-mentor)를 참고하세요.
+- 선택 사항인 더 강한 AI: 서드파티 [spire-mentor](https://github.com/tfriedel/spire-mentor)를 직접 빌드하면 공식 패키지에서 `mentor-full` / `mentor-full-ev` 를 고를 수 있습니다 (전투는 MCTS, 전투 밖은 PPO, 기본 캐릭터 5명만. DeckBench 를 다시 빌드할 필요는 없습니다). spire-mentor 는 포함하지 않습니다. Windows 패키지는 `mentor.local.json` 의 `python` 을 `sts2_rs` 를 빌드한 Python 으로 가리키세요. v0.111 새 카드 19장(SIDESTEP 등)을 읽을 때 알려진 문제가 있어 작은 로컬 패치를 둡니다. 동작 확인과 패키징 주의는 [docs/DEVELOPER.md](docs/DEVELOPER.md#可选spire-mentor更强的-ai--optional-spire-mentor).
 - [docs/MODDING.md](docs/MODDING.md): YAML + Python으로 나만의 모드 만들기(카드, 파워, 유물, 덱, 실험).
 - [gui/README.md](gui/README.md): 그래픽 화면의 구조와 패키징.
 - [CONTRIBUTING.md](CONTRIBUTING.md): 기여 안내(게임 콘텐츠는 일절 받지 않습니다).

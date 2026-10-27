@@ -35,6 +35,9 @@ Application runtime (DeckBench.exe, folder "_internal") / 程序运行时
   h11 (MIT), click (BSD-3-Clause), python-multipart (Apache-2.0), PyYAML (MIT), typing_extensions (PSF),
   annotated-types (MIT), idna (BSD-3-Clause)
 - pywebview (BSD-3-Clause), pythonnet (MIT), clr_loader (MIT), bottle (MIT), proxy_tools (MIT), pywin32-ctypes (BSD-3-Clause)
+- dnfile (MIT, Copyright (c) MalwareFrank) — reads .NET metadata only, does not execute assemblies.
+  https://github.com/malwarefrank/dnfile
+- pefile (MIT) — dependency of dnfile. https://github.com/erocarrera/pefile
 
 Web UI (bundled JavaScript) / 界面
 ----------------------------------

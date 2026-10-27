@@ -21,10 +21,14 @@ if os.name == "nt":
 MENTOR_AGENTS = ["mentor-full", "mentor-full-ev"]
 
 
+def mentor_status():
+    """外部 spire-mentor 能不能在界面里选。只看路径，不在界面进程里导入它。"""
+    from sts2sim.engine.mentor_paths import availability
+    return availability()
+
+
 def mentor_configured():
-    """外部 spire-mentor 是否已配置（只看目录，不在界面进程里导入它）。"""
-    site, py = os.environ.get("DECKBENCH_MENTOR_SITE", ""), os.environ.get("DECKBENCH_MENTOR_PY", "")
-    return bool(site and py and os.path.isdir(os.path.join(site, "sts2_rs")) and os.path.isdir(os.path.join(py, "sts2_hint")))
+    return mentor_status()["available"]
 
 
 def _agent(prefix, aid, lang):
@@ -32,10 +36,16 @@ def _agent(prefix, aid, lang):
 
 
 def agents_batch(lang=None):
-    ok = mentor_configured()
+    st = mentor_status()
     out = [_agent("agent", a, lang) for a in AGENTS_BATCH]
+    if st["available"]:
+        hint = ""
+    elif st["reason"] == "need_python":
+        hint = i18n.t("agent.mentorHintPython", lang)
+    else:
+        hint = i18n.t("agent.mentorHint", lang)
     for a in MENTOR_AGENTS:
-        out.append({**_agent("agent", a, lang), "available": ok, "hint": "" if ok else i18n.t("agent.mentorHint", lang)})
+        out.append({**_agent("agent", a, lang), "available": st["available"], "hint": hint})
     return out
 
 
@@ -104,13 +114,24 @@ class SimBackend:
         raise NotImplementedError
 
 
-def worker_argv(*args):
+def worker_argv(*args, agent=""):
+    """mentor-* 且配置了用户自己的 Python 时，用那个解释器跑工作进程。
+
+    打包版 exe 里的解释器加载不了 maturin 编出来的 sts2_rs。源码运行时如果也填了
+    DECKBENCH_MENTOR_PYTHON，同样用它，这样 .pyd 和编译它的 CPython 对得上。
+    """
+    py = ""
+    if str(agent).startswith("mentor"):
+        from sts2sim.engine.mentor_paths import python_executable
+        py = python_executable()
+    if py:
+        return [py, "-m", "gui.worker", *args]
     if paths.FROZEN:
         return [sys.executable, "--worker", *args]
     return [sys.executable, "-m", "gui.worker", *args]
 
 
-def worker_env():
+def worker_env(agent=""):
     env = dict(os.environ)
     gui_parent = os.path.dirname(paths.APP_DIR) if not paths.FROZEN else ""
     pp = [p for p in (paths.SIM_ROOT, gui_parent, env.get("PYTHONPATH", "")) if p]
@@ -119,6 +140,10 @@ def worker_env():
     env["PYTHONUNBUFFERED"] = "1"
     env["STS2SIM_USER_MODS"] = paths.USER_MODS_DIR
     env["STS2SIM_ROOT"] = paths.SIM_ROOT
+    env["STS2SIM_GUI_DATA"] = paths.DATA_DIR
+    if str(agent).startswith("mentor"):
+        from sts2sim.engine.mentor_paths import apply_env
+        apply_env(env)
     return env
 
 
@@ -134,7 +159,7 @@ class LocalPythonBackend(SimBackend):
         self._catalog = None
 
     def capabilities(self, lang=None):
-        return {"batch": True, "combat": True, "yaml_mods": True, "dll_mods": False,
+        return {"batch": True, "combat": True, "yaml_mods": True, "dll_mods": False, "dll_import": True,
                 "engine": i18n.t("backend.engine", lang)}
 
     # ---------------- 目录：角色、AI、变体、卡牌、实验预设、mod
@@ -277,16 +302,17 @@ class LocalPythonBackend(SimBackend):
         if kind == "batch":
             out = os.path.join(run_dir, "runs.jsonl")
             sid = check_style(p.get("style"), p.get("agent", "heuristic"))
+            agent = p.get("agent", "heuristic")
             argv = worker_argv("batch", "--char", str(p.get("char", "Claude")), "--asc", str(int(p.get("asc", 0))),
                                "--n", str(int(p.get("n", 20))), "--start", str(int(p.get("start", 0))),
-                               "--procs", str(int(p.get("procs") or os.cpu_count() or 1)), "--agent", p.get("agent", "heuristic"),
+                               "--procs", str(int(p.get("procs") or os.cpu_count() or 1)), "--agent", agent,
                                "--variant", "+".join(p.get("variants") or []), "--force", ",".join(p.get("force") or []),
-                               "--replace", ",".join(p.get("replace") or []), "--style", sid, "--out", out)
+                               "--replace", ",".join(p.get("replace") or []), "--style", sid, "--out", out, agent=agent)
             if p.get("mod"):         # YAML 数据 mod（模组编辑器的「试跑」）：整局引擎直接加载
                 argv += ["--mod", mod_dir(p["mod"])]
             if p.get("game_seed"):   # 指定真游戏种子：只打这一局，并写逐步决策日志到 <run_dir>/steps/
                 argv += ["--game-seed", str(p["game_seed"]), "--log-dir", os.path.join(run_dir, "steps")]
-            return argv, worker_env(), paths.SIM_ROOT
+            return argv, worker_env(agent), paths.SIM_ROOT
         if kind == "combat":
             exp = {}
             if p.get("preset"):

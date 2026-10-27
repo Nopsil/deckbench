@@ -1,0 +1,70 @@
+{
+  "schema_version": 9,
+  "seed": "SAMPLESEED01",
+  "ascension": 3,
+  "build_id": "test-build",
+  "game_mode": "standard",
+  "platform_type": "steam",
+  "start_time": 1779550532,
+  "run_time": 640,
+  "win": false,
+  "was_abandoned": false,
+  "killed_by_encounter": "ENCOUNTER.SAMPLE_BOSS",
+  "killed_by_event": "NONE.NONE",
+  "acts": ["ACT.SAMPLE_ONE", "ACT.SAMPLE_TWO"],
+  "modifiers": [],
+  "players": [
+    {
+      "id": 1,
+      "max_potion_slot_count": 3,
+      "character": "CHARACTER.IRONCLAD",
+      "deck": [
+        {"id": "CARD.SAMPLE_STRIKE", "floor_added_to_deck": 0},
+        {"id": "CARD.SAMPLE_PICK", "floor_added_to_deck": 2, "current_upgrade": 1,
+         "enchantment": {"id": "ENCHANT.SAMPLE", "amount": 2}}
+      ],
+      "potions": [{"id": "POTION.SAMPLE", "slot_index": 0}],
+      "relics": [
+        {"id": "RELIC.SAMPLE_START", "floor_added_to_deck": 0},
+        {"id": "RELIC.SAMPLE_CHEST", "floor_added_to_deck": 4}
+      ]
+    }
+  ],
+  "map_point_history": [
+    [
+      {
+        "map_point_type": "Ancient",
+        "player_stats": [{"player_id": 1, "current_hp": 80, "max_hp": 80, "current_gold": 99}],
+        "rooms": [{"model_id": "EVENT.SAMPLE_START", "turns_taken": 1}]
+      },
+      {
+        "map_point_type": "Monster",
+        "player_stats": [{
+          "player_id": 1,
+          "current_hp": 70,
+          "max_hp": 80,
+          "current_gold": 114,
+          "damage_taken": 10,
+          "card_choices": [
+            {"card": {"id": "CARD.SAMPLE_PICK"}, "was_picked": true},
+            {"card": {"id": "CARD.SAMPLE_SKIP"}, "was_picked": false}
+          ],
+          "potion_choices": [{"choice": "POTION.SAMPLE", "was_picked": true}]
+        }],
+        "rooms": [{
+          "model_id": "ENCOUNTER.SAMPLE_FIGHT",
+          "monster_ids": ["MONSTER.SAMPLE"],
+          "turns_taken": 4,
+          "room_type": "Monster"
+        }]
+      }
+    ],
+    [
+      {
+        "map_point_type": "Boss",
+        "player_stats": [{"player_id": 1, "current_hp": 0, "max_hp": 80, "current_gold": 20}],
+        "rooms": [{"model_id": "ENCOUNTER.SAMPLE_BOSS", "monster_ids": ["MONSTER.SAMPLE_BOSS"], "turns_taken": 6, "room_type": "Boss"}]
+      }
+    ]
+  ]
+}

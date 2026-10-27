@@ -38,6 +38,8 @@ An unofficial balance-testing tool for Slay the Spire 2 mod authors and players.
 - **Test your own mod**: a sample mod is built in (Claude娘, original content), and you can upload your own YAML mod for combat tests.
 - **A desktop app, all on your PC**: pick settings with a few clicks, run with one button, live progress, chart reports and history. Nothing goes online and nothing is uploaded.
 - **Four languages**: English, 简体中文, 日本語 and 한국어, switchable in the app; game names (cards, characters, enemies) come from your own install in the same language.
+- **Import a real run**: read a finished run or the in-progress save (seed, route, card picks, relics) without modifying it.
+- **Seed preview**: given a seed, see the map, encounter mix and opening rewards without playing a full run.
 
 ## Getting started (Windows)
 
@@ -101,18 +103,30 @@ Linux/macOS: see [docs/DEVELOPER.md](docs/DEVELOPER.md).
 
 - **General AI (recommended, works with mod characters)**: the one to use in most cases. Card picks, rest sites and shops are handled by a small network that only looks at generic numbers (cost, damage, block, rarity…) and doesn't know specific card names, so **it works with your own mod characters too**. It's as fast as the learned AI (1–2 seconds per run) and works on Windows. In our tests it gets 1–4 floors further on average than the learned AI.
 - **Learned AI**: the previous recommendation, same speed; useful for comparison.
-- **The two spire-mentor full-run AI options**: the strongest, but you have to build the third-party spire-mentor yourself, and they only support the 5 base-game characters. See [docs/DEVELOPER.md](docs/DEVELOPER.md).
+- **The two spire-mentor full-run AI options**: stronger on the 5 base-game characters, for seed screening. They are in the official package, but spire-mentor itself is not: build it yourself and add `mentor.local.json` next to the app (the Windows package also needs `python` set to the interpreter that built it). Until then the two entries stay greyed out. See [docs/DEVELOPER.md](docs/DEVELOPER.md).
 
 ## Play a real game seed
 
 In **New test → Full runs**, fill in **Game seed** with the seed shown in the game (for example `7F3K9Q2ZB8MA`). The AI then plays just that one run and records every decision, which you can look through on the results page.
 Lowercase letters, and the letters O and I, are converted to uppercase and the digits 0 and 1 automatically, just like the game does. Command line: `python tools/batch.py --char Silent --seed 7F3K9Q2ZB8MA --log-dir steps`.
 
+## Import a real run
+
+Open **Import run** on the left. It reads a finished `history/*.run` or the in-progress `current_run.save` from your own game folder: seed, ascension, rooms visited, which card you picked on each floor, relics and the deck. It does not modify the save.
+Command line: `python tools/import_run.py <file or folder>`. Where the files live, and how the two JSON shapes differ, is in [docs/SAVE_FORMAT.md](docs/SAVE_FORMAT.md).
+
+## Preview a seed
+
+Open **Seed preview**. Enter a seed from the game (plus character and ascension) and see each act's map, how normals, elites and bosses are ordered, the opening choices and the rewards of the first normal fight — without an AI playing the whole run. Useful for picking a seed to record or for planning a route. Maps from act 2 on are projections; act 1 can be checked against a screenshot.
+Command line: `python tools/seed_preview.py <seed> --char Ironclad --asc 0`. This needs the data DeckBench generates from your install.
+
 ## Make a mod without code (Mod editor)
 
 Open **Mod editor** on the left. Fill in forms for a character (HP, energy, starting deck, starting relic), cards (pick effects from a menu, such as Deal damage, Apply a power or Draw cards, or use a template), powers and relics (when → what). **Check** points out problems in plain language.
 Then, under **Test**, start a full-run batch or a one-card A/B (same seeds, starting deck vs starting deck + this card) with one click. Import and export zips to share mods.
 The same YAML files also work from the command line: put them in `mods/` and run `python tools/batch.py --mod mods/my_mod --char MyHero --agent modai`. Format reference: [docs/MODDING.md](docs/MODDING.md).
+
+A mod already installed in the game does not have to be rewritten by hand first. In **Mod editor**, use **Import game mod** and pick that mod's zip (manifest JSON + DLL), or pick it from the dropdown of mods under the game's `mods/` folder. Cards we can read become a form. The DLL is not executed. Limits: [docs/DLL_MODS.md](docs/DLL_MODS.md).
 
 ## Let an AI assistant play step by step (MCP)
 
@@ -152,7 +166,7 @@ After installing the .NET 9 SDK, open a **new** PowerShell window, run the `dotn
 ## Advanced
 
 - [docs/DEVELOPER.md](docs/DEVELOPER.md): command-line batch runs (all options), how the first-time data generation works, the optional spire-mentor AI, the legacy combat simulator, folder layout, tests (including Linux/macOS commands).
-- Optional stronger AI: after building the third-party [spire-mentor](https://github.com/tfriedel/spire-mentor) yourself, you can use `mentor-full` (its MCTS plays the fights and its PPO networks make the out-of-combat choices; base-game characters only). spire-mentor is not shipped with this project; it has a known loading problem with 19 new cards from v0.111 (SIDESTEP etc.), and we provide a small local patch. See [docs/DEVELOPER.md](docs/DEVELOPER.md#可选spire-mentor更强的-ai--optional-spire-mentor).
+- Optional stronger AI: after you build the third-party [spire-mentor](https://github.com/tfriedel/spire-mentor) yourself, the official package can run `mentor-full` / `mentor-full-ev` (MCTS for fights, PPO for out-of-combat choices; base-game characters only) without rebuilding DeckBench. spire-mentor is not shipped with this project. On the Windows package, set `python` in `mentor.local.json` to the interpreter that built `sts2_rs`. It has a known loading problem with 19 new cards from v0.111 (SIDESTEP etc.), and we provide a small local patch. Smoke steps and packaging rules: [docs/DEVELOPER.md](docs/DEVELOPER.md#可选spire-mentor更强的-ai--optional-spire-mentor).
 - [docs/MODDING.md](docs/MODDING.md): write your own mod in YAML + Python (cards, powers, relics, decks, experiments).
 - [gui/README.md](gui/README.md): how the desktop app is structured and packaged.
 - [CONTRIBUTING.md](CONTRIBUTING.md): contribution rules (no game content of any kind).
