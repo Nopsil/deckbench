@@ -62,11 +62,14 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { NButton, NInput, NSpin, NUpload, useMessage } from 'naive-ui'
 import { api } from '../api'
 import { t, has } from '../i18n'
 import RunDetail from '../components/RunDetail.vue'
+
+const route = useRoute()
 
 const msg = useMessage()
 const path = ref('')
@@ -123,6 +126,15 @@ async function find() {
   } catch (e) { msg.error(e.message) }
   finally { finding.value = false }
 }
+function applyQueryPath() {
+  const q = route.query.path
+  if (typeof q === 'string' && q.trim()) {
+    path.value = q.trim()
+    loadPath()
+  }
+}
+onMounted(applyQueryPath)
+watch(() => route.query.path, (v, prev) => { if (v && v !== prev) applyQueryPath() })
 </script>
 
 <style scoped>

@@ -88,7 +88,7 @@ python tools/import_run.py tests/fixtures/saves/sample_live.save --lang en
 python tools/import_run.py --discover
 ```
 
-图形界面左侧 **导入对局**：贴路径、选文件，或点「查找本机存档」。只读，不会改你的存档。
+图形界面左侧 **导入对局**：贴路径、选文件，或点「查找本机存档」。地址 `#/import?path=` 后面也可以直接带文件路径。只读，不会改你的存档。
 接口（只监听本机）：
 
 - `POST /api/import`，正文 `{"path": "..."}` 
