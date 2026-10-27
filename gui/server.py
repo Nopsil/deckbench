@@ -322,25 +322,41 @@ class PreviewReq(BaseModel):
     neow: str = "first"
 
 
+def _import_detail(err):
+    """解析器附带的一行原因。不进成功响应，只接在已经翻译的错误后面。"""
+    raw = (getattr(err, "params", None) or {}).get("detail")
+    if not raw:
+        return ""
+    text = " ".join(str(raw).split()).replace("{", "(").replace("}", ")")
+    if len(text) > 160:
+        text = text[:160] + "..."
+    return text
+
+
 def _import_http(err):
-    p = err.params
+    p = getattr(err, "params", None) or {}
     if err.code == "not_found":
-        return T("imp.err.not_found", path=p.get("path", ""))
-    if err.code == "not_json":
-        return T("imp.err.not_json")
-    if err.code == "not_object":
-        return T("imp.err.not_object")
-    if err.code == "unknown_shape":
-        return T("imp.err.unknown_shape")
-    if err.code == "not_a_run":
-        return T("imp.err.not_a_run")
-    if err.code == "too_big":
-        return T("imp.err.too_big")
-    if err.code == "decode":
-        return T("imp.err.decode")
-    if err.code == "dir_empty":
-        return T("imp.err.dir_empty", path=p.get("path", ""))
-    return T("imp.err.unknown_shape")
+        msg = T("imp.err.not_found", path=p.get("path", ""))
+    elif err.code == "not_json":
+        msg = T("imp.err.not_json")
+    elif err.code == "not_object":
+        msg = T("imp.err.not_object")
+    elif err.code == "unknown_shape":
+        msg = T("imp.err.unknown_shape")
+    elif err.code == "not_a_run":
+        msg = T("imp.err.not_a_run")
+    elif err.code == "too_big":
+        msg = T("imp.err.too_big")
+    elif err.code == "decode":
+        msg = T("imp.err.decode")
+    elif err.code == "dir_empty":
+        msg = T("imp.err.dir_empty", path=p.get("path", ""))
+    else:
+        msg = T("imp.err.unknown_shape")
+    extra = _import_detail(err)
+    if extra and extra not in msg:
+        return T("imp.err.withDetail", text=msg, detail=extra)
+    return msg
 
 
 def _preview_http(err):

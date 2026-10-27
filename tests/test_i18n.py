@@ -72,6 +72,8 @@ def test_keys_used_in_code_exist():
     dyn += [f"prev.limit.{c}" for c in (
         "full_unlocks", "not_tutorial", "no_modifiers", "unknown_nodes", "later_act_maps_projected", "rewards_no_combat")]
     dyn += [f"prev.confidence.{c}" for c in ("act_entry", "projected", "failed")]
+    dyn += [f"prev.badge.{c}" for c in ("act_entry", "projected", "failed")]
+    dyn += [f"prev.neowHint.{c}" for c in ("first", "all", "none", "index")]
     dyn += [f"prev.warn.{c}" for c in ("seedNormalized", "seedCharset", "seedLength", "relicQueueHidden")]
     dyn += [f"status.{s}" for s in ("running", "done", "failed", "cancelled", "interrupted", "queued")]
     dyn += [f"metric.{k}" for k in ("floor", "boss1", "act2", "act3", "win")]

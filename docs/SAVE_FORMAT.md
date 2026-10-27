@@ -88,7 +88,7 @@ python tools/import_run.py tests/fixtures/saves/sample_live.save --lang en
 python tools/import_run.py --discover
 ```
 
-图形界面左侧 **导入对局**：贴路径、选文件，或点「查找本机存档」。地址 `#/import?path=` 后面也可以直接带文件路径。只读，不会改你的存档。
+图形界面左侧 **导入对局**：贴路径、选文件，或点「查找本机存档」。地址 `#/import?path=` 后面也可以直接带文件路径。读不开、损坏或不是一局对局的文件会说明原因；目录里坏掉的文件逐个标出来。只读，不会改你的存档。
 接口（只监听本机）：
 
 - `POST /api/import`，正文 `{"path": "..."}` 
@@ -113,7 +113,7 @@ python tools/seed_preview.py 7F3K9Q2ZB8MA --char Ironclad --asc 0
 python tools/seed_preview.py 7F3K9Q2ZB8MA --neow all --json /tmp/preview.json --lang en
 ```
 
-图形界面 **种子预览**，或 `POST /api/seed-preview`，正文 `{"seed","char","asc","neow"}`。`neow` 取 `first`（默认，第一个没锁的）、`all`、`none` 或序号。
+图形界面 **种子预览**（`#/preview?seed=` 可以直接打开），或 `POST /api/seed-preview`，正文 `{"seed","char","asc","neow"}`。`neow` 取 `first`（默认，第一个没锁的）、`all`、`none` 或序号。界面上用三个按钮选这个范围。每一幕地图标「进幕」「投影」或「未生成」。还没有本机游戏数据时，页面说明原因，不猜地图。
 
 和真游戏对照时的前提（和种子探针相同）：
 

@@ -15,7 +15,10 @@
     <div v-if="run.killed_by_encounter || run.killed_by_event" class="hint">
       {{ t('imp.killedBy') }}: <span class="mono">{{ run.killed_by_encounter || run.killed_by_event }}</span>
     </div>
-    <div v-for="w in run.warnings || []" :key="w.code + (w.act || '')" class="hint">{{ warnText(w) }}</div>
+    <div v-if="(run.warnings || []).length" class="warn-block">
+      <div class="label">{{ t('imp.warnings') }}</div>
+      <div v-for="w in run.warnings || []" :key="w.code + (w.act || '')" class="hint warn">{{ warnText(w) }}</div>
+    </div>
 
     <div v-for="act in maps" :key="act.index" style="margin-top:16px">
       <div class="label">{{ t('imp.acts') }} {{ act.index + 1 }} <span class="mono">{{ act.id }}</span></div>
@@ -108,4 +111,6 @@ function openPreview() {
 .gridish { width: 100%; border-collapse: collapse; font-size: 13px; }
 .gridish th { text-align: left; color: #9C978F; font-weight: 600; padding: 6px 8px; }
 .gridish td { padding: 8px; border-top: 1px solid #2A2A30; vertical-align: top; }
+.warn-block { margin-top: 12px; }
+.hint.warn { color: #E0A86C; }
 </style>
