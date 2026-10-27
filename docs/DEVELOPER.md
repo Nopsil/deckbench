@@ -221,7 +221,7 @@ spire-mentor 已经实现了这些牌，但 `state_from_dict` 查牌 id 时只�
 
 ## MCP 对战模式 / MCP play mode
 
-见 [docs/MCP.md](MCP.md)：`tools/mcp_server.py`（stdio 或 streamable-HTTP），每局一个子进程，可撤销/恢复/导出。需要 `pip install -r requirements-mcp.txt`。
+见 [docs/MCP.md](MCP.md)：`tools/mcp_server.py`（stdio 或 streamable-HTTP），每局一个子进程，可撤销/恢复/导出。同一服务还能只读导入存档摘要（`import_save`），并返回和 `tools/seed_preview.py --json -` 相同的种子预览（`seed_preview`，`neow` 取 `first` / `all` / `none` / 序号）。需要 `pip install -r requirements-mcp.txt`。
 
 ## 旧版 YAML 战斗模拟器 / Legacy YAML combat simulator
 
