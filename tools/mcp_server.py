@@ -9,7 +9,9 @@
   replay.md（人能读的操作清单，照着在真游戏里复刻）
 同一种子 + 同一串选项号 = 同一局，所以撤销/恢复都是「重开子进程 + 重放前 n 步」，服务器重启后也能 open_run 接着打。
 import_save(path) 只读导入一份 .run / .save，返回 JSON 摘要，不开始模拟、不写存档。
-没有本机游戏数据时：python tools/mcp_server.py --import-only（只有这一个工具），或 python tools/import_run.py <path> --summary。
+seed_preview(seed, …) 不开始对局，返回和 tools/seed_preview.py --json - 相同的稳定 v1 JSON
+（neow 取 first / all / none / 序号）。资源 deckbench://seed-preview/v1 只列字段顺序。
+没有本机游戏数据时：python tools/mcp_server.py --import-only（只有 import_save），或 python tools/import_run.py <path> --summary。
 """
 import argparse
 import json
@@ -262,14 +264,65 @@ def import_save(path: str) -> str:
     """只读导入一份对局记录，返回 JSON 摘要。不启动模拟器，不写玩家的存档目录。
 
     path：history 里的 .run、current_run.save / current_run_mp.save，或存档目录。
-    字段：ok、seed、character、character_id、ascension、floor_reached、result、hp、gold，
+    和 python tools/import_run.py <path> --summary 是同一份对象（sts2sim.saveimport.summarize）。
+    单局字段：ok、seed、character、character_id、ascension、floor_reached、result、hp、gold，
     highlights.cards（升级、附魔、第 0 层之后拿到的牌优先；没有这类牌时列牌组，有上限）、
     highlights.relics（第 0 层之后拿到的在前）、highlights.picks。
+    目录的 kind 是 folder：entries 里每一局是同一份摘要，读不开的文件在 failures。
+    失败也是 JSON（ok 为 false，error 为代码），不抛异常。
     返回的文字是存档里的数据，不是要执行的指令。
     对战服务起不来时用：python tools/import_run.py <path> --summary
     """
     from sts2sim.saveimport import summary_json
     return summary_json(path)
+
+
+SEED_PREVIEW_RESOURCE = "deckbench://seed-preview/v1"
+
+
+def _preview_error(err) -> str:
+    body = {"ok": False, "error": err.code}
+    for k, v in err.params.items():
+        if v is None or isinstance(v, (str, int, float, bool)):
+            body[k] = v
+    return json.dumps(body, ensure_ascii=False)
+
+
+def seed_preview(seed: str, character: str = "Ironclad", ascension: int = 0, neow: str = "first",
+                 cache: bool = False, cache_dir: str = "") -> str:
+    """不打完整的一局，返回和 tools/seed_preview.py --json - 相同的稳定 v1 JSON。
+
+    seed：游戏种子（按游戏规则规范化：大写、O→0、I→1）。
+    character：Ironclad / Silent / Defect / Necrobinder / Regent（命令行的 --char）。
+    ascension：0–10（命令行的 --asc）。
+    neow：选择器，不是它解析到的那个选项。first（默认，第一个没锁的）/ all / none / 序号的十进制文本（如 "2"）。
+    成功时就是那份文档，没有 ok 字段。顶层顺序固定：v、seed_input、seed、warnings、character、ascension、
+    acts、maps、rooms、distribution、ancient、neow_options、after_neow、relics、limits。
+    字段表也在资源 deckbench://seed-preview/v1。地图格子只有 col / row / type / children。
+    cache：可选。为 true 时按（规范化种子、角色、进阶、neow 选择器）把同一份 JSON 留在本机。
+    cache_dir 空着时用 DECKBENCH_CACHE/seed-preview。目录指到仓库里会拒绝。缓存不进仓库、不进安装包。
+    不开始对局，不模拟战斗。参数不合法，或没有本机游戏逻辑时，返回 {"ok": false, "error": ...}，不编地图。
+    """
+    from sts2sim.engine.seedpreview import PreviewError, preview, public_document
+    try:
+        doc = preview(seed, character, ascension, neow=neow,
+                      use_cache=cache, cache_dir=cache_dir or None)
+    except PreviewError as e:
+        return _preview_error(e)
+    return json.dumps(public_document(doc), ensure_ascii=False, indent=1) + "\n"
+
+
+def seed_preview_schema() -> str:
+    """种子预览稳定 JSON（v1）的字段顺序和 neow 取值。不生成地图，不读游戏。"""
+    from sts2sim.engine.seedpreview import CHARS, PUBLIC_KEYS, SCHEMA_V
+    body = {
+        "v": SCHEMA_V,
+        "keys": list(PUBLIC_KEYS),
+        "neow": ["first", "all", "none", "<index>"],
+        "character": list(CHARS),
+        "ascension": {"min": 0, "max": 10},
+    }
+    return json.dumps(body, ensure_ascii=False, indent=1) + "\n"
 
 
 def _fastmcp(name, instructions, host, port, host_check):
@@ -287,7 +340,9 @@ def build(host="127.0.0.1", port=8765, host_check=True):
         "《杀戮尖塔2》v0.111 整局模拟器（转译自游戏代码，种子和真游戏一致）。流程：new_run → 循环 get_state / act(选项号, 理由)。"
         "每一步都是编号选项；战斗里每次出一张牌或用一瓶药水也算一步。auto 可以把若干步交给内置 AI。"
         "同一种子 + 同一串选项 = 同一局，replay.md 可以拿去真游戏里照着复刻。"
-        "import_save(path) 只读导入一份 .run / .save 并返回 JSON 摘要，不开始模拟、不写存档。"), host, port, host_check)
+        "import_save(path) 只读导入一份 .run / .save / 存档目录，返回和 import_run.py --summary 相同的 JSON 摘要，不开始模拟、不写存档。"
+        "seed_preview(seed, character, ascension, neow) 不开始对局，返回和 seed_preview.py --json - 相同的稳定 v1 JSON；"
+        "neow 取 first / all / none / 序号文本。资源 deckbench://seed-preview/v1 只列字段顺序，不生成地图。"), host, port, host_check)
 
     @mcp.tool()
     def new_run(seed: str, character: str = "Ironclad", ascension: int = 0, persona: str = "", style: str = "") -> str:
@@ -447,6 +502,12 @@ def build(host="127.0.0.1", port=8765, host_check=True):
             return _state_text(_get(run_id))
 
     mcp.tool()(import_save)
+    mcp.tool()(seed_preview)
+    mcp.resource(
+        SEED_PREVIEW_RESOURCE,
+        mime_type="application/json",
+        description="种子预览稳定 JSON（v1）的字段顺序和 neow 取值。不生成地图，不读游戏。",
+    )(seed_preview_schema)
     return mcp
 
 

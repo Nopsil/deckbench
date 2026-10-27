@@ -28,9 +28,21 @@ python tools/mcp_server.py --http --port 8765   # streamable-HTTP → http://127
 | `undo(steps)` / `restore(step)` | 回退几步 / 回到第 step 个决策之前 |
 | `get_log(last)` / `export_log()` | 决策日志；导出 decisions.jsonl + replay.md |
 | `list_runs()` / `open_run(run_id)` | 列出 / 重新打开以前的局 |
-| `import_save(path)` | 只读导入一个 `.run` / `current_run.save` / 存档目录，返回 JSON 摘要（`seed`、`character`、`ascension`、`floor_reached`、`highlights.cards`、`highlights.relics`）。不开始模拟，不写存档 |
+| `import_save(path)` | 只读导入一个 `.run` / `current_run.save` / 存档目录，返回 JSON 摘要（`seed`、`character`、`ascension`、`floor_reached`、`highlights.cards`、`highlights.relics`；目录是 `kind: folder`）。不开始模拟，不写存档。失败也是 JSON（`ok: false`） |
+| `seed_preview(seed, character, ascension, neow, cache, cache_dir)` | 不打一局。返回和 `tools/seed_preview.py --json -` 相同的稳定 v1 JSON。`neow`：`first`（默认，第一个没锁的）/ `all` / `none` / 序号文本（如 `"2"`），是选择器本身。`cache` 可选，把同一份 JSON 留在本机（目录不能在仓库里）。参数不合法或没有本机游戏逻辑时返回 `{"ok": false, "error": ...}`，不编地图 |
 
-`import_save` 和 `python tools/import_run.py <path> --summary` 是同一份摘要（`sts2sim/saveimport.py` 的 `summarize`）。没有本机游戏数据时，对战服务仍会退出；改跑 `python tools/mcp_server.py --import-only`（只有这一个工具）或上面的命令行。格式见 [SAVE_FORMAT.md](SAVE_FORMAT.md)。
+`import_save` 和 `python tools/import_run.py <path> --summary` 是同一份摘要（`sts2sim/saveimport.py` 的 `summarize`；命令行多缩进，对象相同）。没有本机游戏数据时，对战服务仍会退出；改跑 `python tools/mcp_server.py --import-only`（只有 `import_save`）或上面的命令行。
+
+`seed_preview` 只在对战服务器上（需要已经生成本机游戏逻辑，和 `new_run` 一样）。成功时没有 `ok` 字段，就是那份 v1 文档：`v`、`seed_input`、`seed`、`warnings`、`character`、`ascension`、`acts`、`maps`、`rooms`、`distribution`、`ancient`、`neow_options`、`after_neow`、`relics`、`limits`。可选 `cache=true` 按规范化种子、角色、进阶和 `neow` 选择器写入 `cache_dir`（空着则用 `DECKBENCH_CACHE/seed-preview`），不进仓库。
+
+*Seed preview is the same stable v1 document as `python tools/seed_preview.py <seed> --json -`. `neow` is `first`, `all`, `none`, or a decimal index such as `"2"`. It does not start a run. A bad selector or a missing local engine returns `{"ok": false, "error": "..."}` instead of an invented map. `--import-only` stays import-only.*
+
+## 资源 / Resources
+| 资源 | 说明 |
+|---|---|
+| `deckbench://seed-preview/v1` | 预览 JSON 的字段顺序、`neow` 取值和角色列表。不生成地图，不读游戏 |
+
+格式见 [SAVE_FORMAT.md](SAVE_FORMAT.md)。
 
 同一种子 + 同一串选择 = 同一局，所以撤销/恢复是「重开 + 重放」；服务器重启后也能 `open_run` 接着打。
 奖励里的金币/药水/遗物默认全拿，不算决策；宝箱遗物会真正进遗物栏（0.1.3 修复）。一局结束时列出全部遗物和牌组。`auto` 用的 AI 内部随机状态不随撤销回滚，撤销后再 `auto` 可能走出不同的路线。

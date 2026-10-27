@@ -587,13 +587,21 @@ def _import_cli():
 
 def test_import_cli_errors_discover_and_kind_text(tmp_path, monkeypatch, capsys):
     cli = _import_cli()
-    bad = tmp_path / "bad.run"
+    # JSON 不能写进直接放着 .run / .save 的目录。样本文件放在子目录里。
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    out = tmp_path / "out.json"
+    assert cli.main([HIST, "--json", str(out), "--lang", "en"]) == 0
+    doc = json.loads(out.read_text(encoding="utf-8"))
+    assert doc["kind"] == "run" and doc["run"]["kind"] == "run_history" and doc["run"]["schema_version"] == 9
+
+    bad = scratch / "bad.run"
     bad.write_bytes(b"\x00\x01")
     assert cli.main([str(bad), "--lang", "en"]) == 2
     assert "not a text JSON" in capsys.readouterr().err
-    assert cli.main([str(tmp_path / "missing.run"), "--lang", "en"]) == 2
+    assert cli.main([str(scratch / "missing.run"), "--lang", "en"]) == 2
     assert "Path not found" in capsys.readouterr().err
-    prefs = tmp_path / "prefs.save"
+    prefs = scratch / "prefs.save"
     prefs.write_text("{}", encoding="utf-8")
     assert cli.main([str(prefs), "--lang", "en"]) == 2
     assert "not one run" in capsys.readouterr().err
@@ -601,24 +609,19 @@ def test_import_cli_errors_discover_and_kind_text(tmp_path, monkeypatch, capsys)
         cli.main(["--lang", "en"])
     assert missing_arg.value.code == 2
 
-    gz = tmp_path / "h.run"
+    gz = scratch / "h.run"
     gz.write_bytes(gzip.compress(open(HIST, "rb").read()))
     assert cli.main([str(gz), "--lang", "en"]) == 0
     gz_out = capsys.readouterr().out
     assert "SAMPLESEED01" in gz_out and "gzip-compressed" in gz_out and "Lost" in gz_out
     assert "no map column" in gz_out and "in-progress save" not in gz_out
-    u16 = tmp_path / "current_run.save"
+    u16 = scratch / "current_run.save"
     u16.write_bytes(open(LIVE, "rb").read().decode("utf-8").encode("utf-16"))
     assert cli.main([str(u16), "--lang", "en"]) == 0
     live_out = capsys.readouterr().out
     assert "LIVESEED0001" in live_out and "In progress" in live_out and "Schema 16" in live_out
     assert "UTF-16" in live_out and "No top-level seed" in live_out
     assert "in-progress save" in live_out and "no map column" not in live_out
-
-    out = tmp_path / "out.json"
-    assert cli.main([HIST, "--json", str(out), "--lang", "en"]) == 0
-    doc = json.loads(out.read_text(encoding="utf-8"))
-    assert doc["kind"] == "run" and doc["run"]["kind"] == "run_history" and doc["run"]["schema_version"] == 9
 
     saves = tmp_path / "saves"
     (saves / "history").mkdir(parents=True)
