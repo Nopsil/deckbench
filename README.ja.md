@@ -101,7 +101,7 @@ Linux/macOS の場合は [docs/DEVELOPER.md](docs/DEVELOPER.md) を参照して�
 
 - **「汎用 AI（おすすめ・Mod キャラでも使える）」**：ほとんどの場合はこれがおすすめです。カード選択・休憩所・ショップは小さなニューラルネットが担当し、コスト・ダメージ・ブロック・レアリティなどの汎用的な数値だけを見て、個々のカード名は見ません。そのため**自作の Mod キャラクターでも使えます**。速度は学習版と同じ（1 ランあたり 1〜2 秒）で、Windows でも使えます。私たちのテストでは、学習版より平均 1〜4 階層多く進みました。
 - **「学習版 AI」**：前のバージョンでのおすすめです。速度は同じなので、比較用に使えます。
-- **「spire-mentor フルラン AI」の 2 つ**：いちばん強いですが、サードパーティの spire-mentor をご自身でビルドする必要があり、ベースゲームの 5 キャラクターにしか対応していません。詳しくは [docs/DEVELOPER.md](docs/DEVELOPER.md) を参照してください。
+- **「spire-mentor フルラン AI」の 2 つ**：ベースゲームの 5 キャラクターではより強く、シード選別に向いています。公式パッケージの一覧にありますが、spire-mentor 自体は同梱されません。ご自身でビルドし、アプリの横に `mentor.local.json` を置いてください（Windows 版は `python` を、ビルドに使った Python に向ける必要があります）。未設定のあいだは灰色です。詳しくは [docs/DEVELOPER.md](docs/DEVELOPER.md)。
 
 ## ゲームのシードで遊ばせる
 
@@ -152,7 +152,7 @@ Steam でゲームがインストールされているか確認し、上記の `
 ## さらに詳しく
 
 - [docs/DEVELOPER.md](docs/DEVELOPER.md)：コマンドラインでの一括実行（全オプション）、初回データ生成の仕組み、オプションの spire-mentor AI、旧版の戦闘シミュレーター、フォルダ構成、テスト（Linux/macOS 用コマンドを含む）。
-- オプションのより強い AI：サードパーティの [spire-mentor](https://github.com/tfriedel/spire-mentor) をご自身でビルドすると、`mentor-full` が使えます（戦闘は MCTS、戦闘外の判断は PPO ネットワークが担当。ベースゲームの 5 キャラクターのみ対応）。spire-mentor は本プロジェクトには同梱されていません。v0.111 で追加された 19 枚の新カード（SIDESTEP など）の読み込みに既知の問題があり、小さなローカルパッチを用意しています。詳しくは [docs/DEVELOPER.md](docs/DEVELOPER.md#可选spire-mentor更强的-ai--optional-spire-mentor) を参照してください。
+- オプションのより強い AI：サードパーティの [spire-mentor](https://github.com/tfriedel/spire-mentor) をご自身でビルドすれば、公式パッケージで `mentor-full` / `mentor-full-ev` を選べます（戦闘は MCTS、戦闘外は PPO。ベースゲームの 5 キャラクターのみ。DeckBench を作り直す必要はありません）。spire-mentor は同梱しません。Windows 版は `mentor.local.json` の `python` を、`sts2_rs` をビルドした Python に向けてください。v0.111 の新カード 19 枚（SIDESTEP など）には既知の読み込み問題があり、小さなローカルパッチがあります。動作確認とパッケージ時の注意は [docs/DEVELOPER.md](docs/DEVELOPER.md#可选spire-mentor更强的-ai--optional-spire-mentor)。
 - [docs/MODDING.md](docs/MODDING.md)：YAML + Python で自分の Mod を作る方法（カード、パワー、レリック、デッキ、実験）。
 - [gui/README.md](gui/README.md)：GUI アプリの構成とパッケージ化。
 - [CONTRIBUTING.md](CONTRIBUTING.md)：コントリビュートのルール（ゲームのコンテンツは一切受け付けません）。

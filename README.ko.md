@@ -101,7 +101,7 @@ Linux/macOS는 [docs/DEVELOPER.md](docs/DEVELOPER.md)를 참고하세요.
 
 - **「범용 AI (추천, 모드 캐릭터도 사용 가능)」**: 대부분의 경우 이걸 추천합니다. 카드 선택, 휴식처, 상점은 작은 신경망이 맡는데, 비용·피해량·방어도·희귀도 같은 일반적인 수치만 보고 개별 카드 이름은 모릅니다. 그래서 **직접 만든 모드 캐릭터에도 쓸 수 있습니다**. 속도는 학습형 AI와 같고(한 판에 1~2초) Windows에서도 됩니다. 저희 테스트에서는 학습형 AI보다 평균 1~4층 더 갔습니다.
 - **「학습형 AI」**: 이전 버전의 추천 AI입니다. 속도가 같아서 비교용으로 쓸 수 있습니다.
-- **「spire-mentor 풀런 AI」 두 가지**: 가장 강하지만, 서드파티 프로그램인 spire-mentor를 직접 빌드해야 하고 기본 캐릭터 5명만 지원합니다. 자세한 내용은 [docs/DEVELOPER.md](docs/DEVELOPER.md)를 참고하세요.
+- **「spire-mentor 풀런 AI」 두 가지**: 기본 캐릭터 5명에서는 더 강해서 시드 가리기에 맞습니다. 공식 패키지 목록에 있지만 spire-mentor 자체는 들어 있지 않습니다. 직접 빌드하고 프로그램 옆에 `mentor.local.json` 을 두세요 (Windows 패키지는 `python` 을 그 빌드에 쓴 Python 으로 가리켜야 합니다). 설정 전에는 회색입니다. 자세한 내용은 [docs/DEVELOPER.md](docs/DEVELOPER.md).
 
 ## 게임 시드로 돌려 보기
 
@@ -152,7 +152,7 @@ Steam에 게임이 설치되어 있는지 확인한 다음, 위에서 설명한 
 ## 더 알아보기
 
 - [docs/DEVELOPER.md](docs/DEVELOPER.md): 명령줄 일괄 실행(전체 옵션), 첫 데이터 생성의 내부 원리, 선택 사항인 spire-mentor AI, 구버전 전투 시뮬레이터, 폴더 구조, 테스트(Linux/macOS 명령 포함).
-- 선택 사항인 더 강한 AI: 서드파티 [spire-mentor](https://github.com/tfriedel/spire-mentor)를 직접 빌드하면 `mentor-full`을 쓸 수 있습니다(전투는 MCTS, 전투 밖 결정은 PPO 신경망이 담당하며 기본 캐릭터 5명만 지원). spire-mentor는 이 프로젝트에 포함되어 있지 않습니다. v0.111에서 추가된 새 카드 19장(SIDESTEP 등)을 읽을 때 알려진 문제가 있어서, 작은 로컬 패치를 제공합니다. 자세한 내용은 [docs/DEVELOPER.md](docs/DEVELOPER.md#可选spire-mentor更强的-ai--optional-spire-mentor)를 참고하세요.
+- 선택 사항인 더 강한 AI: 서드파티 [spire-mentor](https://github.com/tfriedel/spire-mentor)를 직접 빌드하면 공식 패키지에서 `mentor-full` / `mentor-full-ev` 를 고를 수 있습니다 (전투는 MCTS, 전투 밖은 PPO, 기본 캐릭터 5명만. DeckBench 를 다시 빌드할 필요는 없습니다). spire-mentor 는 포함하지 않습니다. Windows 패키지는 `mentor.local.json` 의 `python` 을 `sts2_rs` 를 빌드한 Python 으로 가리키세요. v0.111 새 카드 19장(SIDESTEP 등)을 읽을 때 알려진 문제가 있어 작은 로컬 패치를 둡니다. 동작 확인과 패키징 주의는 [docs/DEVELOPER.md](docs/DEVELOPER.md#可选spire-mentor更强的-ai--optional-spire-mentor).
 - [docs/MODDING.md](docs/MODDING.md): YAML + Python으로 나만의 모드 만들기(카드, 파워, 유물, 덱, 실험).
 - [gui/README.md](gui/README.md): 그래픽 화면의 구조와 패키징.
 - [CONTRIBUTING.md](CONTRIBUTING.md): 기여 안내(게임 콘텐츠는 일절 받지 않습니다).

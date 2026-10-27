@@ -312,7 +312,8 @@
  "agent.mentor-full.desc": "전투는 spire-mentor의 MCTS, 카드 선택·경로·상점·휴식은 그 PPO 신경망이 맡습니다. 기본 캐릭터 5명만 지원 (모드 캐릭터는 학습형 AI로 대체). 한 판에 약 30~50초",
  "agent.mentor-full-ev.name": "spire-mentor 풀런 AI + 이벤트 (외부, A10 최강)",
  "agent.mentor-full-ev.desc": "위 항목에 더해 이벤트와 강화/제거/변화/인챈트도 PPO가 맡습니다 (이벤트 영어 텍스트는 실행 중에 설치된 게임에서 읽음). 보스/엘리트전은 4000회 시뮬레이션. 한 판에 약 50~130초",
- "agent.mentorHint": "외부 spire-mentor를 직접 빌드하고 DECKBENCH_MENTOR_SITE / DECKBENCH_MENTOR_PY를 설정한 뒤 다시 시작하세요 (docs/DEVELOPER.md 참고)",
+ "agent.mentorHint": "DeckBench에 포함되어 있지 않습니다. spire-mentor를 직접 빌드한 뒤 DECKBENCH_MENTOR_SITE 와 DECKBENCH_MENTOR_PY 를 설정하거나, 프로그램 옆에 mentor.local.json 을 두고 다시 시작하세요 (docs/DEVELOPER.md)",
+ "agent.mentorHintPython": "패키지된 DeckBench.exe 는 spire-mentor를 불러올 수 없습니다. DECKBENCH_MENTOR_PYTHON(또는 mentor.local.json 의 python)을 sts2_rs 를 빌드한 Python 으로 설정한 뒤 다시 시작하세요 (docs/DEVELOPER.md)",
  "agentc.heuristic.name": "휴리스틱 (빠름)",
  "agentc.heuristic.desc": "탐욕법, 다음 턴은 계획하지 않음",
  "agentc.beam.name": "빔 탐색",
@@ -646,6 +647,11 @@
  "nt.styleNeedAgent": "이 스타일은 {agents} 계열 AI가 필요합니다",
  "chip.style": "스타일 {style}",
  "log.style": "플레이 스타일: {style}",
+ "log.mentorUnavailable": "spire-mentor 를 불러오지 못해 멈췄습니다 (학습형 AI로 조용히 바꾸지 않음): {err}. 확인: python -m sts2sim.engine.mentor_paths (docs/DEVELOPER.md)",
+ "log.mentorVanilla": "이 AI의 신경망은 기본 캐릭터 5명(Ironclad, Silent, Defect, Necrobinder, Regent)만 다룹니다. {char} 의 전투 밖 선택은 학습형 AI로 돌아갑니다.",
+ "log.mentorStats": "spire-mentor 결정 {ok}, 폴백 {fb} ({pct}); PPO 신경망/폴백 {ppo}",
+ "log.mentorAllFallback": "전투 결정이 모두 학습형 AI로 돌아갔습니다. 이 결과로 시드를 가리지 마세요 (docs/DEVELOPER.md).",
+ "log.mentorPpoFallback": "전투 밖 PPO 선택이 모두 돌아갔습니다. sts2_rs 를 빌드할 때 박아 둔 경로에 신경망이 없을 가능성이 큽니다. 이 결과로 시드를 가리지 마세요.",
  "style.unknown": "알 수 없는 플레이 스타일: {id}",
  "style.incompatible": "플레이 스타일 \"{style}\"은(는) AI \"{agent}\"와 함께 쓸 수 없습니다. 학습형 / 범용 / 강한 AI를 고르세요"
 }

@@ -5,8 +5,13 @@ from gui import backend
 
 
 def test_mentor_full_greyed_out_without_config(monkeypatch):
+    monkeypatch.setenv("DECKBENCH_MENTOR_NO_DEFAULTS", "1")
+    monkeypatch.setenv("STS2SIM_GUI_DATA", "no-such-mentor-data")
     monkeypatch.delenv("DECKBENCH_MENTOR_SITE", raising=False)
     monkeypatch.delenv("DECKBENCH_MENTOR_PY", raising=False)
+    monkeypatch.delenv("DECKBENCH_MENTOR_PYTHON", raising=False)
+    monkeypatch.delenv("DECKBENCH_MENTOR_CONFIG", raising=False)
+    monkeypatch.delenv("DECKBENCH_MENTOR_HOME", raising=False)
     a = {x["id"]: x for x in backend.agents_batch()}["mentor-full"]
     assert a["available"] is False and "DECKBENCH_MENTOR_SITE" in a["hint"]
 
@@ -21,7 +26,11 @@ def test_mentor_full_available_when_dirs_exist(monkeypatch, tmp_path):
 
 
 def test_mentor_full_ev_listed(monkeypatch):
+    monkeypatch.setenv("DECKBENCH_MENTOR_NO_DEFAULTS", "1")
+    monkeypatch.setenv("STS2SIM_GUI_DATA", "no-such-mentor-data")
     monkeypatch.delenv("DECKBENCH_MENTOR_SITE", raising=False)
+    monkeypatch.delenv("DECKBENCH_MENTOR_CONFIG", raising=False)
+    monkeypatch.delenv("DECKBENCH_MENTOR_HOME", raising=False)
     a = {x["id"]: x for x in backend.agents_batch()}["mentor-full-ev"]
     assert a["available"] is False
 

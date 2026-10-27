@@ -31,3 +31,7 @@ manifest.json
 
 # 实验输出（可能含游戏名称/数值）/ run outputs
 reports/
+
+# 用户本机的 spire-mentor 指针（不进仓库、不进安装包）
+mentor.local.json
+/mentor/

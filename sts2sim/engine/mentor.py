@@ -1,23 +1,18 @@
 """spire-mentor（外部 Rust 引擎）做战斗搜索的桥接。
 
-spire-mentor 不在本仓库里（它的仓库带游戏文本/数据），需要用户自己克隆并构建 Python 绑定：
+spire-mentor 不在本仓库里（它的仓库带游戏文本/数据），需要用户自己克隆并构建 Python 绑定。
+路径见 sts2sim/engine/mentor_paths.py（环境变量、mentor.local.json，或程序旁边的 mentor/）。
   DECKBENCH_MENTOR_SITE = sts2_rs 所在的 site-packages（maturin develop 装好的 venv）
   DECKBENCH_MENTOR_PY = spire-mentor/sts2-pycli/python（用它的 sts2_hint.adapter 把状态转成线格式）
+  DECKBENCH_MENTOR_PYTHON = 构建 sts2_rs 的 python（打包版 exe 必须填；由界面启动那个解释器）
 流程：我们的 CombatState → Sts2Headless combat_play 形状的 dict → sts2_hint.adapter.translate
      → sts2_rs.state_from_dict → sts2_rs.mcts_recommend → 映射回我们的动作。
 任何牌/遗物/能力/怪物/药水不被识别（如 Claude娘 模组内容）就抛 Unsupported，调用方回退到自己的搜索。
 """
-import os
 import re
-import sys
 
 from ..rt.boot import game as G
 from .combat import alive_enemies, hand
-
-# spire-mentor 是外部依赖（其仓库含游戏数据，本项目不内置）：自行构建后用环境变量指向它
-_DEF_SITE = os.environ.get("DECKBENCH_MENTOR_SITE", "")   # 装了 sts2_rs 的 site-packages
-_DEF_PY = os.environ.get("DECKBENCH_MENTOR_PY", "")       # spire-mentor 的 sts2-pycli/python 目录
-
 
 class Unsupported(Exception):
     pass
@@ -33,9 +28,8 @@ def lib():
             raise Unsupported("sts2_rs unavailable: " + _M["err"])
         return _M["rs"], _M["ad"]
     try:
-        for p in (os.environ.get("STS2SIM_MENTOR_SITE", _DEF_SITE), os.environ.get("STS2SIM_MENTOR_PY", _DEF_PY)):
-            if p and os.path.isdir(p) and p not in sys.path:
-                sys.path.append(p)
+        from .mentor_paths import add_paths
+        add_paths()
         import logging
         logging.getLogger("sts2_hint").setLevel(logging.ERROR)
         import sts2_rs
@@ -43,7 +37,9 @@ def lib():
         _M.update(rs=sts2_rs, ad=adapter)
         _M["status_titles"] = {t.upper().replace(" ", "_"): t for t in adapter.STATUS_CARD_TITLES}
         _M["potions"] = frozenset(sts2_rs.list_registry_names("potion"))
-    except Exception as e:  # noqa
+    except (KeyboardInterrupt, SystemExit):
+        raise
+    except BaseException as e:  # noqa  Rust panic 是 BaseException
         _M.update(rs=None, err=f"{type(e).__name__}: {e}")
         raise Unsupported("sts2_rs unavailable: " + _M["err"])
     return _M["rs"], _M["ad"]
