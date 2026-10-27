@@ -63,7 +63,16 @@ def test_keys_used_in_code_exist():
     missing = sorted(k for k in used if k not in zh and not k.endswith("."))
     assert not missing, missing
     # 动态拼出来的键
-    dyn = [f"page.{p}.{x}" for p in ("new", "run", "report", "ab", "history") for x in ("title", "sub")]
+    dyn = [f"page.{p}.{x}" for p in ("new", "run", "report", "ab", "history", "import", "preview") for x in ("title", "sub")]
+    dyn += [f"imp.result.{s}" for s in ("won", "lost", "abandoned", "in_progress")]
+    dyn += [f"imp.warn.{c}" for c in (
+        "gzip", "utf16", "bom", "doubleEncoded", "seedFromRng", "seedMissing", "noRouteColumn",
+        "mapUnparsed", "actsMixed", "actsObjects", "backup", "liveInProgress", "truncated")]
+    dyn += [f"mp.{c}" for c in ("Monster", "Elite", "Unknown", "Shop", "RestSite", "Treasure", "Boss", "Ancient", "Unassigned")]
+    dyn += [f"prev.limit.{c}" for c in (
+        "full_unlocks", "not_tutorial", "no_modifiers", "unknown_nodes", "later_act_maps_projected", "rewards_no_combat")]
+    dyn += [f"prev.confidence.{c}" for c in ("act_entry", "projected", "failed")]
+    dyn += [f"prev.warn.{c}" for c in ("seedNormalized", "seedCharset", "seedLength", "relicQueueHidden")]
     dyn += [f"status.{s}" for s in ("running", "done", "failed", "cancelled", "interrupted", "queued")]
     dyn += [f"metric.{k}" for k in ("floor", "boss1", "act2", "act3", "win")]
     dyn += [f"room.{r}" for r in backend.ROOMS + ["Monster", "Elite", "Boss", "Event", "_unrecorded", "探针"]]

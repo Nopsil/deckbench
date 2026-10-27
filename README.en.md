@@ -38,6 +38,8 @@ An unofficial balance-testing tool for Slay the Spire 2 mod authors and players.
 - **Test your own mod**: a sample mod is built in (Claude娘, original content), and you can upload your own YAML mod for combat tests.
 - **A desktop app, all on your PC**: pick settings with a few clicks, run with one button, live progress, chart reports and history. Nothing goes online and nothing is uploaded.
 - **Four languages**: English, 简体中文, 日本語 and 한국어, switchable in the app; game names (cards, characters, enemies) come from your own install in the same language.
+- **Import a real run**: read a finished run or the in-progress save (seed, route, card picks, relics) without modifying it.
+- **Seed preview**: given a seed, see the map, encounter mix and opening rewards without playing a full run.
 
 ## Getting started (Windows)
 
@@ -107,6 +109,16 @@ Linux/macOS: see [docs/DEVELOPER.md](docs/DEVELOPER.md).
 
 In **New test → Full runs**, fill in **Game seed** with the seed shown in the game (for example `7F3K9Q2ZB8MA`). The AI then plays just that one run and records every decision, which you can look through on the results page.
 Lowercase letters, and the letters O and I, are converted to uppercase and the digits 0 and 1 automatically, just like the game does. Command line: `python tools/batch.py --char Silent --seed 7F3K9Q2ZB8MA --log-dir steps`.
+
+## Import a real run
+
+Open **Import run** on the left. It reads a finished `history/*.run` or the in-progress `current_run.save` from your own game folder: seed, ascension, rooms visited, which card you picked on each floor, relics and the deck. It does not modify the save.
+Command line: `python tools/import_run.py <file or folder>`. Where the files live, and how the two JSON shapes differ, is in [docs/SAVE_FORMAT.md](docs/SAVE_FORMAT.md).
+
+## Preview a seed
+
+Open **Seed preview**. Enter a seed from the game (plus character and ascension) and see each act's map, how normals, elites and bosses are ordered, the opening choices and the rewards of the first normal fight — without an AI playing the whole run. Useful for picking a seed to record or for planning a route. Maps from act 2 on are projections; act 1 can be checked against a screenshot.
+Command line: `python tools/seed_preview.py <seed> --char Ironclad --asc 0`. This needs the data DeckBench generates from your install.
 
 ## Make a mod without code (Mod editor)
 

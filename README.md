@@ -38,6 +38,8 @@
 - **测你自己的 mod**：内置示例 mod（Claude娘，原创内容），也可以上传自己写的 YAML mod 跑战斗测试。
 - **图形界面，全在本机**：点选参数、一键运行、实时进度、图表报告、历史记录，不联网也不上传任何东西。
 - **四种界面语言**：简体中文、English、日本語、한국어。第一次打开跟着系统语言走，左下角随时可以切换（会记住你的选择）；卡牌、角色、敌人的名字也跟着切换，从你自己的游戏安装里读。
+- **导入真游戏的一局**：只读打开存档里的对局记录，看种子、路线、选牌和遗物。
+- **种子预览**：给一个种子，不打完整的一局，先看地图、怪物分布和开局奖励。
 
 *Win rate and floors reached for full runs at any ascension; death causes; same-seed single-card A/B tests; test your own mods; a local desktop app with charts and history (nothing is uploaded).*
 
@@ -115,6 +117,20 @@ $env:DECKBENCH_GAME_DIR = "D:\SteamLibrary\steamapps\common\Slay the Spire 2"
 小写、字母 O 和 I 会按游戏规则自动换成大写、数字 0 和 1。命令行：`python tools/batch.py --char Silent --seed 7F3K9Q2ZB8MA --log-dir steps`。
 
 *Type a seed from the game into "Game seed" in New test → Full runs: the AI plays just that run and records every decision. Lowercase, O and I are normalized like the game does. CLI: `--seed` and `--log-dir`.*
+
+## 导入真游戏的一局 / Import a real run
+
+左侧 **「导入对局」**：只读打开游戏存下来的一局（打完的 `history/*.run`，或正在打的 `current_run.save`）。能看种子、进阶、走过的房间、每一层选了哪张牌、遗物和牌组。不会改你的存档。
+命令行：`python tools/import_run.py <文件或文件夹>`。文件在哪、两种 JSON 差在哪，见 [docs/SAVE_FORMAT.md](docs/SAVE_FORMAT.md)。
+
+*The **Import run** page reads a finished `history/*.run` or an in-progress `current_run.save` from your own install: seed, ascension, route, card picks, relics and deck. Read-only. CLI: `python tools/import_run.py`. Paths and the two JSON shapes: docs/SAVE_FORMAT.md.*
+
+## 先看种子再决定打不打 / Preview a seed
+
+左侧 **「种子预览」**：填游戏里的种子（以及角色、进阶），不让 AI 把整局打完，先看每一幕的地图、普通怪/精英/首领怎么排、开局选项和第一场普通战斗的奖励。适合挑录像用的种子、先想路线。第 2 幕往后的地图是投影，第 1 幕可以拿游戏截图对照。
+命令行：`python tools/seed_preview.py <种子> --char Ironclad --asc 0`。需要已经从你的游戏生成本机数据。
+
+*The **Seed preview** page shows each act's map, the normal/elite/boss queues, opening choices and the first fight's rewards for a game seed, without playing the run. Act 2+ maps are projections; check act 1 against a screenshot. CLI: `python tools/seed_preview.py`. Needs data generated from your install.*
 
 ## 不写代码做 mod（模组编辑器） / Make a mod without code (Mod editor)
 

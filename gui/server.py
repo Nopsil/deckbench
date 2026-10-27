@@ -311,6 +311,96 @@ def delete_mod(name: str):
     return {"ok": True}
 
 
+class ImportPathReq(BaseModel):
+    path: str
+
+
+class PreviewReq(BaseModel):
+    seed: str = ""
+    char: str = "Ironclad"
+    asc: int = 0
+    neow: str = "first"
+
+
+def _import_http(err):
+    p = err.params
+    if err.code == "not_found":
+        return T("imp.err.not_found", path=p.get("path", ""))
+    if err.code == "not_json":
+        return T("imp.err.not_json")
+    if err.code == "not_object":
+        return T("imp.err.not_object")
+    if err.code == "unknown_shape":
+        return T("imp.err.unknown_shape")
+    if err.code == "not_a_run":
+        return T("imp.err.not_a_run")
+    if err.code == "too_big":
+        return T("imp.err.too_big")
+    if err.code == "decode":
+        return T("imp.err.decode")
+    if err.code == "dir_empty":
+        return T("imp.err.dir_empty", path=p.get("path", ""))
+    return T("imp.err.unknown_shape")
+
+
+def _preview_http(err):
+    p = err.params
+    if err.code == "need_seed":
+        return T("prev.err.need_seed")
+    if err.code == "bad_asc":
+        return T("prev.err.bad_asc")
+    if err.code == "bad_char":
+        return T("prev.err.bad_char", char=p.get("char", ""))
+    if err.code == "bad_neow":
+        return T("prev.err.bad_neow")
+    if err.code == "no_engine":
+        return T("prev.err.no_engine", err=p.get("err", ""))
+    return T("prev.err.failed", err=err.code)
+
+
+@app.post("/api/import")
+def import_save(req: ImportPathReq):
+    """只读解析玩家指出的 .run / current_run.save / 存档目录。"""
+    from sts2sim.saveimport import SaveImportError, load_path
+    try:
+        return load_path(req.path)
+    except SaveImportError as e:
+        raise HTTPException(400, _import_http(e))
+
+
+@app.post("/api/import/upload")
+async def import_upload(file: UploadFile = File(...)):
+    """浏览器选中的存档只在内存里解析，不写回游戏目录。"""
+    from sts2sim.saveimport import MAX_BYTES, SaveImportError, parse_bytes
+    data = await file.read()
+    if len(data) > MAX_BYTES:
+        raise HTTPException(400, T("imp.err.too_big"))
+    try:
+        run = parse_bytes(data, filename=file.filename or "upload.run")
+    except SaveImportError as e:
+        raise HTTPException(400, _import_http(e))
+    return {"v": 1, "kind": "run", "run": run}
+
+
+@app.get("/api/saves/discover")
+def saves_discover():
+    """常见位置里的存档目录。只列路径，不读内容。"""
+    from sts2sim.saveimport import discover
+    return {"roots": discover()}
+
+
+@app.post("/api/seed-preview")
+async def seed_preview(req: PreviewReq):
+    """地图、遭遇队列、开局奖励。不打战斗。没有本机游戏逻辑时返回说明。"""
+    from sts2sim.engine.seedpreview import PreviewError, preview
+    try:
+        return await asyncio.to_thread(preview, req.seed, req.char, req.asc, req.neow)
+    except PreviewError as e:
+        raise HTTPException(400, _preview_http(e))
+    except Exception as e:  # noqa
+        raise HTTPException(400, T("prev.err.failed", err=f"{type(e).__name__}: {e}"))
+
+
 LAST_PING = [0.0]
 
 
