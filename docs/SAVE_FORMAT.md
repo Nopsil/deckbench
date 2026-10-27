@@ -86,10 +86,9 @@ python tools/import_run.py tests/fixtures/saves/sample_history.run
 python tools/import_run.py tests/fixtures/saves/sample_history.run --lang en --json /tmp/run.json
 python tools/import_run.py tests/fixtures/saves/sample_live.save --lang en
 python tools/import_run.py --discover
-python tools/import_run.py tests/fixtures/saves/sample_history.run --summary
 ```
 
-图形界面左侧 **导入对局**：贴路径、选文件，或点「查找本机存档」。地址 `#/import?path=` 后面也可以直接带文件路径。读不开、损坏或不是一局对局的文件会说明原因；目录里坏掉的文件逐个标出来。只读，不会改你的存档。
+图形界面左侧 **导入对局**：贴路径、选文件，或点「查找本机存档」。地址 `#/import?path=` 后面也可以直接带文件路径。只读，不会改你的存档。
 接口（只监听本机）：
 
 - `POST /api/import`，正文 `{"path": "..."}` 
@@ -97,19 +96,6 @@ python tools/import_run.py tests/fixtures/saves/sample_history.run --summary
 - `GET /api/saves/discover`
 
 测试：`tests/test_saveimport.py`。
-
-## 给外部代理的短摘要 / Short summary for an external agent
-
-不打开图形界面。`summarize()`（`sts2sim/saveimport.py`）把同一份只读解析收成短 JSON：`seed`、`character`、`character_id`、`ascension`、`floor_reached`、`result`，以及 `highlights.cards` / `highlights.relics`。牌优先留升级、附魔、第 0 层之后拿到的；没有这类牌时才列牌组（有上限）。遗物把第 0 层之后拿到的放前面。`floor_reached` 是 `map_point_history` 里的最高层；那段是空的时候，改用 `visited_map_coords` 的个数。
-
-```bash
-python tools/import_run.py tests/fixtures/saves/sample_history.run --summary
-python tools/import_run.py tests/fixtures/saves/sample_live.save --summary --json /tmp/summary.json
-```
-
-`--summary` 把 JSON 打到标准输出。同时给 `--json` 时，写出去的也是这份摘要；只有 `--json` 时仍是完整解析。两条路径都拒绝把文件写进存档目录、覆盖刚读的存档，或写成 `.run` / `.save`。
-
-已经连上对战 MCP 时，工具 `import_save(path)` 返回同一份 JSON，不开始一局。没有本机游戏数据、对战服务起不来时，用 `python tools/mcp_server.py --import-only`，或上面的 `--summary`。见 [MCP.md](MCP.md)。
 
 ## 种子预览 / Seed preview
 
@@ -125,9 +111,18 @@ python tools/import_run.py tests/fixtures/saves/sample_live.save --summary --jso
 ```bash
 python tools/seed_preview.py 7F3K9Q2ZB8MA --char Ironclad --asc 0
 python tools/seed_preview.py 7F3K9Q2ZB8MA --neow all --json /tmp/preview.json --lang en
+python tools/seed_preview.py 7F3K9Q2ZB8MA --json - --cache
 ```
 
-图形界面 **种子预览**（`#/preview?seed=` 可以直接打开），或 `POST /api/seed-preview`，正文 `{"seed","char","asc","neow"}`。`neow` 取 `first`（默认，第一个没锁的）、`all`、`none` 或序号。界面上用三个按钮选这个范围。每一幕地图标「进幕」「投影」或「未生成」。还没有本机游戏数据时，页面说明原因，不猜地图。
+`--json 文件` 写出稳定的预览 JSON（`"v": 1`）。`--json -` 只把这份 JSON 打到标准输出。顶层字段按这个顺序固定：`v`、`seed_input`、`seed`、`warnings`、`character`、`ascension`、`acts`、`maps`、`rooms`、`distribution`、`ancient`、`neow_options`、`after_neow`、`relics`、`limits`。地图格子是 `col` / `row` / `type` / `children`；`relics` 是 `starting`、`shared_queue`、`character_queue`。不认识的字段不会写进去。
+
+可选 `--cache [目录]`：按（规范化后的种子、角色、进阶、`neow`）把同一份 JSON 存在本机。`neow` 用 `first`、`all`、`none` 或序号，不写成选中的那一项。不写目录时用 `DECKBENCH_CACHE/seed-preview`（默认 `~/.cache/deckbench/seed-preview`）。缓存里是游戏派生的 ID，只留在本机，不要提交，也不要打进安装包。目录若指到仓库里面会拒绝写入。游戏更新之后删掉这个目录再预览（缓存不跟安装绑定）。没有缓存、或没有本机游戏逻辑时，仍然说明原因并退出，不编一份地图。
+
+*`--json FILE` writes stable preview JSON (`"v": 1`) with those top-level fields in that order. `--json -` prints only that JSON. Unknown fields are omitted.*
+
+*Optional `--cache [DIR]` stores that JSON locally, keyed by canonical seed, character, ascension and the `neow` selector (`first`, `all`, `none`, or an index — not the choice it resolved to). With no directory it uses `DECKBENCH_CACHE/seed-preview` (default `~/.cache/deckbench/seed-preview`). The cache holds game-derived ids, stays on the machine, and is not committed or packaged. A directory inside the repository is refused. After a game update, delete that directory; the cache is not tied to the install. A missing cache or a missing engine still exits with an explanation instead of inventing a map.*
+
+图形界面 **种子预览**，或 `POST /api/seed-preview`，正文 `{"seed","char","asc","neow"}`。`neow` 取 `first`（默认，第一个没锁的）、`all`、`none` 或序号。接口返回和 `--json` 同一份文档，不读上面的本机缓存。
 
 和真游戏对照时的前提（和种子探针相同）：
 
@@ -140,4 +135,4 @@ python tools/seed_preview.py 7F3K9Q2ZB8MA --neow all --json /tmp/preview.json --
 - 遭遇队列是开局就排好的抽取顺序，不是地图上从左到右的位置。
 - 遗物袋顺序读不到时，只列出开局遗物，并写明原因。不会替你选宝箱。
 
-测试：`tests/test_seedpreview.py`。没有本机游戏缓存时，预览测试只检查分布、报错和命令行退出码；有缓存时会真的生成一局预览。
+测试：`tests/test_seedpreview.py`。没有本机游戏缓存时，预览测试只检查分布、报错和命令行退出码；有缓存时会真的生成一局预览。JSON 字段和 `--cache` 用虚构结果测，不启动游戏。

@@ -23,7 +23,7 @@ foreach ($f in $all) {
   if ($f.Name -eq 'champions.toml') { Hit "spire-mentor ppo config" $f }
   if ($f.FullName -match '[\\/]sts2_rs[\\/]|[\\/]sts2_hint[\\/]') { Hit "spire-mentor package" $f }
   if ($f.Name -match '^(eng|zhs)_(cards|monsters|relics|powers|potions|encounters|characters|acts)\.json$') { Hit "spire-codex data" $f }
-  if ($f.FullName -match '\\(spire-codex|sts2-beta-src|sts2-src|decompiled|stubs|legacy|vanilla|testcache|deckbench\\[0-9a-f]{16})\\') { Hit "forbidden folder" $f }
+  if ($f.FullName -match '\\(spire-codex|sts2-beta-src|sts2-src|decompiled|stubs|legacy|vanilla|testcache|seed-preview|deckbench\\[0-9a-f]{16})\\') { Hit "forbidden folder" $f }
 }
 # 2) 内容：反编译 C# / 大段转译代码的特征（只查文本类文件）
 $text = $all | Where-Object { $_.Extension -in '.py', '.json', '.txt', '.yaml', '.yml', '.md', '.tsv', '.js', '.html' -and $_.Length -lt 20MB }

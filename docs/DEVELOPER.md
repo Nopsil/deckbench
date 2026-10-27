@@ -275,6 +275,8 @@ python tools/import_run.py --discover
 
 # 需要已经生成本机游戏逻辑（python -m sts2sim.gamedata setup）。不打战斗。
 python tools/seed_preview.py 7F3K9Q2ZB8MA --char Silent --asc 0 --neow first --lang en
+# --json - 只打稳定的 v1 JSON。--cache 写到 DECKBENCH_CACHE/seed-preview，不进仓库。
+python tools/seed_preview.py 7F3K9Q2ZB8MA --json - --cache
 ```
 
 图形界面多了「导入对局」和「种子预览」。接口：`POST /api/import`、`POST /api/import/upload`、`GET /api/saves/discover`、`POST /api/seed-preview`。导入页认 `#/import?path=`，预览页认 `#/preview?seed=`。
@@ -310,7 +312,7 @@ tests/               单元测试
 ```
 
 - 不需要游戏：`tests/test_gamedata.py`（找安装、缓存绑定/拒绝加载、仓库里没有生成代码）、`tests/test_saveimport.py`（虚构的对局 JSON）、`tests/test_seedpreview.py` 里不启动引擎的部分。
-- 种子预览的真生成：有本机缓存时 `tests/test_seedpreview.py` 会跑 `preview()`；没有就只检查「缺少引擎」的报错。
+- 种子预览的真生成：有本机缓存时 `tests/test_seedpreview.py` 会跑 `preview()`；没有就只检查「缺少引擎」的报错。JSON 结构和 `--cache` 用虚构结果测，不启动游戏。
 - 需要本机生成的缓存（没有时自动 skip）：`test_engine.py`、`test_ai_upgrade.py`、`test_claude_v35.py`、`test_status_damage.py`。
 - 需要旧版模拟器的本机数据（spire-codex JSON + `mods/vanilla/`，没有时不收集）：`test_claude.py`、`test_intents.py`、`test_shensu.py`。
 - 图形界面端到端：`gui/tests_e2e.py`（Playwright，先 `python -m gui.app --serve --port 8765`）。

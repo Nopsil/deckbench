@@ -371,6 +371,8 @@ def _preview_http(err):
         return T("prev.err.bad_neow")
     if err.code == "no_engine":
         return T("prev.err.no_engine", err=p.get("err", ""))
+    if err.code == "cache_in_repo":
+        return T("prev.err.cache_in_repo", path=p.get("path", ""))
     return T("prev.err.failed", err=err.code)
 
 

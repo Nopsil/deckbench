@@ -3,6 +3,9 @@
 地图和遭遇来自本机生成的游戏逻辑（和 tools/seed_probe.py 同一条路），不是把游戏数据打进仓库。
 没有本机游戏缓存时 preview() 抛 PreviewError('no_engine')。
 
+preview() 的返回值是稳定的 JSON 文档（SCHEMA_V，顶层键 PUBLIC_KEYS）。
+可选本机缓存按（规范化种子、角色、进阶、neow）存在用户缓存目录，不进仓库、不进安装包。
+
 和真游戏一致的前提（和种子探针相同）：全解锁、不是教程局、没有自定义修改器。
 第 1 幕地图是进幕时 CreateMap 的结果。后面几幕也是「如果现在进这一幕会生成的图」，
 中间没有把上一幕真的打完，所以标成 projected：只有地图随机流不被战斗消耗时才和实机一致。
@@ -12,6 +15,8 @@
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import sys
 
@@ -27,6 +32,24 @@ LIMITS = (
     "later_act_maps_projected",
     "rewards_no_combat",
 )
+
+# 命令行 --json、接口和本机缓存共用这一份。加字段要同时改 SCHEMA_V，旧缓存就不会被当成新文档。
+SCHEMA_V = 1
+PUBLIC_KEYS = (
+    "v", "seed_input", "seed", "warnings", "character", "ascension", "acts",
+    "maps", "rooms", "distribution", "ancient", "neow_options", "after_neow",
+    "relics", "limits",
+)
+_MAP_KEYS = ("act_index", "act", "rows", "cols", "boss", "confidence", "counts", "error")
+_NODE_KEYS = ("col", "row", "type", "children")
+_ROOM_KEYS = ("act", "boss", "second_boss", "ancient", "normal", "elite", "events")
+_DIST_KEYS = _ROOM_KEYS + ("normal_counts", "elite_counts")
+_NEOW_KEYS = ("index", "key", "id", "locked")
+_REWARD_KEYS = ("kind", "cards", "gold", "potion", "relic")
+_AFTER_KEYS = ("encounter", "rewards", "gold", "deck", "relics", "potions", "error")
+_WARN_KEYS = ("code", "raw", "canon", "chars", "n", "want", "text")
+_SEED_WARN = {"seedNormalized", "seedCharset", "seedLength"}
+CACHE_FORMAT = 1
 
 
 class PreviewError(Exception):
@@ -246,13 +269,141 @@ def assemble(seed, canon, warnings, character, ascension, acts, maps, rooms, anc
     }
 
 
+def _as_int(value, default):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _pick(obj, keys):
+    if not isinstance(obj, dict):
+        return None
+    return {k: obj[k] for k in keys if k in obj}
+
+
+def _warn_doc(w):
+    if isinstance(w, str):
+        w = {"code": "text", "text": w}
+    picked = _pick(w, _WARN_KEYS)
+    if not picked or "code" not in picked:
+        return None
+    return picked
+
+
+def _child_links(value):
+    links = []
+    if not isinstance(value, list):
+        return links
+    for pair in value:
+        if isinstance(pair, (list, tuple)) and len(pair) >= 2:
+            links.append([_as_int(pair[0], 0), _as_int(pair[1], 0)])
+    return links
+
+
+def _map_doc(mp):
+    picked = _pick(mp, _MAP_KEYS)
+    if picked is None:
+        return None
+    if "boss" in picked:
+        boss = picked["boss"]
+        picked["boss"] = _pick(boss, ("col", "row")) if isinstance(boss, dict) else boss
+    if "rows" in picked:
+        rows = []
+        for row in picked["rows"] or []:
+            nodes = []
+            for n in row or []:
+                node = _pick(n, _NODE_KEYS)
+                if not node:
+                    continue
+                if "children" in node:
+                    node["children"] = _child_links(node["children"])
+                nodes.append(node)
+            rows.append(nodes)
+        picked["rows"] = rows
+    if "counts" in picked:
+        counts = picked["counts"] if isinstance(picked["counts"], dict) else {}
+        picked["counts"] = {str(k): counts[k] for k in counts}
+    return picked
+
+
+def _room_doc(room):
+    return _pick(room, _ROOM_KEYS)
+
+
+def _dist_doc(dist):
+    picked = _pick(dist, _DIST_KEYS)
+    if picked is None:
+        return None
+    for key in ("normal_counts", "elite_counts"):
+        if key not in picked:
+            continue
+        picked[key] = [_pick(c, ("id", "n")) for c in (picked[key] or []) if _pick(c, ("id", "n"))]
+    return picked
+
+
+def _reward_doc(reward):
+    return _pick(reward, _REWARD_KEYS)
+
+
+def _after_doc(block):
+    picked = _pick(block, _AFTER_KEYS)
+    if picked is None:
+        return None
+    if "rewards" in picked:
+        picked["rewards"] = [r for r in (_reward_doc(x) for x in (picked["rewards"] or [])) if r]
+    return picked
+
+
+def _relic_doc(relics):
+    src = relics if isinstance(relics, dict) else {}
+    return {
+        "starting": list(src.get("starting") or []),
+        "shared_queue": list(src.get("shared_queue") or []),
+        "character_queue": list(src.get("character_queue") or []),
+    }
+
+
+def public_document(res):
+    """稳定的预览 JSON。不认识的字段丢掉，避免引擎多返回的内容变成对外契约。"""
+    src = res if isinstance(res, dict) else {}
+    warnings = [w for w in (_warn_doc(x) for x in (src.get("warnings") or [])) if w]
+    maps = [m for m in (_map_doc(x) for x in (src.get("maps") or [])) if m]
+    rooms = [r for r in (_room_doc(x) for x in (src.get("rooms") or [])) if r]
+    dist = [d for d in (_dist_doc(x) for x in (src.get("distribution") or [])) if d]
+    options = [o for o in (_pick(x, _NEOW_KEYS) for x in (src.get("neow_options") or [])) if o]
+    after = {}
+    raw_after = src.get("after_neow") if isinstance(src.get("after_neow"), dict) else {}
+    for key in raw_after:
+        block = _after_doc(raw_after[key])
+        if block:
+            after[str(key)] = block
+    return {
+        "v": SCHEMA_V,
+        "seed_input": src.get("seed_input", ""),
+        "seed": src.get("seed", ""),
+        "warnings": warnings,
+        "character": src.get("character", ""),
+        "ascension": _as_int(src.get("ascension"), 0),
+        "acts": list(src.get("acts") or []),
+        "maps": maps,
+        "rooms": rooms,
+        "distribution": dist,
+        "ancient": src.get("ancient"),
+        "neow_options": options,
+        "after_neow": after,
+        "relics": _relic_doc(src.get("relics")),
+        "limits": list(src.get("limits") or LIMITS),
+    }
+
+
 def _fresh(char, asc, seed):
     from sts2sim.engine.agents import Agent
     from sts2sim.engine.run import RunDriver
     return RunDriver(char, asc, seed, agent=Agent())
 
 
-def preview(seed, char="Ironclad", asc=0, neow="first"):
+def _request(seed, char, asc, neow):
     if char not in CHARS:
         raise PreviewError("bad_char", char=str(char))
     try:
@@ -264,8 +415,115 @@ def preview(seed, char="Ironclad", asc=0, neow="first"):
     canon = canonicalize(seed)
     if not str(canon).strip():
         raise PreviewError("need_seed")
+    return {"raw": seed, "canon": canon, "char": char, "asc": asc, "neow": _neow_selector(neow)}
+
+
+def _neow_selector(neow):
+    """缓存键里的 neow：first / all / none / 十进制序号。和选项解析用同一套名字。"""
+    if neow in (None, "none"):
+        return "none"
+    if neow == "all":
+        return "all"
+    if neow == "first":
+        return "first"
     try:
-        from sts2sim.rt.boot import game as G  # noqa: F401
+        return str(int(neow))
+    except (TypeError, ValueError):
+        raise PreviewError("bad_neow")
+
+
+def _repo_root():
+    return os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+
+
+def _inside_repo(path):
+    root = os.path.abspath(_repo_root())
+    target = os.path.abspath(path)
+    try:
+        return os.path.commonpath([root, target]) == root
+    except ValueError:
+        return False
+
+
+def default_cache_dir():
+    """本机缓存目录。跟 DECKBENCH_CACHE 走，不在仓库里。"""
+    from sts2sim.gamedata import cache_root
+    return os.path.join(cache_root(), "seed-preview")
+
+
+def _cache_key(spec):
+    return {"seed": spec["canon"], "char": spec["char"], "asc": spec["asc"], "neow": spec["neow"]}
+
+
+def _cache_file(spec, cache_dir):
+    key = _cache_key(spec)
+    raw = f"{key['seed']}\0{key['char']}\0{key['asc']}\0{key['neow']}\0{CACHE_FORMAT}"
+    name = hashlib.sha256(raw.encode("utf-8")).hexdigest() + ".json"
+    return os.path.join(cache_dir, name)
+
+
+def _cache_complete(preview, spec):
+    if not isinstance(preview, dict) or preview.get("v") != SCHEMA_V:
+        return False
+    for field in ("seed", "character", "ascension", "maps", "distribution", "limits"):
+        if field not in preview:
+            return False
+    if preview.get("seed") != spec["canon"] or preview.get("character") != spec["char"]:
+        return False
+    return _as_int(preview.get("ascension"), -1) == spec["asc"]
+
+
+def cache_load(spec, cache_dir):
+    path = _cache_file(spec, cache_dir)
+    try:
+        with open(path, encoding="utf-8") as f:
+            payload = json.load(f)
+    except (OSError, json.JSONDecodeError, UnicodeError):
+        return None
+    if not isinstance(payload, dict) or payload.get("cache_v") != CACHE_FORMAT:
+        return None
+    if payload.get("key") != _cache_key(spec):
+        return None
+    preview = payload.get("preview")
+    if not _cache_complete(preview, spec):
+        return None
+    return public_document(preview)
+
+
+def cache_store(spec, doc, cache_dir):
+    os.makedirs(cache_dir, exist_ok=True)
+    path = _cache_file(spec, cache_dir)
+    payload = {"cache_v": CACHE_FORMAT, "key": _cache_key(spec), "preview": public_document(doc)}
+    tmp = path + f".{os.getpid()}.tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=1)
+        f.write("\n")
+    os.replace(tmp, path)
+
+
+def _bind_seed(doc, raw, canon):
+    """同一局的另一种写法（大小写、O/I）共用缓存，但 seed_input 和种子提醒跟这次的输入走。"""
+    out = dict(doc)
+    out["seed_input"] = raw
+    out["seed"] = canon
+    rest = []
+    for w in out.get("warnings") or []:
+        if isinstance(w, dict) and w.get("code") in _SEED_WARN:
+            continue
+        rest.append(w)
+    out["warnings"] = seed_warning_codes(raw, canon) + rest
+    return out
+
+
+def _load_game():
+    from sts2sim.rt.boot import game
+    return game
+
+
+def _generate(spec):
+    seed, canon, char, asc, neow = spec["raw"], spec["canon"], spec["char"], spec["asc"], spec["neow"]
+    try:
+        G = _load_game()
     except Exception as e:
         first = str(e).splitlines()[0][:300] if str(e) else type(e).__name__
         raise PreviewError("no_engine", err=first) from e
@@ -311,6 +569,26 @@ def preview(seed, char="Ironclad", asc=0, neow="first"):
         seed, canon, seed_warning_codes(seed, canon), char, asc, acts, maps, rooms,
         ev.get("ancient"), neow_options, after, relics,
     )
+
+
+def preview(seed, char="Ironclad", asc=0, neow="first", *, use_cache=False, cache_dir=None):
+    """生成预览。use_cache 时按（规范化种子、角色、进阶、neow）读写本机 JSON，不把结果放进仓库。"""
+    spec = _request(seed, char, asc, neow)
+    directory = None
+    if use_cache:
+        directory = os.path.abspath(cache_dir or default_cache_dir())
+        if _inside_repo(directory):
+            raise PreviewError("cache_in_repo", path=directory)
+        hit = cache_load(spec, directory)
+        if hit is not None:
+            return _bind_seed(hit, spec["raw"], spec["canon"])
+    doc = _bind_seed(public_document(_generate(spec)), spec["raw"], spec["canon"])
+    if directory is not None:
+        try:
+            cache_store(spec, doc, directory)
+        except OSError:
+            pass
+    return doc
 
 
 def format_text(res, lang="zhs"):
