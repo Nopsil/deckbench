@@ -22,13 +22,16 @@ def _load(lang):
 
 
 def test_every_key_in_every_language():
+    """zhs / en / ja / ko 的键集合必须相同。某一种语言少键或多键都失败。"""
     tables = {lang: _load(lang) for lang in LANGS}
-    keys = set(tables["zhs"])
-    assert len(keys) > 300
+    union = set.union(*(set(t) for t in tables.values()))
+    assert len(union) > 300
+    gaps = {lang: sorted(union - set(t)) for lang, t in tables.items()}
+    gaps = {lang: missing for lang, missing in gaps.items() if missing}
     for lang, t in tables.items():
-        assert set(t) == keys, (lang, sorted(keys ^ set(t))[:20])
         empty = [k for k, v in t.items() if not isinstance(v, str) or (not v.strip() and k != "sep.list")]
         assert not empty, (lang, empty)
+    assert not gaps, gaps
 
 
 def test_placeholders_match():
@@ -63,7 +66,7 @@ def test_keys_used_in_code_exist():
     missing = sorted(k for k in used if k not in zh and not k.endswith("."))
     assert not missing, missing
     # 动态拼出来的键
-    dyn = [f"page.{p}.{x}" for p in ("new", "run", "report", "ab", "history", "import", "preview") for x in ("title", "sub")]
+    dyn = [f"page.{p}.{x}" for p in ("new", "run", "report", "ab", "history", "import", "preview", "mods") for x in ("title", "sub")]
     dyn += [f"imp.result.{s}" for s in ("won", "lost", "abandoned", "in_progress")]
     dyn += [f"imp.warn.{c}" for c in (
         "gzip", "utf16", "bom", "doubleEncoded", "seedFromRng", "seedMissing", "noRouteColumn",
@@ -83,7 +86,24 @@ def test_keys_used_in_code_exist():
     for a in backend.AGENTS_COMBAT:
         dyn += [f"agentc.{a}.name", f"agentc.{a}.desc"]
     dyn += [f"preset.{os.path.basename(f)[:-5]}" for f in glob.glob(os.path.join(ROOT, "experiments", "*.yaml"))]
+    dyn += _parser_locale_keys()
     assert not [k for k in dyn if k not in zh], [k for k in dyn if k not in zh]
+
+
+def _src(rel):
+    return open(os.path.join(ROOT, rel), encoding="utf-8").read()
+
+
+def _parser_locale_keys():
+    """存档导入 / 种子预览 / DLL 导入把错误码拼成翻译键。键不在 gui 源码里写成字面量。"""
+    save = _src("sts2sim/saveimport.py")
+    preview = _src("sts2sim/engine/seedpreview.py")
+    dll = _src(os.path.join("sts2sim", "dllmod", "package.py"))
+    keys = [f"imp.err.{c}" for c in re.findall(r'SaveImportError\(\s*"([A-Za-z0-9_]+)"', save)]
+    keys += [f"imp.warn.{c}" for c in re.findall(r'\{"code":\s*"([A-Za-z0-9_]+)"', save)]
+    keys += [f"prev.err.{c}" for c in re.findall(r'PreviewError\(\s*"([A-Za-z0-9_]+)"', preview)]
+    keys += re.findall(r'DllModError\(\s*"(err\.[A-Za-z0-9_]+)"', dll)
+    return keys
 
 
 def test_no_chinese_left_in_web_templates():
