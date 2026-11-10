@@ -185,6 +185,72 @@ def runs():
     return jobs.list()
 
 
+def _compare_http(exc):
+    if exc.code == "not_json":
+        return T("err.compareBad", line=exc.params.get("line") or 1)
+    if exc.code == "too_big":
+        return T("imp.err.too_big")
+    return T("err.compareNoData")
+
+
+def _run_brief(meta):
+    return {key: meta.get(key) for key in ("id", "kind", "title", "status", "created")}
+
+
+@app.get("/api/runs/compare")
+def runs_compare(request: Request):
+    """两次已完成的战斗实验：格子差值和单卡使用/效率差值。不新开模拟。
+
+    a、b 各是一次测试的 id。未知 id、同一个 id、重复或缺失的参数都是 400。
+    胜率和超时用两比例 z 检验（并给出 Wilson 区间是否重叠）。
+    平均回合、掉血、每回合输出和单卡使用次数在有逐场记录时用 Welch。
+    """
+    from sts2sim.runcompare import CompareError, compare_dirs
+
+    query_a = request.query_params.getlist("a")
+    query_b = request.query_params.getlist("b")
+    if len(query_a) != 1:
+        if not query_a:
+            raise HTTPException(400, T("api.err.missing", field="a"))
+        raise HTTPException(400, T("api.err.bad_type", field="a", expected=T("api.type.string")))
+    if len(query_b) != 1:
+        if not query_b:
+            raise HTTPException(400, T("api.err.missing", field="b"))
+        raise HTTPException(400, T("api.err.bad_type", field="b", expected=T("api.type.string")))
+    a = query_a[0].strip()
+    b = query_b[0].strip()
+    if not a:
+        raise HTTPException(400, T("api.err.missing", field="a"))
+    if not b:
+        raise HTTPException(400, T("api.err.missing", field="b"))
+    if a == b:
+        raise HTTPException(400, T("err.compareSame"))
+    left = jobs.get(a)
+    right = jobs.get(b)
+    if not left or not right:
+        raise HTTPException(400, T("err.compareUnknown"))
+    if left.get("status") != "done" or right.get("status") != "done":
+        raise HTTPException(400, T("err.abNotDone"))
+    if left.get("kind") != right.get("kind"):
+        raise HTTPException(400, T("err.abKind"))
+    if left.get("kind") != "combat":
+        raise HTTPException(400, T("err.compareCombat"))
+    dir_a = jobs.run_dir(a)
+    dir_b = jobs.run_dir(b)
+    out_a = os.path.join(dir_a, "out") if dir_a else ""
+    out_b = os.path.join(dir_b, "out") if dir_b else ""
+    try:
+        body = compare_dirs(out_a if os.path.isdir(out_a) else dir_a, out_b if os.path.isdir(out_b) else dir_b)
+    except CompareError as exc:
+        raise HTTPException(400, _compare_http(exc))
+    body["ok"] = True
+    body["read_only"] = True
+    body["kind"] = "combat"
+    body["a"] = _run_brief(left)
+    body["b"] = _run_brief(right)
+    return body
+
+
 @app.post("/api/runs")
 def start(req: StartReq):
     if req.kind not in ("batch", "combat"):

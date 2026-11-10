@@ -57,6 +57,120 @@ def two_proportion_ztest(wins_a, n_a, wins_b, n_b):
     return out
 
 
+def _betacf(a, b, x):
+    """不完全贝塔的连分式（Numerical Recipes）。"""
+    fpmin = 1.0e-30
+    qab = a + b
+    qap = a + 1.0
+    qam = a - 1.0
+    c = 1.0
+    d = 1.0 - qab * x / qap
+    if abs(d) < fpmin:
+        d = fpmin
+    d = 1.0 / d
+    h = d
+    for m in range(1, 201):
+        m2 = 2 * m
+        aa = m * (b - m) * x / ((qam + m2) * (a + m2))
+        d = 1.0 + aa * d
+        if abs(d) < fpmin:
+            d = fpmin
+        c = 1.0 + aa / c
+        if abs(c) < fpmin:
+            c = fpmin
+        d = 1.0 / d
+        h *= d * c
+        aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2))
+        d = 1.0 + aa * d
+        if abs(d) < fpmin:
+            d = fpmin
+        c = 1.0 + aa / c
+        if abs(c) < fpmin:
+            c = fpmin
+        d = 1.0 / d
+        delta = d * c
+        h *= delta
+        if abs(delta - 1.0) < 3.0e-12:
+            return h
+    return h
+
+
+def _reg_inc_beta(a, b, x):
+    """正则化不完全贝塔 I_x(a, b)。"""
+    if x <= 0.0:
+        return 0.0
+    if x >= 1.0:
+        return 1.0
+    ln_beta = math.lgamma(a) + math.lgamma(b) - math.lgamma(a + b)
+    front = math.exp(a * math.log(x) + b * math.log(1.0 - x) - ln_beta)
+    if x < (a + 1.0) / (a + b + 2.0):
+        return front * _betacf(a, b, x) / a
+    return 1.0 - front * _betacf(b, a, 1.0 - x) / b
+
+
+def _student_t_two_sided(t, df):
+    """双侧 Student t 的 p 值。df 或 t 不合法时返回 None。"""
+    if df is None or t is None:
+        return None
+    if not math.isfinite(df) or df <= 0.0 or not math.isfinite(t):
+        return None
+    x = df / (df + t * t)
+    p = _reg_inc_beta(df / 2.0, 0.5, x)
+    if not math.isfinite(p):
+        return None
+    return min(1.0, max(0.0, p))
+
+
+def welch_ttest(xs, ys):
+    """双侧 Welch t 检验。diff 是 mean(ys) − mean(xs)。
+
+    任一侧少于 2 个数，或出现非有限值时，p 值和 t 为 None。
+    两侧样本方差都是 0：标准误为 0。均值相同则 p=1；否则 p=0，t 为 None
+    （t 会是无穷，JSON 里不写 Infinity）。
+    """
+    out = {"diff": None, "t": None, "df": None, "p_value": None, "se": None, "method": "welch"}
+    xs = [float(x) for x in xs]
+    ys = [float(y) for y in ys]
+    na = len(xs)
+    nb = len(ys)
+    if na < 2 or nb < 2:
+        return out
+    if not all(math.isfinite(v) for v in xs + ys):
+        return out
+    ma = sum(xs) / na
+    mb = sum(ys) / nb
+    va = sum((x - ma) ** 2 for x in xs) / (na - 1)
+    vb = sum((y - mb) ** 2 for y in ys) / (nb - 1)
+    diff = mb - ma
+    out["diff"] = diff
+    if va == 0.0 and vb == 0.0:
+        out["se"] = 0.0
+        out["df"] = float(na + nb - 2)
+        if diff == 0.0:
+            out["t"] = 0.0
+            out["p_value"] = 1.0
+        else:
+            out["p_value"] = 0.0
+        return out
+    se2 = va / na + vb / nb
+    if se2 <= 0.0:
+        out["se"] = 0.0
+        return out
+    se = math.sqrt(se2)
+    left = 0.0 if va == 0.0 else (va / na) ** 2 / (na - 1)
+    right = 0.0 if vb == 0.0 else (vb / nb) ** 2 / (nb - 1)
+    if left + right <= 0.0:
+        out["se"] = se
+        return out
+    df = (se2 * se2) / (left + right)
+    t = diff / se
+    out["se"] = se
+    out["df"] = df
+    out["t"] = t
+    out["p_value"] = _student_t_two_sided(t, df)
+    return out
+
+
 def _warning_text(n_a, n_b=None):
     if n_b is None:
         return f"样本不足，不能下结论 / sample too small to conclude: n={int(n_a)} < {MIN_N}"

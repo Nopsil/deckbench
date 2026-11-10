@@ -11,6 +11,7 @@
       </div>
       <div class="row">
         <n-button size="small" secondary :disabled="checked.length !== 2" @click="compare"><template #icon><n-icon :component="Scale" /></template>{{ t('hist.compare') }}</n-button>
+        <n-button size="small" secondary :disabled="checked.length !== 2" @click="compareCells">{{ t('hist.compareCells') }}</n-button>
         <span class="faint" style="font-size:12.5px">{{ t('hist.total', { n: rows.length }) }}</span>
       </div>
     </div>
@@ -66,6 +67,7 @@ const cols = [
 ]
 function open(r) { router.push((r.status === 'done' ? '/report/' : '/run/') + r.id) }
 function compare() { router.push({ path: '/ab', query: { a: checked.value[1], b: checked.value[0] } }) }
+function compareCells() { router.push({ path: '/compare', query: { a: checked.value[1], b: checked.value[0] } }) }
 async function act(k, r) {
   try {
     if (k === 'rerun') { const m = await api.post(`/api/runs/${r.id}/rerun`); await store.loadRuns(); router.push('/run/' + m.id) }

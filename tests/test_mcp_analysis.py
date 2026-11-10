@@ -328,7 +328,7 @@ def test_server_registers_analysis_tools_on_play_and_import_only():
     mcp = _load_mcp()
     play = mcp.build()
     names = [t.name for t in play._tool_manager.list_tools()]
-    assert names[-5:] == ["batch_run_summary", "card_ab", "explain_fight", "calibrate", "gap_triage"]
+    assert names[-6:] == ["batch_run_summary", "card_ab", "compare_runs", "explain_fight", "calibrate", "gap_triage"]
     tools = {t.name: t for t in play._tool_manager.list_tools()}
     assert tools["batch_run_summary"].parameters["required"] == ["path"]
     assert "sample_warning" in tools["batch_run_summary"].description
@@ -336,6 +336,10 @@ def test_server_registers_analysis_tools_on_play_and_import_only():
     ab = tools["card_ab"].parameters
     assert ab["required"] == ["a"]
     assert "b" in ab["properties"] and "p_value" in tools["card_ab"].description
+    cmp_tool = tools["compare_runs"].parameters
+    assert cmp_tool["required"] == ["a", "b"]
+    assert "Welch" in tools["compare_runs"].description
+    assert "Wilson" in tools["compare_runs"].description
     ex = tools["explain_fight"].parameters
     assert ex["required"] == ["path"]
     assert set(ex["properties"]) >= {"path", "fight", "seed", "offset", "limit"}
@@ -352,7 +356,7 @@ def test_server_registers_analysis_tools_on_play_and_import_only():
     only = mcp.build_import()
     only_names = [t.name for t in only._tool_manager.list_tools()]
     assert only_names == [
-        "import_save", "import_history_batch", "batch_run_summary", "card_ab", "explain_fight",
-        "calibrate", "gap_triage",
+        "import_save", "import_history_batch", "batch_run_summary", "card_ab", "compare_runs",
+        "explain_fight", "calibrate", "gap_triage",
     ]
     assert "seed_preview" not in only_names and "new_run" not in only_names

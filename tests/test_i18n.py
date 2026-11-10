@@ -46,6 +46,7 @@ def test_zh_cn_and_english_share_every_key():
     pages = (
         "gui/web/src/pages/ExplainLog.vue",
         "gui/web/src/pages/Calibrate.vue",
+        "gui/web/src/pages/Compare.vue",
         "gui/web/src/App.vue",
         "gui/web/src/pages/NewTest.vue",
     )
@@ -53,7 +54,7 @@ def test_zh_cn_and_english_share_every_key():
         used = re.findall(r"""(?<![\w.])t\(\s*['"]([A-Za-z][\w.-]*\.[\w.-]+)['"]""", _src(rel))
         missing = sorted(k for k in used if k not in zhs or k not in en)
         assert not missing, (rel, missing)
-    for page in ("explain", "calibrate"):
+    for page in ("explain", "calibrate", "compare"):
         for suffix in ("title", "sub"):
             key = f"page.{page}.{suffix}"
             assert key in zhs and key in en
@@ -109,7 +110,7 @@ def test_keys_used_in_code_exist():
     missing = sorted(k for k in used if k not in zh and not k.endswith("."))
     assert not missing, missing
     # 动态拼出来的键
-    dyn = [f"page.{p}.{x}" for p in ("new", "run", "report", "ab", "history", "import", "preview", "mods", "explain", "calibrate") for x in ("title", "sub")]
+    dyn = [f"page.{p}.{x}" for p in ("new", "run", "report", "ab", "compare", "history", "import", "preview", "mods", "explain", "calibrate") for x in ("title", "sub")]
     dyn += [f"imp.result.{s}" for s in ("won", "lost", "abandoned", "in_progress")]
     dyn += [f"imp.warn.{c}" for c in (
         "gzip", "utf16", "bom", "doubleEncoded", "seedFromRng", "seedMissing", "noRouteColumn",

@@ -567,3 +567,93 @@ def card_ab_json(a, b=""):
 
 def explain_fight_json(path, fight=0, seed="", offset=0, limit=20):
     return _call(explain_fight, path, fight, seed, offset, limit)
+
+
+def _gui_data_root():
+    gui = os.environ.get("STS2SIM_GUI_DATA")
+    if not gui:
+        gui = os.path.join(_repo_root(), "gui", ".data")
+    return gui
+
+
+def _is_run_id(text):
+    return bool(text) and "/" not in text and "\\" not in text and text not in (".", "..")
+
+
+def _check_run_meta(run_dir, field):
+    path = os.path.join(run_dir, "meta.json")
+    if not os.path.isfile(path):
+        return
+    try:
+        with open(path, encoding="utf-8") as handle:
+            meta = json.loads(handle.read())
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return
+    if not isinstance(meta, dict):
+        return
+    status = meta.get("status")
+    if isinstance(status, str) and status != "done":
+        raise AnalysisError("not_done", field=field)
+    kind = meta.get("kind")
+    if isinstance(kind, str) and kind != "combat":
+        raise AnalysisError("not_combat", field=field)
+
+
+def _combat_folder(real, field):
+    names = ("raw.jsonl", "cells.csv", "cards.csv")
+    if os.path.isfile(real):
+        if os.path.basename(real).lower() not in names:
+            raise AnalysisError("not_combat", field=field)
+        folder = os.path.dirname(real)
+        if os.path.basename(folder) == "out":
+            _check_run_meta(os.path.dirname(folder), field)
+        return folder
+    out = os.path.join(real, "out")
+    if any(os.path.isfile(os.path.join(out, name)) for name in names):
+        _check_run_meta(real, field)
+        return out
+    if any(os.path.isfile(os.path.join(real, name)) for name in names):
+        if os.path.basename(real) == "out":
+            _check_run_meta(os.path.dirname(real), field)
+        return real
+    if os.path.isfile(os.path.join(real, "meta.json")):
+        _check_run_meta(real, field)
+        raise AnalysisError("no_data", field=field)
+    raise AnalysisError("not_combat", field=field)
+
+
+def _resolve_combat(token, field):
+    if not isinstance(token, str) or not token.strip() or "\x00" in token:
+        raise AnalysisError("bad_type", field=field)
+    text = token.strip()
+    if _is_run_id(text):
+        candidate = os.path.join(_gui_data_root(), "runs", text)
+        if os.path.isdir(candidate):
+            return _combat_folder(resolve_read(candidate), field)
+        if not os.path.exists(text):
+            raise AnalysisError("not_found", path=text)
+    return _combat_folder(resolve_read(text), field)
+
+
+def compare_runs(a, b):
+    """两次已完成的战斗实验。a、b 是运行 id，或结果目录 / raw.jsonl / cells.csv。"""
+    from sts2sim.runcompare import CompareError, compare_dirs
+    if isinstance(a, str) and isinstance(b, str) and a.strip() and a.strip() == b.strip():
+        raise AnalysisError("same_run")
+    left = _resolve_combat(a, "a")
+    right = _resolve_combat(b, "b")
+    if os.path.normcase(left) == os.path.normcase(right):
+        raise AnalysisError("same_run")
+    try:
+        body = compare_dirs(left, right)
+    except CompareError as exc:
+        raise AnalysisError(exc.code, **exc.params) from exc
+    body["ok"] = True
+    body["read_only"] = True
+    body["a"] = left
+    body["b"] = right
+    return body
+
+
+def compare_runs_json(a, b):
+    return _call(compare_runs, a, b)

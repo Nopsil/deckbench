@@ -57,6 +57,7 @@ FRONTEND_PAGES = (
     "gui/web/src/pages/ModEditor.vue",
     "gui/web/src/pages/ExplainLog.vue",
     "gui/web/src/pages/Calibrate.vue",
+    "gui/web/src/pages/Compare.vue",
 )
 DECOMPILER_SOURCES = (
     "gui/packaging/decompiler/Program.cs",
