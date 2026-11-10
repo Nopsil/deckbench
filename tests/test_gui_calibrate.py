@@ -81,6 +81,16 @@ def test_page_lists_the_table_the_gap_flag_and_the_strip():
     assert "<svg" in src and "cal.reason." in src
     assert "/api/calibrate/upload" in src
     assert "/api/calibrate/reals" in src and "/api/calibrate/sims" in src
+    assert 'data-section="gap-triage"' in src
+    assert "/api/gap_triage" in src
+    assert "data-gap-side=\"optimistic\"" in src
+    assert "data-gap-side=\"pessimistic\"" in src
+    assert "data-gap-side=\"power\"" in src
+    for key in (
+        "cal.triageTitle", "cal.triageOptimistic", "cal.triagePessimistic",
+        "cal.triageByPower", "cal.triageCode", "cal.triageReadOnly",
+    ):
+        assert key in src
 
 
 def test_compare_returns_the_table_fields_and_does_not_write(client, allowed):

@@ -12,6 +12,9 @@ it does not start a simulation and does not change seeds or AI.
   python tools/gap_triage.py calibration.json
   python tools/gap_triage.py a.json b.json --catalog catalog.json --out triage.md
   python tools/gap_triage.py tests/fixtures/gap_triage --catalog tests/fixtures/gap_triage/catalog.json --json -
+
+HTTP ``POST /api/gap_triage`` 和 MCP ``gap_triage`` 汇总的是同一份：
+已经由校准得到的 JSON，或这些 JSON 的路径。路径必须在允许的目录里。
 """
 from __future__ import annotations
 
@@ -29,7 +32,7 @@ sys.path.insert(0, ROOT)
 from sts2sim.calibrate import _classify_floor, _norm_enc
 from sts2sim.enemies import ENCOUNTER_SETUP, ROTATING_START
 from sts2sim.gamedata import codex_dir, data_path
-from sts2sim.saveimport import MAX_BYTES, SaveImportError, load_path, refuse_save_write
+from sts2sim.saveimport import SaveImportError, load_path, refuse_save_write
 
 _POWER_FILES = (
     "sts2sim/powers_enemy.py",
@@ -128,7 +131,8 @@ def _read_text(path):
         size = os.path.getsize(path)
     except OSError as exc:
         raise TriageError("not_found", path=path) from exc
-    if size > MAX_BYTES:
+    from sts2sim import saveimport
+    if size > saveimport.MAX_BYTES:
         raise TriageError("too_big", path=path)
     try:
         with open(path, encoding="utf-8-sig") as fh:
@@ -199,8 +203,11 @@ def _skip_note(path):
     return f"跳过（不是校准报告）/ skipped (not a calibration report): {path}"
 
 
-def load_reports(paths, catalog_path=""):
-    """读校准 JSON。目录只取其中的 ``*.json``。不是报告的对象跳过，坏 JSON 直接失败。"""
+def load_reports(paths, catalog_path="", *, require=True):
+    """读校准 JSON。目录只取其中的 ``*.json``。不是报告的对象跳过，坏 JSON 直接失败。
+
+    ``require`` 为假时，一份报告都没有也返回空列表（调用方再决定）。命令行仍是真。
+    """
     reports = []
     sources = []
     notes = []
@@ -220,7 +227,7 @@ def load_reports(paths, catalog_path=""):
         for item in taken:
             reports.append(item)
             sources.append(path)
-    if not reports:
+    if not reports and require:
         detail = " ".join(notes)
         raise TriageError("not_calibration", detail=detail)
     return reports, sources, notes
@@ -933,6 +940,216 @@ def analyze(paths, catalog_path="", min_compared=1):
     body["codex"] = codex is not None
     body["notes"] = notes
     return body
+
+
+def _coerce_reports(reports):
+    if reports is None:
+        return []
+    if isinstance(reports, dict):
+        return [reports]
+    if isinstance(reports, list):
+        out = []
+        for i, item in enumerate(reports):
+            if not isinstance(item, dict):
+                raise TriageError("bad_type", field="reports." + str(i))
+            out.append(item)
+        return out
+    raise TriageError("bad_type", field="reports")
+
+
+def _coerce_paths(paths):
+    if paths is None:
+        return []
+    if not isinstance(paths, list):
+        raise TriageError("bad_type", field="paths")
+    out = []
+    for i, item in enumerate(paths):
+        if not isinstance(item, str):
+            raise TriageError("bad_type", field="paths." + str(i))
+        out.append(item)
+    return out
+
+
+def _coerce_catalog(catalog):
+    if catalog is None:
+        return ""
+    if not isinstance(catalog, str):
+        raise TriageError("bad_type", field="catalog")
+    return catalog
+
+
+def _coerce_min(value):
+    if value is None:
+        return 1
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise TriageError("bad_type", field="min_compared")
+    return value
+
+
+def _checked_path(path, restricted):
+    """restricted 时和只读分析同一套允许目录。否则只展开用户给的路径，不读内容。"""
+    if not restricted:
+        if not isinstance(path, str) or not path.strip():
+            raise TriageError("need_input")
+        return os.path.abspath(os.path.expanduser(path.strip()))
+    from sts2sim.analysis import resolve_read
+    return resolve_read(path)
+
+
+def _real_path_readable(path, restricted):
+    """校准报告里的 real_path。``.run`` / ``.save`` 和导入一样可读；别的文件必须在允许目录里。"""
+    if not isinstance(path, str) or not path.strip():
+        return False
+    if not restricted:
+        return True
+    lower = path.strip().lower()
+    if lower.endswith((".run", ".save")):
+        return True
+    from sts2sim.analysis import AnalysisError, resolve_read
+    try:
+        resolve_read(path)
+    except AnalysisError:
+        return False
+    return True
+
+
+def _reports_for_monsters(reports, restricted, notes):
+    if not restricted:
+        return reports
+    out = []
+    for report in reports:
+        raw = report.get("real_path") if isinstance(report, dict) else None
+        if isinstance(raw, str) and raw.strip() and not _real_path_readable(raw, True):
+            clone = dict(report)
+            clone.pop("real_path", None)
+            out.append(clone)
+            notes.append(
+                "跳过真对局路径，怪物 ID 没接上 / skipped real_path, so monster ids were not attached: "
+                + os.path.basename(raw.strip())
+            )
+        else:
+            out.append(report)
+    return out
+
+
+def _source_rows(sources, inline):
+    rows = []
+    seen = []
+    for path in sources:
+        if path not in seen:
+            seen.append(path)
+    for path in seen:
+        rows.append({"path": os.path.realpath(path), "name": os.path.basename(path)})
+    if inline:
+        rows.append({"path": None, "name": "request"})
+    return rows
+
+
+def _load_for_triage(paths, catalog, restricted):
+    resolved = [_checked_path(path, restricted) for path in paths]
+    catalog_real = _checked_path(catalog, restricted) if catalog.strip() else ""
+    files = _iter_files(resolved, catalog_real)
+    if restricted:
+        files = [_checked_path(path, True) for path in files]
+    reports, sources, notes = load_reports(files, catalog_real, require=False)
+    catalog_obj = load_catalog(catalog_real) if catalog_real else empty_catalog()
+    return reports, sources, notes, catalog_obj, catalog_real
+
+
+def run_triage(reports=None, paths=None, catalog="", min_compared=1, *, restricted=True):
+    """汇总一份或多份校准结果。``reports`` 是已经读入的对象；``paths`` 是它们的 JSON。
+
+    restricted 时路径必须在 analysis 的允许目录里，目录里跳出去的符号链接不读。
+    不写盘，不新开模拟，不改种子和 AI。
+    """
+    report_objs = _coerce_reports(reports)
+    path_list = _coerce_paths(paths)
+    catalog = _coerce_catalog(catalog)
+    min_compared = _coerce_min(min_compared)
+    if not path_list and not report_objs:
+        raise TriageError("need_input")
+    notes = []
+    sources = []
+    file_reports = []
+    catalog_obj = empty_catalog()
+    catalog_real = ""
+    if path_list:
+        file_reports, sources, notes, catalog_obj, catalog_real = _load_for_triage(
+            path_list, catalog, restricted,
+        )
+    elif catalog.strip():
+        catalog_real = _checked_path(catalog, restricted)
+        catalog_obj = load_catalog(catalog_real)
+    inline = []
+    for item in report_objs:
+        if _is_report(item):
+            inline.append(item)
+        else:
+            notes.append(_skip_note("request"))
+    merged = file_reports + inline
+    if not merged:
+        raise TriageError("not_calibration", detail=" ".join(notes))
+    codex, codex_note = load_codex_catalog()
+    if codex_note:
+        notes.append(codex_note)
+    safe = _reports_for_monsters(merged, restricted, notes)
+    run_monsters, run_notes = monsters_from_reports(safe)
+    notes.extend(run_notes)
+    body = triage_reports(
+        merged,
+        catalog=catalog_obj,
+        codex=codex,
+        run_monsters=run_monsters,
+        min_compared=min_compared,
+    )
+    body["sources"] = _source_rows(sources, bool(inline))
+    body["catalog"] = os.path.realpath(catalog_real) if catalog_real else None
+    body["codex"] = codex is not None
+    body["notes"] = notes
+    return body
+
+
+def _dump_error(err):
+    body = {"ok": False, "read_only": True, "error": err.code}
+    params = getattr(err, "params", None) or {}
+    for key, value in params.items():
+        if value is None or isinstance(value, (str, int, float, bool)):
+            body[key] = value
+    return json.dumps(body, ensure_ascii=False, indent=1) + "\n"
+
+
+def _parse_reports_text(reports):
+    """MCP 的 reports 是校准 JSON 文本：一个对象，或对象数组。空字符串表示没给。"""
+    if reports is None or not isinstance(reports, str):
+        raise TriageError("bad_type", field="reports")
+    if not reports.strip():
+        return None
+    from sts2sim.saveimport import MAX_BYTES
+    if len(reports) > MAX_BYTES:
+        raise TriageError("too_big", path="reports")
+    try:
+        parsed = json.loads(reports)
+    except (json.JSONDecodeError, RecursionError, UnicodeError) as exc:
+        raise TriageError("not_json", path="reports") from exc
+    if parsed is None:
+        return None
+    return parsed
+
+
+def gap_triage_json(reports="", paths=None, catalog="", min_compared=1):
+    """MCP / 调用方用的 JSON。失败也是 JSON，不抛异常。路径受 analysis 目录限制。"""
+    from sts2sim.analysis import AnalysisError
+    try:
+        body = run_triage(
+            reports=_parse_reports_text(reports),
+            paths=paths,
+            catalog=catalog,
+            min_compared=min_compared,
+            restricted=True,
+        )
+    except (TriageError, AnalysisError) as err:
+        return _dump_error(err)
+    return json.dumps(body, ensure_ascii=False, indent=1) + "\n"
 
 
 def _md_cell(value):

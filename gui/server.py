@@ -11,7 +11,7 @@ import tempfile
 import zipfile
 
 import yaml
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -468,6 +468,91 @@ def _preview_http(err):
     return T("prev.err.failed", err=err.code)
 
 
+_GAP_KEYS = {"reports", "report", "paths", "catalog", "min_compared"}
+
+
+def _gap_mod():
+    """tools 不是包。和测试一样按文件加载，避免改模拟器的导入路径。"""
+    name = "deckbench_gap_triage_api"
+    mod = sys.modules.get(name)
+    if mod is not None:
+        return mod
+    import importlib.util
+    path = os.path.join(paths.SIM_ROOT, "tools", "gap_triage.py")
+    spec = importlib.util.spec_from_file_location(name, path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _gap_type_expected(field):
+    if field in ("reports", "report", "request"):
+        return "api.type.object_or_array"
+    if field == "paths":
+        return "api.type.array"
+    if field.startswith("paths."):
+        return "api.type.string"
+    if field == "catalog":
+        return "api.type.string"
+    if field == "min_compared":
+        return "api.type.integer"
+    if field.startswith("reports."):
+        return "api.type.object"
+    return "api.type.object"
+
+
+def _gap_http(err):
+    p = getattr(err, "params", None) or {}
+    code = err.code
+    if code == "bad_type":
+        field = p.get("field") or "request"
+        return T("api.err.bad_type", field=field, expected=T(_gap_type_expected(field)))
+    if code == "need_input":
+        return T("gap.err.need_input")
+    if code == "not_calibration":
+        return T("gap.err.not_calibration")
+    if code == "not_json":
+        return T("gap.err.not_json", path=p.get("path", ""))
+    if code == "too_big":
+        return T("imp.err.too_big")
+    if code == "not_found":
+        return T("gap.err.not_found", path=p.get("path", ""))
+    if code == "bad_catalog":
+        return T("gap.err.bad_catalog", path=p.get("path", ""))
+    return T("gap.err.failed", err=code)
+
+
+def _gap_analysis_http(err):
+    p = getattr(err, "params", None) or {}
+    code = err.code
+    if code == "path_not_allowed":
+        return T("exp.err.path_not_allowed", path=p.get("path", ""))
+    if code == "refuse_write":
+        return T("exp.err.refuse_write", path=p.get("path", ""))
+    if code == "not_found":
+        return T("gap.err.not_found", path=p.get("path", ""))
+    if code == "need_path":
+        return T("gap.err.need_input")
+    if code == "too_big":
+        return T("imp.err.too_big")
+    if code == "not_json":
+        return T("gap.err.not_json", path=p.get("path", ""))
+    return T("gap.err.failed", err=code)
+
+
+async def _body_capped(request, limit):
+    """JSON 正文超过 limit 就 400。超限的那一块不留下来。"""
+    chunks = []
+    total = 0
+    async for block in request.stream():
+        if total + len(block) > limit:
+            raise HTTPException(400, T("imp.err.too_big"))
+        chunks.append(block)
+        total += len(block)
+    return b"".join(chunks)
+
+
 def _calibrate_http(err):
     p = getattr(err, "params", None) or {}
     code = err.code
@@ -612,6 +697,60 @@ async def calibrate_upload(real: str = Form(""), file: UploadFile = File(...)):
     if not name or name in (".", ".."):
         name = "upload.jsonl"
     body["sim_path"] = name
+    return body
+
+
+@app.post("/api/gap_triage")
+async def gap_triage_report(request: Request):
+    """把一份或多份校准结果按遭遇和敌人能力排成缺口。只读，不新开模拟。
+
+    正文可以是 POST /api/calibrate 返回的那一份 JSON、这样的 JSON 组成的数组，
+    或 ``{"reports","paths","catalog","min_compared"}``。paths 和 catalog 的路径
+    规则与只读分析相同。类型不对、缺了输入、坏 JSON、超限、目录外的路径都是 400。
+    """
+    from sts2sim.analysis import AnalysisError
+    from sts2sim.saveimport import MAX_BYTES
+    mod = _gap_mod()
+    raw = await _body_capped(request, MAX_BYTES)
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise HTTPException(400, T("api.err.bad_json"))
+    if not text.strip():
+        raise HTTPException(400, T("api.err.bad_json"))
+    try:
+        payload = json.loads(text)
+    except (json.JSONDecodeError, RecursionError):
+        raise HTTPException(400, T("api.err.bad_json"))
+    try:
+        if isinstance(payload, list):
+            body = mod.run_triage(reports=payload, restricted=True)
+        elif isinstance(payload, dict) and any(key in payload for key in _GAP_KEYS):
+            if "reports" in payload:
+                reports = payload.get("reports")
+            elif "report" in payload:
+                reports = payload.get("report")
+            else:
+                reports = None
+            body = mod.run_triage(
+                reports=reports,
+                paths=payload.get("paths") if "paths" in payload else None,
+                catalog=payload.get("catalog") if "catalog" in payload else "",
+                min_compared=payload.get("min_compared") if "min_compared" in payload else 1,
+                restricted=True,
+            )
+        elif isinstance(payload, dict) and not payload:
+            raise mod.TriageError("need_input")
+        elif isinstance(payload, dict) and mod._is_report(payload):
+            body = mod.run_triage(reports=[payload], restricted=True)
+        elif isinstance(payload, dict):
+            raise mod.TriageError("not_calibration")
+        else:
+            raise mod.TriageError("bad_type", field="request")
+    except mod.TriageError as exc:
+        raise HTTPException(400, _gap_http(exc))
+    except AnalysisError as exc:
+        raise HTTPException(400, _gap_analysis_http(exc))
     return body
 
 

@@ -372,8 +372,191 @@ def test_mcp_tools_return_structured_errors(allowed, tmp_path, monkeypatch):
     assert escaped.get("path") == "evil.run"
     assert str(target) not in json.dumps(escaped)
 
+    assert load(mcp.gap_triage(reports=None))["error"] == "bad_type"
+    assert load(mcp.gap_triage(paths=str(outside)))["error"] == "bad_type"
+    assert load(mcp.gap_triage(paths=[str(link)]))["error"] == "path_not_allowed"
+    assert load(mcp.gap_triage(paths=[str(bad)]))["error"] == "not_json"
+    assert load(mcp.gap_triage())["error"] == "need_input"
+    assert load(mcp.gap_triage(min_compared="no"))["error"] == "bad_type"
+    monkeypatch.setattr("sts2sim.saveimport.MAX_BYTES", 32)
+    assert load(mcp.gap_triage(paths=[str(huge)]))["error"] == "too_big"
+    monkeypatch.setattr("sts2sim.saveimport.MAX_BYTES", 32 * 1024 * 1024)
+
     preview = load(mcp.seed_preview("ABCDEFGHJKLM", cache="yes"))
     assert preview["error"] == "bad_type" and preview["field"] == "cache"
     cache_dir = json.loads(mcp.seed_preview("ABCDEFGHJKLM", cache=True, cache_dir=3))
     assert cache_dir["ok"] is False and cache_dir["error"] == "bad_type"
     assert cache_dir["field"] == "cache_dir"
+
+
+def _gap_report(encounter="SAMPLE_ELITE"):
+    return {
+        "ok": True,
+        "v": 1,
+        "alignment": "floor_room_encounter",
+        "fights": [{
+            "floor": 1,
+            "room": "Monster",
+            "encounter": encounter,
+            "status": "compared",
+            "real_hp_lost": 20,
+            "p5": 0,
+            "p95": 5,
+            "likely_sim_gap": True,
+        }],
+    }
+
+
+def test_gap_triage_rejects_bad_input(client, allowed, tmp_path, monkeypatch):
+    token = "TYPE-TOKEN-SHOULD-NOT-ECHO"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    secret = outside / "calibration.json"
+    secret.write_text(json.dumps({"secret": SECRET, "ok": True}), encoding="utf-8")
+    good = allowed / "calibration.json"
+    good.write_text(json.dumps(_gap_report()), encoding="utf-8")
+
+    missing = client.post("/api/gap_triage", headers=EN, json={})
+    assert missing.status_code == 400
+    assert "calibration" in _detail(missing).lower()
+
+    zh = client.post("/api/gap_triage", headers={"x-lang": "zhs"}, json={})
+    assert zh.status_code == 400
+    assert _detail(zh) != _detail(missing)
+    assert "校准" in _detail(zh)
+
+    broken = client.post(
+        "/api/gap_triage", headers={**EN, "content-type": "application/json"}, content=b"{",
+    )
+    assert broken.status_code == 400
+    assert "JSON" in _detail(broken)
+
+    reports = client.post("/api/gap_triage", headers=EN, json={"reports": token})
+    assert reports.status_code == 400
+    detail = _detail(reports)
+    assert "reports" in detail and "object" in detail and "array" in detail
+    assert token not in reports.text
+
+    paths = client.post("/api/gap_triage", headers=EN, json={"paths": 12})
+    assert paths.status_code == 400
+    detail = _detail(paths)
+    assert "paths" in detail and "array" in detail
+    assert "12" not in detail
+
+    bad_item = client.post("/api/gap_triage", headers=EN, json={"paths": [{"no": token}]})
+    assert bad_item.status_code == 400
+    detail = _detail(bad_item)
+    assert "paths.0" in detail and "string" in detail
+    assert token not in bad_item.text
+
+    listed = client.post("/api/gap_triage", headers=EN, json={"reports": [token]})
+    assert listed.status_code == 400
+    detail = _detail(listed)
+    assert "reports.0" in detail and "object" in detail
+    assert token not in listed.text
+
+    catalog = client.post(
+        "/api/gap_triage", headers=EN, json={"reports": _gap_report(), "catalog": {"no": token}},
+    )
+    assert catalog.status_code == 400
+    detail = _detail(catalog)
+    assert "catalog" in detail and "string" in detail
+    assert token not in catalog.text
+
+    minimum = client.post(
+        "/api/gap_triage", headers=EN, json={"reports": _gap_report(), "min_compared": token},
+    )
+    assert minimum.status_code == 400
+    detail = _detail(minimum)
+    assert "min_compared" in detail and "integer" in detail
+    assert token not in minimum.text
+
+    flag = client.post(
+        "/api/gap_triage", headers=EN, json={"reports": _gap_report(), "min_compared": True},
+    )
+    assert flag.status_code == 400
+    assert "integer" in _detail(flag)
+
+    direct = client.post("/api/gap_triage", headers=EN, json={"paths": [str(secret)]})
+    assert direct.status_code == 400
+    assert "outside the allowed folders" in _detail(direct)
+
+    link = allowed / "escape.json"
+    link.symlink_to(secret)
+    escaped = client.post("/api/gap_triage", headers=EN, json={"paths": [str(link)]})
+    assert escaped.status_code == 400
+    assert "outside the allowed folders" in _detail(escaped)
+
+    pack = allowed / "pack"
+    pack.mkdir()
+    os.symlink(secret, pack / "linked.json")
+    escaped_dir = client.post("/api/gap_triage", headers=EN, json={"paths": [str(pack)]})
+    assert escaped_dir.status_code == 400
+    assert "outside the allowed folders" in _detail(escaped_dir)
+    assert SECRET not in escaped_dir.text
+
+    nested = allowed / "nested"
+    nested.mkdir()
+    climbed = client.post(
+        "/api/gap_triage", headers=EN,
+        json={"paths": [str(nested / ".." / ".." / "outside" / "calibration.json")]},
+    )
+    assert climbed.status_code == 400
+    assert "outside the allowed folders" in _detail(climbed)
+
+    sibling = tmp_path / (allowed.name + "-not")
+    sibling.mkdir()
+    (sibling / "calibration.json").write_text(json.dumps(_gap_report()), encoding="utf-8")
+    prefixed = client.post("/api/gap_triage", headers=EN, json={"paths": [str(sibling / "calibration.json")]})
+    assert prefixed.status_code == 400
+    _detail(prefixed)
+
+    nul = client.post("/api/gap_triage", headers=EN, json={"paths": ["calibration.json\x00" + SECRET]})
+    assert nul.status_code == 400
+    _detail(nul)
+
+    bad = allowed / "bad.json"
+    bad.write_text("{", encoding="utf-8")
+    malformed = client.post("/api/gap_triage", headers=EN, json={"paths": [str(bad)]})
+    assert malformed.status_code == 400
+    assert "not JSON" in _detail(malformed)
+
+    note = allowed / "note.run"
+    note.write_text(SECRET, encoding="utf-8")
+    refused = client.post("/api/gap_triage", headers=EN, json={"paths": [str(note)]})
+    assert refused.status_code == 400
+    assert SECRET not in refused.text
+
+    monkeypatch.setattr("sts2sim.saveimport.MAX_BYTES", 16)
+    huge = allowed / "huge.json"
+    huge.write_bytes(b"{" + SECRET.encode("utf-8"))
+    oversized = client.post("/api/gap_triage", headers=EN, json={"paths": [str(huge)]})
+    assert oversized.status_code == 400
+    assert "32" in _detail(oversized)
+
+    posted = client.post(
+        "/api/gap_triage",
+        headers={**EN, "content-type": "application/json"},
+        content=b"{" + SECRET.encode("utf-8"),
+    )
+    assert posted.status_code == 400
+    assert "32" in _detail(posted)
+    monkeypatch.setattr("sts2sim.saveimport.MAX_BYTES", 32 * 1024 * 1024)
+
+    crafted = _gap_report()
+    crafted["real_path"] = str(secret)
+    leaked = client.post("/api/gap_triage", headers=EN, json={"reports": crafted})
+    assert leaked.status_code == 200, leaked.text
+    assert SECRET not in leaked.text
+
+    mixed = client.post("/api/gap_triage", headers=EN, json={"reports": [_gap_report(), {"secret": SECRET}]})
+    assert mixed.status_code == 200, mixed.text
+    assert SECRET not in mixed.text
+    assert mixed.json()["counts"]["optimistic"] == 1
+
+    ok = client.post("/api/gap_triage", headers=EN, json={"paths": [str(good)]})
+    assert ok.status_code == 200, ok.text
+    body = ok.json()
+    assert body["read_only"] is True
+    assert body["encounters"]["optimistic"][0]["id"] == "SAMPLE_ELITE"
+    assert any(item["file"] == "sts2sim/powers_enemy.py" for item in body["encounters"]["optimistic"][0]["code"])
