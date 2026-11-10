@@ -18,7 +18,7 @@
 | [MCP.md](MCP.md) | 中文 + English | MCP 对战，以及只读的 `import_save`、`import_history_batch`、`batch_run_summary`、`card_ab`、`explain_fight`、`calibrate`、`gap_triage` |
 | [PERFORMANCE.md](PERFORMANCE.md) | 中文 + English | `python tools/bench.py` 的样本、场/秒和内部战斗引擎改了什么 |
 | [COVERAGE.md](COVERAGE.md) | 中文 + English | 补测试那一次的语句覆盖率快照，以及当时修的五处边界 |
-| [CI.md](CI.md) | 中文 + English | GitHub Actions：Ubuntu / Windows、Python 3.11 与 3.12、pytest-cov 作业摘要、ruff 0.17.4；Windows 安装包工作流、接口冒烟，以及响应的 `charset=utf-8` |
+| [CI.md](CI.md) | 中文 + English | GitHub Actions：Ubuntu / Windows、Python 3.11 与 3.12、pytest-cov 作业摘要、ruff 0.17.4；Ubuntu 上单独的 Playwright 界面冒烟；Windows 安装包工作流、接口冒烟，以及响应的 `charset=utf-8` |
 | [DEVELOPER.md](DEVELOPER.md) | 中文 + English | 命令行、首次生成、spire-mentor、旧版战斗模拟器、目录、测试。[Windows 打包](DEVELOPER.md#windows-打包版--building-the-windows-package) 含 `dry_check.py`、带 BOM 的 `.ps1`、csproj 注释和 Actions 工作流。持续集成的说明在 [CI.md](CI.md) |
 | [patches/spire-mentor-v0111-cards.patch](patches/spire-mentor-v0111-cards.patch) | — | 打在你自己的 spire-mentor 克隆上的代码补丁。不含游戏文本或数据 |
 

@@ -2,11 +2,13 @@
 
 [← 返回 README](../README.md) · [文档索引](INDEX.md) · [覆盖率快照](COVERAGE.md) · [测试](DEVELOPER.md#测试--tests)
 
-GitHub Actions 工作流在 `.github/workflows/ci.yml`，名字是 `CI`。推送到 `main` 和任意 pull request 都会跑。`contents` 权限是只读。同一分支上新的一次运行会取消还没跑完的那次。这里不改工作流文件，只记下它现在做什么。
+GitHub Actions 工作流在 `.github/workflows/ci.yml`，名字是 `CI`。推送到 `main` 和任意 pull request 都会跑。`contents` 权限是只读。同一分支上新的一次运行会取消还没跑完的那次。这一页记下工作流现在做什么。
 
-*The workflow file is `.github/workflows/ci.yml`, named `CI`. It runs on a push to `main` and on every pull request, with read-only `contents`. A newer run on the same ref cancels the one still going. This page describes that file; it does not change it.*
+*The workflow file is `.github/workflows/ci.yml`, named `CI`. It runs on a push to `main` and on every pull request, with read-only `contents`. A newer run on the same ref cancels the one still going. This page describes what that file does now.*
 
-这个工作流不准备游戏安装，所以要本机游戏或本机生成缓存的测试仍会跳过。它不上传覆盖率，也没有发布步骤。
+这个工作流不准备游戏安装，所以要本机游戏或本机生成缓存的测试仍会跳过。它不上传覆盖率，也没有发布步骤。界面的无头浏览器冒烟是另一个作业，只在 Ubuntu 上跑，不改上面的 pytest 矩阵。
+
+*A local game install is not prepared, so tests that need one still skip. Coverage is not uploaded, and there is no publish step. The headless GUI browser smoke is a separate Ubuntu-only job. It does not change the pytest matrix above.*
 
 ## ruff
 
@@ -54,6 +56,36 @@ python .github/scripts/coverage_summary.py coverage.json
 [COVERAGE.md](COVERAGE.md) 里的百分比是补测试那一次记下的快照，不是这张每次作业重新算的表。
 
 *After pytest, `.github/scripts/coverage_summary.py` always runs. It sums statement coverage for `sts2sim`, `gui` and `tools` (anything else is `other`) and appends a Markdown table to the job summary. With `GITHUB_STEP_SUMMARY` unset it prints the same table. Nothing is uploaded. The percentages in [COVERAGE.md](COVERAGE.md) are an earlier snapshot, not this per-job table.*
+
+## 界面浏览器冒烟 / GUI browser smoke
+
+作业 `gui-browser` 只在 `ubuntu-latest` 上跑，不在 pytest 的操作系统 / Python 矩阵里。限时 30 分钟。`contents` 仍是只读；这一作业另外有 `actions: write`，用来在失败时上传 artifact。环境变量 `PYTHONUTF8=1`、`PYTHONIOENCODING=utf-8`，以及 `DECKBENCH_BROWSER_REQUIRED=1`（浏览器没装好就失败，而不是跳过）。
+
+Python 3.12。安装 `requirements-gui.txt` 和 `pytest-playwright==0.7.2`，然后 `python -m playwright install --with-deps chromium`。Node.js 用当前 LTS，在 `gui/web` 里 `npm ci && npm run build`（`dist/` 不进仓库，服务读的是这份构建结果）。然后：
+
+```bash
+python -m pytest -q tests/test_gui_browser.py --browser chromium --screenshot only-on-failure --tracing retain-on-failure
+```
+
+服务是源码里的 `python -m gui.app --serve`，绑一个空闲端口，不需要本机游戏。测试写一份空的卡牌缓存，这样目录接口不用去跑需要游戏数据的卡牌子进程。战斗实验的预设和 Windows 安装包冒烟一样：`claude_v34`、卡组 `probe_noengine`、`encounter: DUMMY`、1 回合。预设只在测试期间写到 `experiments/browser_smoke.yaml`，结束就删。
+
+`tests/test_gui_browser.py` 检查这些：主页面能打开且没有控制台错误（含 `#/calibrate` 和「决策说明」`#/explain`）；侧栏的简体中文（zh-CN）/ English 会换掉可见文案，选择写在 `localStorage` 的 `ui.lang`（`zhs` / `en`），刷新后还在；从界面点一场木桩，状态到完成；用 `tests/fixtures/calibrate/` 的样例对局和 `runs.jsonl` 打开校准页，缺口分诊一节能画出 `SAMPLE_ELITE`。
+
+没装 pytest-playwright 或 Chromium 时，这份测试在收集阶段就跳过。矩阵作业不装它们，所以那里的 `python -m pytest tests` 不会因为缺浏览器失败。
+
+失败时把 `test-results/`（pytest-playwright 的截图和 trace）用 `actions/upload-artifact@v7` 上传，名字是 `gui-browser-smoke`，保留 14 天。没有这些文件时上传步骤不失败。成功不上传。
+
+*Job `gui-browser` runs only on `ubuntu-latest`. It is not part of the pytest OS / Python matrix. The limit is 30 minutes. `contents` stays read-only; this job also has `actions: write` so it can upload an artifact on failure. `PYTHONUTF8`, `PYTHONIOENCODING`, and `DECKBENCH_BROWSER_REQUIRED=1` are set (a missing browser fails the job instead of skipping).*
+
+*Python 3.12. It installs `requirements-gui.txt` and `pytest-playwright==0.7.2`, then `python -m playwright install --with-deps chromium`. Node.js is the current LTS. `gui/web` runs `npm ci && npm run build` (`dist/` is not committed; the server reads that build). The pytest command is above.*
+
+*The server is `python -m gui.app --serve` from source, on a free port, with no local game. The test writes an empty card cache so the catalog does not launch the card subprocess that needs game data. The combat preset matches the Windows package smoke: `claude_v34`, deck `probe_noengine`, `encounter: DUMMY`, one turn. The preset file `experiments/browser_smoke.yaml` exists only while the test runs.*
+
+*`tests/test_gui_browser.py` checks that the main pages open with no console errors (including `#/calibrate` and Decisions, `#/explain`); the sidebar 简体中文 (zh-CN) / English switch changes the visible strings and stores the choice in `localStorage` `ui.lang` (`zhs` / `en`) across a reload; a dummy fight started from the GUI reaches done; and the calibration page opened on `tests/fixtures/calibrate/` renders gap triage with `SAMPLE_ELITE`.*
+
+*Without pytest-playwright or Chromium the module is skipped at collection. The matrix job does not install them, so `python -m pytest tests` there does not fail for a missing browser.*
+
+*On failure, `test-results/` (pytest-playwright screenshots and traces) is uploaded with `actions/upload-artifact@v7` as `gui-browser-smoke`, kept for 14 days. A missing directory does not fail that step. A green run uploads nothing.*
 
 ## Windows 安装包 / Windows package
 
