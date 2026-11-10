@@ -22,28 +22,50 @@ param(
 $ErrorActionPreference = "Stop"
 $script:Server = $null
 $script:Packed = ""
+$script:DataDir = ""
 $script:Failed = $false
+$script:Utf8 = [System.Text.UTF8Encoding]::new($false)
 
 function Write-Log([string]$Message) {
   $line = "{0} {1}" -f (Get-Date).ToString("o"), $Message
-  [System.IO.File]::AppendAllText($Log, ($line + [Environment]::NewLine), (New-Object System.Text.UTF8Encoding $false))
+  [System.IO.File]::AppendAllText($Log, ($line + [Environment]::NewLine), $script:Utf8)
   Write-Host $line
+}
+
+function Read-SharedUtf8([string]$Path) {
+  # The server keeps app.log open for the whole process. ReadAllText shares
+  # nothing and fails with "used by another process". ReadWrite lets us tail it.
+  $fs = $null
+  $reader = $null
+  try {
+    $fs = New-Object System.IO.FileStream(
+      $Path,
+      [System.IO.FileMode]::Open,
+      [System.IO.FileAccess]::Read,
+      [System.IO.FileShare]::ReadWrite)
+    $reader = New-Object System.IO.StreamReader($fs, $script:Utf8)
+    return $reader.ReadToEnd()
+  } finally {
+    if ($null -ne $reader) { $reader.Dispose() }
+    elseif ($null -ne $fs) { $fs.Dispose() }
+  }
 }
 
 function Add-AppLog([string]$Packed) {
   $appLog = Join-Path $Packed "data\app.log"
+  if ($script:DataDir) { $appLog = Join-Path $script:DataDir "app.log" }
   if (-not (Test-Path -LiteralPath $appLog)) {
     Write-Log "no data/app.log"
     return
   }
   Write-Log "---- data/app.log (tail) ----"
   try {
-    $text = [System.IO.File]::ReadAllText($appLog)
+    $text = Read-SharedUtf8 $appLog
   } catch {
     Write-Log ("app.log unreadable: {0}" -f $_.Exception.Message)
     return
   }
-  $lines = @($text -split "`r?`n")
+  $lines = @(($text -replace "`r`n", "`n") -split "`n")
   $start = [Math]::Max(0, $lines.Length - 80)
   for ($i = $start; $i -lt $lines.Length; $i++) {
     if ($lines[$i] -ne "") { Write-Log $lines[$i] }
@@ -58,29 +80,25 @@ function Stop-PackagedServer {
     Write-Log ("server already exited code={0}" -f $proc.ExitCode)
     return
   }
+  # DeckBench.exe has no HTTP shutdown route. /F /T is the stop.
+  # taskkill's own exit code, and the killed process code, are not a smoke failure.
   Write-Log ("stopping server pid={0}" -f $proc.Id)
-  $ErrorActionPreference = "Continue"
-  & taskkill.exe /PID $proc.Id /T 2>&1 | ForEach-Object { Write-Log ("taskkill: {0}" -f $_) }
-  $deadline = (Get-Date).AddSeconds(10)
-  do {
-    $proc.Refresh()
-    if ($proc.HasExited) { break }
-    Start-Sleep -Milliseconds 200
-  } while ((Get-Date) -lt $deadline)
+  $psi = New-Object System.Diagnostics.ProcessStartInfo
+  $psi.FileName = Join-Path $env:SystemRoot "System32\taskkill.exe"
+  $psi.Arguments = "/F /T /PID $($proc.Id)"
+  $psi.UseShellExecute = $false
+  $psi.CreateNoWindow = $true
+  $killer = [System.Diagnostics.Process]::Start($psi)
+  $null = $killer.WaitForExit()
+  $killCode = $killer.ExitCode
+  $killer.Dispose()
   $proc.Refresh()
   if (-not $proc.HasExited) {
-    Write-Log "server still running; forcing stop"
-    & taskkill.exe /F /T /PID $proc.Id 2>&1 | ForEach-Object { Write-Log ("taskkill: {0}" -f $_) }
-    $deadline = (Get-Date).AddSeconds(15)
-    do {
-      $proc.Refresh()
-      if ($proc.HasExited) { break }
-      Start-Sleep -Milliseconds 200
-    } while ((Get-Date) -lt $deadline)
+    Start-Sleep -Milliseconds 500
+    $proc.Refresh()
   }
-  $proc.Refresh()
   if (-not $proc.HasExited) { throw "server did not exit" }
-  Write-Log ("server exited code={0}" -f $proc.ExitCode)
+  Write-Log ("server stopped (taskkill exit={0}, process code={1})" -f $killCode, $proc.ExitCode)
 }
 
 function Wait-Health([string]$Base, [int]$TimeoutSec) {
@@ -105,7 +123,7 @@ $logParent = Split-Path -Parent $Log
 if ($logParent -and -not (Test-Path -LiteralPath $logParent)) {
   New-Item -ItemType Directory -Force -Path $logParent | Out-Null
 }
-[System.IO.File]::WriteAllText($Log, "", (New-Object System.Text.UTF8Encoding $false))
+[System.IO.File]::WriteAllText($Log, "", $script:Utf8)
 
 try {
   if (-not (Test-Path -LiteralPath $Zip)) { throw "zip missing: $Zip" }
@@ -157,6 +175,8 @@ try {
 
   $base = "http://127.0.0.1:$Port"
   $health = Wait-Health $base $HealthTimeoutSec
+  $script:DataDir = [string]$health.data_dir
+  if (-not $script:DataDir) { throw "health did not report data_dir" }
   Write-Log ("health " + ($health | ConvertTo-Json -Compress -Depth 4))
   if (-not $health.ok) { throw "health ok is not true" }
   if ([string]$health.version -ne $ExpectedVersion) {
@@ -199,21 +219,37 @@ try {
     throw "run timed out after $RunTimeoutSec s"
   }
   if ($meta.status -ne "done") {
-    try {
-      $runLog = Invoke-WebRequest -UseBasicParsing -Uri "$base/api/runs/$($started.id)/files/run.log" -TimeoutSec 30
+    $runLogPath = Join-Path $script:DataDir ("runs\{0}\run.log" -f $started.id)
+    if (Test-Path -LiteralPath $runLogPath) {
       Write-Log "---- run.log ----"
-      Write-Log ([string]$runLog.Content)
-    } catch {
-      Write-Log ("run.log unavailable: {0}" -f $_.Exception.Message)
+      Write-Log (Read-SharedUtf8 $runLogPath)
+    } else {
+      Write-Log "run.log missing: $runLogPath"
     }
     throw "run status $($meta.status)"
   }
 
-  $rawResp = Invoke-WebRequest -UseBasicParsing -Uri "$base/api/runs/$($started.id)/files/raw.jsonl" -TimeoutSec 30
-  $raw = [string]$rawResp.Content
-  Write-Log ("raw.jsonl " + $raw.Trim())
-  if ($raw -notmatch '"encounter": "DUMMY"') { throw "smoke fight was not the training dummy" }
-  if ($raw -notmatch '"deck": "probe_noengine"') { throw "smoke fight did not use the packaged probe deck" }
+  # Windows PowerShell 5.1 turns Invoke-WebRequest bytes into "123 34 100 ...".
+  # Read the file the server wrote, as UTF-8, then parse the JSON.
+  $rawPath = Join-Path $script:DataDir ("runs\{0}\out\raw.jsonl" -f $started.id)
+  if (-not (Test-Path -LiteralPath $rawPath)) { throw "raw.jsonl missing: $rawPath" }
+  $rawText = [System.IO.File]::ReadAllText($rawPath, $script:Utf8).Trim()
+  Write-Log ("raw.jsonl " + $rawText)
+  $parsed = @()
+  foreach ($fightLine in ($rawText -split "`r`n")) {
+    $fightLine = $fightLine.Trim()
+    if ($fightLine -eq "") { continue }
+    $parsed += ,($fightLine | ConvertFrom-Json)
+  }
+  if ($parsed.Count -lt 1) { throw "raw.jsonl had no fight" }
+  $fight = $parsed[0]
+  Write-Log ("fight deck={0} encounter={1} result={2} turns={3}" -f $fight.deck, $fight.encounter, $fight.result, $fight.turns)
+  if ([string]$fight.encounter -ne "DUMMY") {
+    throw ("smoke fight was not the training dummy (encounter={0})" -f $fight.encounter)
+  }
+  if ([string]$fight.deck -ne "probe_noengine") {
+    throw ("smoke fight did not use the packaged probe deck (deck={0})" -f $fight.deck)
+  }
   $summary = Invoke-RestMethod -Uri "$base/api/runs/$($started.id)/summary" -TimeoutSec 30
   Write-Log ("summary " + ($summary.summary | ConvertTo-Json -Compress -Depth 4))
   $fights = 0
