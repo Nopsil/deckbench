@@ -46,23 +46,46 @@ function applyHtml(l) {
   try { document.documentElement.lang = (LANGS.find((x) => x.id === l) || LANGS[0]).html } catch (e) { /* ignore */ }
 }
 
-/** 启动时决定语言：已保存的选择 > 后端探测的系统语言 > 浏览器语言。
- *  选择保存在后端（data/settings.json），因为桌面版每次启动端口不同，localStorage 不一定留得住；localStorage 只做备份。 */
+/** zh-CN / en-US / ja_JP 这类标记收成界面语言 id。空的或认不出的返回 null（不把乱写的值当成 English）。 */
+export function canonLang(s) {
+  s = String(s ?? '').trim()
+  if (!s) return null
+  if (Object.prototype.hasOwnProperty.call(MESSAGES, s)) return s
+  const d = detectLang(s)
+  if (d !== 'en') return d
+  const raw = s.toLowerCase().replace(/_/g, '-')
+  if (raw === 'en' || raw.startsWith('en-') || raw === 'english') return 'en'
+  return null
+}
+
+/** 已记住的选择优先。localStorage 盖过后端；没有 localStorage 时再用 settings.json
+ * （桌面版每次端口不同，这个来源还在）。两边都没有，就用浏览器语言，最后才是 en。
+ * 不用操作系统语言盖过浏览器。 */
+export function resolveLang(stored, saved, browser) {
+  return canonLang(stored) || canonLang(saved) || canonLang(browser) || 'en'
+}
+
+/** 启动时决定语言。选择写在 localStorage（ui.lang）；换语言时也会同步到后端，但不让后端盖过本机已经记住的选择。 */
 export async function initLang() {
-  let l = null
-  try { l = localStorage.getItem('ui.lang') } catch (e) { /* ignore */ }
-  try {
-    const r = await fetch('/api/settings')
-    if (r.ok) {
-      const d = await r.json()
-      if (d.lang) l = d.lang
-      else if (!l) l = d.os_lang ? detectLang(d.os_lang) : null
-    }
-  } catch (e) { /* ignore */ }
-  if (!l) l = detectLang(navigator.language || (navigator.languages || [])[0])
-  if (!MESSAGES[l]) l = 'en'
+  let stored = null
+  try { stored = localStorage.getItem('ui.lang') } catch (e) { /* ignore */ }
+  let saved = null
+  if (!canonLang(stored)) {
+    try {
+      const r = await fetch('/api/settings')
+      if (r.ok) {
+        const d = await r.json()
+        saved = d && d.lang
+      }
+    } catch (e) { /* ignore */ }
+  }
+  const browser = (typeof navigator !== 'undefined' && (navigator.language || (navigator.languages || [])[0])) || ''
+  const l = resolveLang(stored, saved, browser)
   lang.value = l
   applyHtml(l)
+  if (canonLang(stored) && stored !== l) {
+    try { localStorage.setItem('ui.lang', l) } catch (e) { /* ignore */ }
+  }
   return l
 }
 

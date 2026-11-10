@@ -34,6 +34,49 @@ def test_every_key_in_every_language():
     assert not gaps, gaps
 
 
+def test_zh_cn_and_english_share_every_key():
+    """简体中文（界面 id 是 zhs，html lang 是 zh-CN）和 English 的键一一对应。
+    决策说明、校准和新测试页用到的键两边都有。卡牌和遭遇 ID 不进翻译表。"""
+    zhs, en = _load("zhs"), _load("en")
+    assert set(zhs) == set(en)
+    assert len(zhs) > 300
+    for name, table in (("zhs", zhs), ("en", en)):
+        empty = [k for k, v in table.items() if not isinstance(v, str) or (not str(v).strip() and k != "sep.list")]
+        assert not empty, (name, empty)
+    pages = (
+        "gui/web/src/pages/ExplainLog.vue",
+        "gui/web/src/pages/Calibrate.vue",
+        "gui/web/src/App.vue",
+        "gui/web/src/pages/NewTest.vue",
+    )
+    for rel in pages:
+        used = re.findall(r"""(?<![\w.])t\(\s*['"]([A-Za-z][\w.-]*\.[\w.-]+)['"]""", _src(rel))
+        missing = sorted(k for k in used if k not in zhs or k not in en)
+        assert not missing, (rel, missing)
+    for page in ("explain", "calibrate"):
+        for suffix in ("title", "sub"):
+            key = f"page.{page}.{suffix}"
+            assert key in zhs and key in en
+    cal = _src("gui/web/src/pages/Calibrate.vue")
+    exp = _src("gui/web/src/pages/ExplainLog.vue")
+    assert "f.encounter" in cal and "t(f.encounter" not in cal
+    assert "c.name || c.id" in exp
+
+
+def test_frontend_defaults_to_browser_and_persists_localstorage():
+    """没记住选择时用浏览器语言。localStorage 的 ui.lang 盖过后端保存的语言。"""
+    src = _src("gui/web/src/i18n.js")
+    found = re.search(r"export function resolveLang\([\s\S]*?\n\}", src)
+    assert found, "resolveLang missing"
+    body = found.group(0)
+    assert body.index("stored") < body.index("saved") < body.index("browser")
+    assert "localStorage.getItem('ui.lang')" in src
+    assert "localStorage.setItem('ui.lang', l)" in src
+    assert "navigator.language" in src
+    assert "os_lang" not in src
+    assert "html: 'zh-CN'" in src
+
+
 def test_placeholders_match():
     tables = {lang: _load(lang) for lang in LANGS}
     for k, zh in tables["zhs"].items():

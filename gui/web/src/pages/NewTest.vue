@@ -56,7 +56,7 @@
           </div>
 
           <div class="panel">
-            <h3>AI</h3>
+            <h3>{{ t('nt.ai') }}</h3>
             <div class="agents">
               <button v-for="a in cat.agents_batch" :key="a.id" class="agent" :class="{ on: b.agent === a.id, off: a.available === false }"
                       :disabled="a.available === false" :title="a.hint || ''" @click="b.agent = a.id">
@@ -104,7 +104,7 @@
               <div v-if="preset" class="pinfo">
                 <span class="chip">{{ t('nt.nDecks', { n: preset.decks.length }) }}</span>
                 <span class="chip">{{ t('nt.roomsChip') }}{{ joinList(preset.rooms.map((r) => tr('room.', r))) }}</span>
-                <span class="chip">mod: {{ joinList(preset.mods) }}</span>
+                <span class="chip">{{ t('nt.modChip', { mods: joinList(preset.mods) }) }}</span>
                 <span v-if="preset.n_extra" class="chip">{{ t('nt.loopProbe', { n: preset.n_extra }) }}</span>
                 <span class="chip">{{ t('nt.defaultFights', { n: preset.fights }) }}</span>
               </div>
@@ -113,7 +113,7 @@
 
           <div v-if="c.source === 'custom'" class="panel">
             <h3>{{ t('nt.modDecks') }}</h3>
-            <div class="label">Mod</div>
+            <div class="label">{{ t('nt.mod') }}</div>
             <n-checkbox-group v-model:value="c.mods" @update:value="onMods">
               <div class="mods">
                 <n-checkbox v-for="m in cat.mods" :key="m.id" :value="m.id">
@@ -145,7 +145,7 @@
             <div class="grid g4">
               <div><div class="label">{{ t('nt.fightsPerCell') }}</div><n-input-number v-model:value="c.fights" :min="1" :max="5000" /></div>
               <div><div class="label">{{ t('nt.seed') }}</div><n-input-number v-model:value="c.seed" :min="0" /></div>
-              <div><div class="label">AI</div><n-select v-model:value="c.agent" :options="cat.agents_combat.map(a => ({ label: a.name, value: a.id }))" /></div>
+              <div><div class="label">{{ t('nt.ai') }}</div><n-select v-model:value="c.agent" :options="cat.agents_combat.map(a => ({ label: a.name, value: a.id }))" /></div>
               <div><div class="label">{{ t('nt.parallel') }} <b class="accent">{{ c.procs }}</b></div><n-slider v-model:value="c.procs" :min="1" :max="cat.cpu" /></div>
             </div>
           </div>
@@ -177,7 +177,7 @@
               <div><span>{{ t('nt.char') }}</span><b>{{ store.charName(b.char) }}</b></div>
               <div><span>{{ t('nt.asc') }}</span><b>A{{ b.asc }}</b></div>
               <div><span>{{ t('nt.runs') }}</span><b>{{ b.n }}</b></div>
-              <div><span>AI</span><b>{{ store.agentName('batch', b.agent) }}</b></div>
+              <div><span>{{ t('nt.ai') }}</span><b>{{ store.agentName('batch', b.agent) }}</b></div>
               <div><span>{{ t('nt.style') }}</span><b>{{ store.styleName(b.style) }}</b></div>
               <div v-if="b.char === 'Claude'"><span>{{ t('nt.variant') }}</span><b>{{ b.variants.length ? b.variants.join(' + ') : t('common.none') }}</b></div>
               <div><span>{{ t('nt.add') }}</span><b>{{ b.force.length ? joinList(b.force.map(store.cardName)) : '—' }}</b></div>
@@ -188,7 +188,7 @@
               <div><span>{{ t('nt.sourceShort') }}</span><b>{{ c.source === 'preset' ? (preset && preset.title) : t('nt.custom') }}</b></div>
               <div v-if="c.source === 'custom'"><span>{{ t('nt.decks') }}</span><b>{{ c.decks.length }}</b></div>
               <div><span>{{ t('nt.perCell') }}</span><b>{{ t('nt.nFights', { n: c.fights }) }}</b></div>
-              <div><span>AI</span><b>{{ store.agentName('combat', c.agent) }}</b></div>
+              <div><span>{{ t('nt.ai') }}</span><b>{{ store.agentName('combat', c.agent) }}</b></div>
               <div v-if="c.source === 'custom'"><span>{{ t('nt.totalFights') }}</span><b>{{ combatTotal }}</b></div>
             </template>
           </div>
