@@ -1284,5 +1284,9 @@
   "bundle.err.kind": "This is not a DeckBench run bundle.",
   "bundle.err.incomplete": "This bundle is missing a required file.",
   "bundle.err.extra": "This bundle contains a file that is not listed in the manifest.",
-  "bundle.err.need": "Choose one finished test, or two finished combat tests."
+  "bundle.err.need": "Choose one finished test, or two finished combat tests.",
+  "demo.load": "Load demo data",
+  "demo.hint": "A 30-fight head-to-head of two probe decks against the synthetic trio (蛮兵, 术士, 荆棘). Not a game encounter, and no game files.",
+  "demo.done": "Loaded {n} sample test(s).",
+  "demo.missing": "This install does not include the sample bundle."
 }

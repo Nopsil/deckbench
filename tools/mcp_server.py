@@ -805,6 +805,30 @@ def import_bundle(path: str) -> str:
     return import_bundle_json(path)
 
 
+def load_demo() -> str:
+    """把内置的示例结果包导入界面测试。不执行包里的文件，不新开模拟。
+
+    包是 tools/make_demo_bundle.py 用战斗工人打出来的：两套探针对
+    sts2sim.fightcheck 的合成三人组（蛮兵、术士、荆棘）各 30 场。不是训练木桩，
+    也不是游戏遭遇。不需要游戏文件。
+    走和 import_bundle 相同的校验和写入（import_zip_bytes）。编号已经存在时换一个新编号。
+    成功是 JSON，字段和 import_bundle 相同。找不到内置包时 error 是 missing。
+    失败也是 JSON（ok 为 false，message 是一句说明），不抛异常，也不留下半截目录。
+    """
+    from gui import i18n
+    from gui.demo import DemoError, load_builtin
+    from sts2sim.bundle import BundleError, _error_json
+
+    try:
+        body = load_builtin()
+    except DemoError as err:
+        payload = {"ok": False, "error": err.code, "message": i18n.t("demo.missing")}
+        return json.dumps(payload, ensure_ascii=False) + "\n"
+    except BundleError as err:
+        return _error_json(err)
+    return json.dumps(body, ensure_ascii=False) + "\n"
+
+
 def _fastmcp(name, instructions, host, port, host_check):
     from mcp.server.fastmcp import FastMCP
     kw = {}
@@ -838,6 +862,7 @@ def build(host="127.0.0.1", port=8765, host_check=True):
         "export_bundle 把一次已完成的测试，或两次战斗实验（对打或单卡贡献），打成一个 .deckbench.zip，"
         "清单里有 DeckBench 版本、schema 版本和每个文件的 SHA-256。import_bundle 校验清单和哈希后导入，"
         "不执行包里的文件；schema 不对会说明当前只读哪一版；编号冲突时换一个新编号。"
+        "load_demo 导入内置的示例结果包（两套探针对合成三人组各 30 场的对打），走和 import_bundle 相同的校验。"
         "list_cards 只读列出模拟器牌池，可按角色、类型、费用、稀有度和中英文名字搜索。"
         "list_encounters 只读列出模拟器会打的遭遇，可按幕和房间（normal/elite/boss）筛选，并给出连战（例如第 1 幕全部精英）。"
         "save_deck 把一套牌存成用户预设（和 experiments/*.yaml 相同的战斗预设）。"
@@ -1023,6 +1048,7 @@ def build(host="127.0.0.1", port=8765, host_check=True):
     mcp.tool()(export_report)
     mcp.tool()(export_bundle)
     mcp.tool()(import_bundle)
+    mcp.tool()(load_demo)
     mcp.tool()(list_cards)
     mcp.tool()(list_encounters)
     mcp.tool()(save_deck)
@@ -1059,6 +1085,7 @@ def build_import(host="127.0.0.1", port=8765, host_check=True):
         "可选的校准或缺口分诊写成一份离线 HTML（内联 CSS 和 SVG，不访问网络），并返回文件路径。"
         "export_bundle 把一次已完成的测试，或两次战斗实验，打成一个 .deckbench.zip（清单含版本和 SHA-256）。"
         "import_bundle 校验清单和哈希后导入，不执行包里的文件。schema 不对时说明当前只读 schema 1。"
+        "load_demo 导入内置示例结果包，走同一条校验。没有游戏文件也能用。"
         "编号冲突时换一个新编号。导进来的测试标记为 imported，并出现在列表和对比里。"
         "list_cards 只读列出模拟器牌池。list_encounters 只读列出模拟器会打的遭遇，可按幕和房间筛选，并给出连战。"
         "save_deck 把一套牌存成用户预设，可以指定遭遇或连战；都省略时仍是一场训练木桩。只写用户预设目录，不覆盖出厂预设。"
@@ -1080,6 +1107,7 @@ def build_import(host="127.0.0.1", port=8765, host_check=True):
     mcp.tool()(export_report)
     mcp.tool()(export_bundle)
     mcp.tool()(import_bundle)
+    mcp.tool()(load_demo)
     mcp.tool()(list_cards)
     mcp.tool()(list_encounters)
     mcp.tool()(save_deck)
@@ -1098,7 +1126,7 @@ def main(argv=None):
     ap.add_argument("--port", type=int, default=int(os.environ.get("DECKBENCH_MCP_PORT", "8765")))
     ap.add_argument("--no-host-check", action="store_true", help="关闭 Host 头校验（经隧道/反代给远程连接器用）")
     ap.add_argument("--import-only", action="store_true",
-                    help="提供 import_save、import_history_batch，以及 batch_run_summary / card_ab / compare_runs / explain_fight / calibrate / gap_triage（只读 JSON）、export_report（写出一份离线 HTML）、export_bundle（写出一个 .deckbench.zip）、import_bundle（校验清单和哈希后导入，不执行包里的文件）、list_cards（只读牌池）、list_encounters（只读遭遇）、save_deck（只写用户预设，可指定遭遇）、head_to_head（用已有战斗测试把两份预设打同一份遭遇）、card_impact（留一法，用已有战斗测试看每张牌对胜率的影响）和可选的 check_update（只有调用时才查询 GitHub Releases）。"
+                    help="提供 import_save、import_history_batch，以及 batch_run_summary / card_ab / compare_runs / explain_fight / calibrate / gap_triage（只读 JSON）、export_report（写出一份离线 HTML）、export_bundle（写出一个 .deckbench.zip）、import_bundle（校验清单和哈希后导入，不执行包里的文件）、load_demo（导入内置示例结果包，走和 import_bundle 相同的校验）、list_cards（只读牌池）、list_encounters（只读遭遇）、save_deck（只写用户预设，可指定遭遇）、head_to_head（用已有战斗测试把两份预设打同一份遭遇）、card_impact（留一法，用已有战斗测试看每张牌对胜率的影响）和可选的 check_update（只有调用时才查询 GitHub Releases）。"
                          "不检查本机游戏数据。除 head_to_head 和 card_impact 外不启动对局。check_update 启动时不联网。")
     a = ap.parse_args(argv)
     if a.import_only:

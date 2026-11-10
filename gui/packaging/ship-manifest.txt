@@ -18,6 +18,8 @@ sim/gui/modeditor.py
 sim/gui/worker.py
 sim/gui/backend.py
 sim/gui/i18n.py
+sim/gui/demo.py
+sim/gui/demo/sample.deckbench.zip
 sim/gui/locales/en.json pointer
 sim/gui/locales/zhs.json pointer
 sim/gui/locales/ja.json pointer

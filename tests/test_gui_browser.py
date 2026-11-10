@@ -393,6 +393,34 @@ def test_language_toggle_persists_in_local_storage(gui):
     _assert_clean(gui, "language")
 
 
+def test_empty_history_loads_demo_and_compare_works(gui):
+    """空的历史页载入内置示例。两套探针对合成三人组的对打出现，对比能打开。"""
+    page = gui.page
+    page.goto(gui.base + "/#/history", wait_until="domcontentloaded")
+    gui.expect(page.locator("h1")).to_have_text("History")
+    gui.expect(page.get_by_text("Nothing here yet")).to_be_visible()
+    button = page.locator("[data-action='load-demo']")
+    gui.expect(button).to_be_visible()
+    gui.expect(button).to_have_text("Load demo data")
+    button.click()
+    gui.expect(page.get_by_text("Loaded 2 sample test(s).")).to_be_visible()
+    gui.expect(page.get_by_text("探针·无引擎", exact=True).first).to_be_visible()
+    gui.expect(page.get_by_text("探针·路线D", exact=True).first).to_be_visible()
+    listed = _get_json(gui.base + "/api/runs")
+    by_title = {row.get("title"): row for row in listed}
+    deck = by_title["探针·无引擎"]
+    probe = by_title["探针·路线D"]
+    assert deck["kind"] == "combat" and deck["status"] == "done"
+    assert probe["kind"] == "combat" and probe["status"] == "done"
+    assert deck.get("imported") is True and probe.get("imported") is True
+    query = urlencode({"a": deck["id"], "b": probe["id"]})
+    page.goto(gui.base + "/#/compare?" + query, wait_until="domcontentloaded")
+    gui.expect(page.locator("[data-page='compare']")).to_be_visible()
+    gui.expect(page.locator("[data-table='cells']")).to_be_visible(timeout=30_000)
+    _save_shot(page, "demo-compare.png")
+    _assert_clean(gui, "demo")
+
+
 def _run_log_tail(data):
     logs = sorted((data / "runs").glob("*/run.log"))
     if not logs:
@@ -929,7 +957,7 @@ def test_whatsnew_panel_opens_dismisses_and_stays_dismissed(gui):
     panel = page.get_by_test_id("whatsnew-panel")
     gui.expect(panel).to_be_visible()
     gui.expect(panel).to_contain_text(f"What's new in {version}")
-    gui.expect(panel).to_contain_text("战斗进程")
+    gui.expect(panel).to_contain_text("示例数据")
     _save_shot(page, "whatsnew-panel.png")
     page.get_by_test_id("whatsnew-dismiss").click()
     gui.expect(panel).to_have_count(0)
