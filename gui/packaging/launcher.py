@@ -19,8 +19,15 @@ paths.setup_sys_path()
 
 import multiprocessing  # noqa: E402
 
+from gui.fightworkers import support_spawn  # noqa: E402
+
 if __name__ == "__main__":
+    # PyInstaller on Windows looks for this call in the packaged entry point.
+    # support_spawn also covers a frozen Linux build, where the stdlib helper is a no-op.
     multiprocessing.freeze_support()
+    support_spawn()
+    if multiprocessing.parent_process() is not None:
+        raise SystemExit(0)
     from gui.app import main
     try:
         main()

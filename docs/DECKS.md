@@ -133,7 +133,7 @@
 
 同一份预设选两次、预设不存在、不是用户预设、`..`、空字节、类型不对、回合不在 1–200、超过 400 场，都是 400，一句说明，没有堆栈，也不回显提交的原文。不改出厂预设、`mods/`、种子算法或 AI。
 
-MCP `head_to_head(a, b, encounters="", gauntlet="", max_turns=None, seed=None)` 做同一件事，也是马上返回。`encounters` 是上面的 JSON 数组文本。成功的 JSON 和 HTTP 相同。失败是 `{"ok": false, "error": "..."}`，不抛异常。`--import-only` 也有这个工具：训练木桩不需要本机游戏数据，真正开打用的仍是原来的战斗测试。进度和取消是 `run_progress` / `cancel_run`。
+MCP `head_to_head(a, b, encounters="", gauntlet="", max_turns=None, seed=None, workers=None)` 做同一件事，也是马上返回。`encounters` 是上面的 JSON 数组文本。成功的 JSON 和 HTTP 相同。失败是 `{"ok": false, "error": "..."}`，不抛异常。`--import-only` 也有这个工具：训练木桩不需要本机游戏数据，真正开打用的仍是原来的战斗测试。进度和取消是 `run_progress` / `cancel_run`。
 
 ## 单卡贡献 / Card impact
 
@@ -147,7 +147,7 @@ MCP `head_to_head(a, b, encounters="", gauntlet="", max_turns=None, seed=None)` 
 
 `#/decks` 上是进度条、取消，和一张按差值排序的表。跑完的父任务在运行页上也能看到这张表。`GET /api/runs/<id>/export.html` 把同一张表写进离线 HTML。见 [EXPORT.md](EXPORT.md)。
 
-MCP `card_impact(deck, job="", plus=false, scale=true, encounters="", gauntlet="", max_turns=None, seed=None)` 做同一件事。不写 `job` 就开跑并马上返回。写了 `job` 就只读那一次的结果。失败是 `{"ok": false, "error": "..."}`，不抛异常。`--import-only` 也有这个工具。训练木桩不需要本机游戏数据。
+MCP `card_impact(deck, job="", plus=false, scale=true, encounters="", gauntlet="", max_turns=None, seed=None, workers=None)` 做同一件事。不写 `job` 就开跑并马上返回。写了 `job` 就只读那一次的结果。失败是 `{"ok": false, "error": "..."}`，不抛异常。`--import-only` 也有这个工具。训练木桩不需要本机游戏数据。
 
 *Deck builder has **Card impact**. Pick one saved user preset. `POST /api/decks/<id>/card_impact` runs leave-one-out with the combat test that already exists: the baseline, then one variant per unique card (the same id and the same upgrade) with one copy removed. `plus: true` also runs one extra copy of each card. A card already at 15 copies is not increased; it is listed in `skipped` with reason `count`. Encounters, seed, turn cap and deck id match the baseline. The deck id does not change, so `sts2sim.runner` keeps its existing seeding (seed, deck, act, room, index and encounter together). There is no second play implementation.*
 
@@ -159,7 +159,33 @@ MCP `card_impact(deck, job="", plus=false, scale=true, encounters="", gauntlet="
 
 *`#/decks` shows a progress bar, Cancel, and a table sortable by delta. A finished parent also shows the table on the run page. `GET /api/runs/<id>/export.html` writes the same table into the offline HTML. See [EXPORT.md](EXPORT.md).*
 
-*MCP `card_impact(deck, job="", plus=false, scale=true, encounters="", gauntlet="", max_turns=None, seed=None)` does the same thing. Omit `job` to start and return immediately. Pass `job` to read that result and not start another run. A failure is `{"ok": false, "error": "..."}` and does not raise. `--import-only` exposes this tool too. A training dummy does not need a local game install.*
+*MCP `card_impact(deck, job="", plus=false, scale=true, encounters="", gauntlet="", max_turns=None, seed=None, workers=None)` does the same thing. Omit `job` to start and return immediately. Pass `job` to read that result and not start another run. A failure is `{"ok": false, "error": "..."}` and does not raise. `--import-only` exposes this tool too. A training dummy does not need a local game install.*
+
+## 战斗进程 / Fight workers
+
+新建测试的战斗、组牌预设、连战、对打和单卡贡献默认仍是一场接一场。请求里的 `workers` 是同时打的进程数。不写、或写成 null，就是 1。必须是从 1 起的整数；布尔、小数、0 和负数是 400，或 MCP 的 `{"ok": false, "error": "bad_type", "field": "workers"}`。大于 `min(cpu_count, 8)` 时收到这个上限，不报错。旧的 `procs` 在没写 `workers` 时仍表示同一个数，也吃这个上限。
+
+进程是 spawn 的。Windows 和 PyInstaller 包里会先调用 `freeze_support`，子进程去打战斗，不会再打开一次界面。每场的随机数仍只由种子、卡组、幕、房间、场次和遭遇决定，牌的编号也在每场开始时归零。`workers` 为 1 和大于 1 时，`raw.jsonl` 的场次顺序相同；每场自己的用时（`secs`）和整次的墙钟会变。
+
+连战不在一条种子里面拆开。同一条种子上的遭遇按名单顺序打完，才算这一条结束。不同的种子（同一种遭遇的第 0 场、第 1 场……）可以同时打。认得出连战的两种情况：请求写了 `gauntlet`，或者 `extra` 里的遭遇顺序刚好是模拟器现算的某一条连战（例如 `act1_elite`）。房间表还在的出厂实验不走这条链，格子仍各打各的。
+
+取消和以前一样。取消文件出现之后不再派发新的一场；已经派发的那场打完。连战里，同一条种子的下一场也不会再派。状态是 `cancelled`，`partial` 为 true。打完的场次留在原来的位置。
+
+新建测试（`#/new`）的战斗页有一个选择器，默认 1，最大是目录里的 `worker_cap`（也就是上面的上限）。整局批量仍用原来的进程滑块。`#/decks` 上同一个选择器用于对打和单卡贡献。单卡贡献在每个变体有多场时，把进程用在这个变体里面，变体仍按顺序开；每个变体只有一场时，用来同时跑不同的变体，结果仍按变体顺序对齐。
+
+这一台 4 核机器、Python 3.12 上的计时见 [PERFORMANCE.md](PERFORMANCE.md)。
+
+*Combat on New test, a saved deck, a gauntlet, a head-to-head and a card impact still run one fight after another unless `workers` is set. Omit it, or send null, and the count is 1. It has to be an integer starting at 1. A boolean, a fraction, 0 or a negative number is a 400, or MCP `{"ok": false, "error": "bad_type", "field": "workers"}`. A number above `min(cpu_count, 8)` is reduced to that cap and is not an error. The older `procs` field is that same count when `workers` is omitted, and it is capped the same way.*
+
+*The processes are spawned. On Windows and in the PyInstaller package, `freeze_support` runs first, and the child fights instead of opening the app again. A fight's random numbers still come only from the seed, the deck, the act, the room, the index and the encounter, and the card-id counter still resets at the start of each fight. `workers` 1 and `workers` above 1 write `raw.jsonl` in the same fight order. Per-fight `secs` and the run's wall clock change.*
+
+*A gauntlet is not split inside one seed. The encounters on that seed run in list order, and that seed is done only when they are done. Other seeds (fight 0, fight 1, … of the same encounter) can run at the same time. A run is treated as a gauntlet when the request names `gauntlet`, or when the `extra` encounter order is exactly one gauntlet the simulator builds (for example `act1_elite`). A shipped experiment that still has a room list is not chained; each cell stays independent.*
+
+*Cancel is unchanged. After the cancel file appears, no new fight is dispatched. A fight that was already dispatched finishes. On a gauntlet, the next encounter of that same seed is not dispatched either. The status is `cancelled` and `partial` is true. Finished fights stay in their original places.*
+
+*The combat side of New test (`#/new`) has a selector. It defaults to 1. The maximum is `worker_cap` from the catalog, which is the cap above. Full runs keep their existing process slider. `#/decks` uses one selector for head-to-head and card impact. When a card-impact variant has more than one fight, the processes run inside that variant and variants still start in order. When each variant is a single fight, the processes run different variants at the same time, and the result stays aligned to variant order.*
+
+*Timings on this 4-core Python 3.12 machine are in [PERFORMANCE.md](PERFORMANCE.md).*
 
 ## 进度和取消 / Progress and cancel
 
@@ -173,7 +199,7 @@ MCP `card_impact(deck, job="", plus=false, scale=true, encounters="", gauntlet="
 
 *The same preset twice, an unknown id, a preset that is not a saved user deck, `..`, a null byte, a wrong type, a turn cap outside 1–200, or more than 400 fights is a 400 with one sentence and no stack trace. The submitted text is not echoed. Shipped presets, `mods/`, the seeding, and the AI are unchanged.*
 
-*MCP `head_to_head(a, b, encounters="", gauntlet="", max_turns=None, seed=None)` does the same thing and also returns immediately. `encounters` is the JSON array above, as text. Success is the same JSON as HTTP. A failure is `{"ok": false, "error": "..."}` and does not raise. `--import-only` exposes this tool too. A training dummy does not need a local game install. The fights themselves are still the existing combat test. Progress and cancel are `run_progress` / `cancel_run`.*
+*MCP `head_to_head(a, b, encounters="", gauntlet="", max_turns=None, seed=None, workers=None)` does the same thing and also returns immediately. `encounters` is the JSON array above, as text. Success is the same JSON as HTTP. A failure is `{"ok": false, "error": "..."}` and does not raise. `--import-only` exposes this tool too. A training dummy does not need a local game install. The fights themselves are still the existing combat test. Progress and cancel are `run_progress` / `cancel_run`.*
 
 ## Progress and cancel
 

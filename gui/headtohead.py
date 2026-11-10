@@ -6,16 +6,28 @@
 from sts2sim.deckpresets import DeckPresetError, head_to_head_plan
 
 
+def _workers(payload):
+    from gui.fightworkers import WorkersError, checked_workers
+    raw = None
+    if isinstance(payload, dict) and "workers" in payload:
+        raw = payload.get("workers")
+    try:
+        return checked_workers(raw)
+    except WorkersError as err:
+        raise DeckPresetError("bad_type", field="workers", expected="integer") from err
+
+
 def run_pair(payload):
     """校验后开两场战斗测试，马上返回它们的 id。页面再轮询进度。"""
     plan = head_to_head_plan(payload)
     from gui import i18n
     from gui.server import jobs
 
+    workers = _workers(payload)
     params = {
         "seed": plan["seed"],
         "agent": plan["agent"],
-        "procs": 1,
+        "workers": workers,
         "fights": 1,
         "max_turns": plan["max_turns"],
         "shared_plan": True,
@@ -42,5 +54,6 @@ def run_pair(payload):
         "agent": plan["agent"],
         "encounters": [row["id"] for row in plan["encounters"]],
         "fights": plan["fights"],
+        "workers": workers,
         "compare": "/#/compare?a=" + meta_a["id"] + "&b=" + meta_b["id"],
     }

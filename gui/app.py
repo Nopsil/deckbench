@@ -218,5 +218,8 @@ def main():
 
 
 if __name__ == "__main__":
-    multiprocessing.freeze_support()
-    main()
+    from gui.fightworkers import support_spawn
+
+    support_spawn()
+    if multiprocessing.parent_process() is None:
+        main()

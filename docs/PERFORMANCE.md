@@ -76,4 +76,19 @@ Python 3.12。数字会随机器变，前后是同一条命令、同一进程设
 
 固定种子的胜负、回合、掉血、出牌、敌人血量和能力层数与改前逐字段相同。`tests/test_sim_determinism.py` 把启发式和束搜索的记录再打一遍，并和改前写下的 `tests/fixtures/fight_seeds.json`、`tests/fixtures/fight_seeds_beam.json` 比较。同一组种子打两遍也必须相同。
 
+## 界面战斗的 workers / GUI fight workers
+
+新建测试、组牌预设、连战、对打和单卡贡献的 `workers` 默认是 1。大于 1 时，界面工作进程用 spawn 的 `ProcessPoolExecutor` 打独立的场次，再按原来的下标写回 `raw.jsonl`。计时是 `meta.json` 里的 `wall_secs`（战斗循环，不含后面写报告）。机器是 4 核、Python 3.12。样本是 `claude_v34` 的 `probe_noengine` 打训练木桩 `DUMMY`，种子 11。不读游戏安装。
+
+*GUI fight batches default to `workers` 1. Above 1, the GUI worker uses a spawned `ProcessPoolExecutor` for independent fights and writes `raw.jsonl` back in the original index order. The clock is `wall_secs` in `meta.json` (the fight loop, not the report written afterwards). The machine is 4 cores, Python 3.12. The sample is `claude_v34` deck `probe_noengine` against the training dummy `DUMMY`, seed 11. No game install.*
+
+| 样本 | workers=1 | workers=4 |
+| --- | --- | --- |
+| 启发式，200 场，1 回合 | 0.172 秒，**1163 场/秒** | 0.359 秒，**557 场/秒** |
+| 束搜索，200 场，8 回合 | 2.362 秒，**84.7 场/秒** | 0.902 秒，**222 场/秒** |
+
+启发式那 200 场太短，开 4 个进程的时间比战斗本身长，所以更慢。束搜索每场更贵，4 个进程大约是 2.6 倍。两组的 `raw.jsonl` 去掉每场 `secs` 之后一致。出厂实验和模拟器的播种没有改。
+
+*Those 200 heuristic fights are shorter than starting four processes, so four workers is slower there. Beam fights cost more, and four workers are about 2.6× faster. Both pairs of `raw.jsonl` match once per-fight `secs` is removed. Shipped experiments and the simulator's seeding are unchanged.*
+
 *Fixed-seed win/loss, turns, HP, cards played, enemy HP and power stacks match field for field. `tests/test_sim_determinism.py` replays the heuristic and beam records against `tests/fixtures/fight_seeds.json` and `tests/fixtures/fight_seeds_beam.json`, and runs each batch twice.*
