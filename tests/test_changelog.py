@@ -54,8 +54,9 @@ def _hrefs(node, out):
 def test_latest_section_is_015_and_stops_before_014():
     parsed = load_changelog("0.1.5", CHANGELOG)
     assert parsed["version"] == "0.1.5"
-    assert parsed["heading"].startswith("未发布（0.1.5）")
-    assert "Unreleased (0.1.5)" in parsed["heading"]
+    assert parsed["heading"] == "0.1.5（2026-11-11） / 0.1.5 (2026-11-11)"
+    assert "未发布" not in parsed["heading"]
+    assert "Unreleased" not in parsed["heading"]
     blocks = []
     _walk(parsed["blocks"], blocks)
     text = json.dumps(parsed, ensure_ascii=False)
@@ -70,6 +71,14 @@ def test_latest_section_is_015_and_stops_before_014():
         assert title in headings
     assert "界面多语言" not in text
     assert "未发布（0.1.4）" not in text
+    assert "未发布（0.1.5）" not in text
+    assert "Unreleased (0.1.5)" not in text
+    assert "载入示例数据" in text
+    assert "sample.deckbench.zip" in text
+    assert "BCP-47" in text
+    assert "部分结果" in text
+    assert "preset.yaml" in text
+    assert "raw.jsonl" in text
     assert "<id>" in text
     assert all(not str(href).lower().startswith("javascript:") for href in _collect(parsed))
 
@@ -194,7 +203,7 @@ def test_gui_renders_changelog_as_text_not_html():
         assert "v-html" not in text, rel
     with open(os.path.join(web, "App.vue"), encoding="utf-8") as handle:
         app = handle.read()
-    assert "whatsnew.dismissed." in app
+    assert "return 'whatsnew.dismissed.' + version" in app
     assert "/whatsnew" in app
     assert 'data-testid="whatsnew-panel"' in app
     assert 'data-testid="whatsnew-footer"' in app
