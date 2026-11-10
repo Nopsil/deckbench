@@ -67,6 +67,7 @@ PAGES = (
     ("/#/calibrate", "Calibration", "No comparison yet"),
     ("/#/mods", "Mod editor", "Open a mod or create a new one"),
     ("/#/decks", "Deck builder", "Card pool"),
+    ("/#/whatsnew", "What's new", "战斗进程"),
 )
 
 
@@ -815,6 +816,48 @@ def test_deck_card_impact_shows_a_sortable_table(gui):
     table.scroll_into_view_if_needed()
     _save_shot(page, "card-impact.png")
     _assert_clean(gui, "card-impact")
+
+
+def test_whatsnew_panel_opens_dismisses_and_stays_dismissed(gui):
+    """本版更新：打开、关掉、刷新之后仍然关掉。关于和页脚都能再打开这一页。"""
+    reported = _get_json(gui.base + "/api/changelog")
+    version = reported["version"]
+    assert version
+    page = gui.page
+    page.goto(gui.base + "/#/new", wait_until="domcontentloaded")
+    panel = page.get_by_test_id("whatsnew-panel")
+    gui.expect(panel).to_be_visible()
+    gui.expect(panel).to_contain_text(f"What's new in {version}")
+    gui.expect(panel).to_contain_text("战斗进程")
+    _save_shot(page, "whatsnew-panel.png")
+    page.get_by_test_id("whatsnew-dismiss").click()
+    gui.expect(panel).to_have_count(0)
+    key = f"whatsnew.dismissed.{version}"
+    assert page.evaluate("(key) => localStorage.getItem(key)", key) == "1"
+
+    page.reload(wait_until="domcontentloaded")
+    gui.expect(page.locator("h1")).to_have_text("New test")
+    gui.expect(page.get_by_test_id("whatsnew-panel")).to_have_count(0)
+    assert page.evaluate("(key) => localStorage.getItem(key)", key) == "1"
+
+    page.get_by_test_id("whatsnew-footer").click()
+    gui.expect(page.locator("h1")).to_have_text("What's new")
+    notes = page.get_by_test_id("whatsnew-notes")
+    gui.expect(notes).to_contain_text("战斗进程")
+    gui.expect(notes).to_contain_text("组牌对打")
+    html = notes.inner_html().lower()
+    assert "<script" not in html
+    assert "javascript:" not in html
+    assert notes.locator("img").count() == 0
+    _save_shot(page, "whatsnew-page.png")
+
+    page.goto(gui.base + "/#/new", wait_until="domcontentloaded")
+    gui.expect(page.get_by_test_id("whatsnew-panel")).to_have_count(0)
+    page.get_by_test_id("about-version").click()
+    page.get_by_test_id("whatsnew-about").click()
+    gui.expect(page.locator("h1")).to_have_text("What's new")
+    gui.expect(page.get_by_test_id("whatsnew-notes")).to_be_visible()
+    _assert_clean(gui, "whatsnew")
 
 
 def test_about_shows_the_version_and_an_update_check(gui):

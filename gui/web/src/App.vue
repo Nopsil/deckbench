@@ -35,9 +35,22 @@
               <div v-else-if="store.catalogError" class="eng err">{{ t('app.backendError', { err: store.catalogError }) }}</div>
               <div v-else class="eng"><n-spin size="small" /> <span class="es">{{ t('app.loadingSim') }}</span></div>
               <button v-if="appVersion" type="button" class="ver" data-testid="about-version" @click="aboutOpen = true">DeckBench v{{ appVersion }}</button>
+              <router-link class="ver link" data-testid="whatsnew-footer" to="/whatsnew">{{ t('whatsnew.open') }}</router-link>
             </div>
           </aside>
           <main class="main">
+            <div v-if="showWhatsNew" class="wn-wrap">
+              <div class="wn" data-testid="whatsnew-panel">
+                <div class="wn-top">
+                  <strong>{{ t('whatsnew.banner', { version: notes.version }) }}</strong>
+                  <button type="button" class="wn-dismiss" data-testid="whatsnew-dismiss" @click="dismissWhatsNew">{{ t('whatsnew.dismiss') }}</button>
+                </div>
+                <ul v-if="previewHeads.length" class="wn-list">
+                  <li v-for="(head, i) in previewHeads" :key="i">{{ head }}</li>
+                </ul>
+                <router-link class="wn-more" data-testid="whatsnew-more" to="/whatsnew">{{ t('whatsnew.open') }}</router-link>
+              </div>
+            </div>
             <header class="top page">
               <div>
                 <h1>{{ route.meta.key ? t('page.' + route.meta.key + '.title') : '' }}</h1>
@@ -55,6 +68,7 @@
             <div data-testid="about-dialog">
               <p class="about-ver">{{ t('about.versionLine', { version: appVersion }) }}</p>
               <p class="about-note">{{ t('about.manual') }}</p>
+              <p class="about-links"><router-link data-testid="whatsnew-about" to="/whatsnew" @click="aboutOpen = false">{{ t('about.whatsnew') }}</router-link></p>
               <n-button data-testid="check-updates" :loading="updateBusy" :disabled="updateBusy" @click="checkUpdates">{{ t('about.check') }}</n-button>
               <p v-if="updateStatus === 'up_to_date'" class="about-result" data-testid="update-result">{{ t('about.upToDate') }}</p>
               <p v-else-if="updateStatus === 'update_available'" class="about-result" data-testid="update-result">
@@ -80,6 +94,7 @@ import { NConfigProvider, NMessageProvider, NDialogProvider, NIcon, NSelect, NSp
 import { CirclePlus, PlayerPlay, ChartBar, Scale, ArrowsLeftRight, History, World, Puzzle, Folder, Map, ListSearch, ChartDots, Stack2 } from '@vicons/tabler'
 import { themeFor } from './theme'
 import { store } from './api'
+import { previewHeadings } from './changelogText'
 import { t, lang, LANGS, setLang } from './i18n'
 
 const route = useRoute()
@@ -110,7 +125,29 @@ const isOn = (it) => route.path === it.to || route.path.startsWith(it.to + '/')
 const runningCount = computed(() => store.runs.filter((r) => r.status === 'running').length)
 let timer
 const appVersion = ref('')
+const notes = ref(null)
+const whatsNewDismissed = ref(false)
 const aboutOpen = ref(false)
+const previewHeads = computed(() => previewHeadings(notes.value && notes.value.blocks))
+function whatsNewKey(version) {
+  return 'whatsnew.dismissed.' + version
+}
+function storedDismissed(version) {
+  try { return localStorage.getItem(whatsNewKey(version)) === '1' } catch (e) { return false }
+}
+const showWhatsNew = computed(() => {
+  const version = notes.value && notes.value.version
+  return !!(version && notes.value.blocks && notes.value.blocks.length
+    && route.path !== '/whatsnew'
+    && !whatsNewDismissed.value
+    && !storedDismissed(version))
+})
+function dismissWhatsNew() {
+  const version = notes.value && notes.value.version
+  if (!version) return
+  try { localStorage.setItem(whatsNewKey(version), '1') } catch (e) { /* private mode */ }
+  whatsNewDismissed.value = true
+}
 const updateBusy = ref(false)
 const updateStatus = ref('')
 const updateLatest = ref('')
@@ -147,6 +184,7 @@ async function checkUpdates() {
 }
 onMounted(() => {
   fetch('/api/version').then((r) => r.json()).then((d) => { appVersion.value = d.version || '' }).catch(() => {})
+  fetch('/api/changelog').then((r) => (r.ok ? r.json() : null)).then((d) => { notes.value = d }).catch(() => {})
   store.loadCatalog()
   store.loadRuns()
   timer = setInterval(() => store.loadRuns().catch(() => {}), 3000)
@@ -174,10 +212,24 @@ nav { display: flex; flex-direction: column; gap: 3px; flex: 1; min-height: 0; o
 .lang { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding: 0 2px; }
 .lang-ic { color: #77736C; flex: none; }
 .eng { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: 12px; background: #1E1E22; border: 1px solid #2A2A2F; }
-.ver { margin-top: 10px; padding: 0 4px; font-size: 11px; color: #77736C; letter-spacing: .02em; background: none; border: 0; cursor: pointer; text-align: left; font-family: inherit; }
+.ver { display: block; margin-top: 10px; padding: 0 4px; font-size: 11px; color: #77736C; letter-spacing: .02em; background: none; border: 0; cursor: pointer; text-align: left; font-family: inherit; text-decoration: none; }
+.ver.link { margin-top: 4px; }
 .ver:hover { color: #E4DFD8; }
+.wn-wrap { max-width: 1240px; margin: 0 auto; padding: 18px 36px 0; }
+.wn { background: #1E1E22; border: 1px solid rgba(217,119,87,.45); border-radius: 14px; padding: 14px 16px 12px; }
+.wn-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.wn-top strong { font-size: 14px; }
+.wn-dismiss { background: none; border: 1px solid #3A3A41; color: #CFCAC2; border-radius: 8px; padding: 4px 10px; cursor: pointer; font: inherit; font-size: 12.5px; }
+.wn-dismiss:hover { border-color: #D97757; color: #F2A385; }
+.wn-list { margin: 10px 0 8px; padding-left: 1.15em; color: #CFCAC2; font-size: 13px; line-height: 1.45; }
+.wn-list li { margin: 2px 0; }
+.wn-more { color: #F2A385; font-size: 13px; text-decoration: none; }
+.wn-more:hover { text-decoration: underline; }
 .about-ver { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
-.about-note { color: #8A857E; font-size: 12.5px; line-height: 1.5; margin: 0 0 14px; }
+.about-note { color: #8A857E; font-size: 12.5px; line-height: 1.5; margin: 0 0 8px; }
+.about-links { margin: 0 0 14px; }
+.about-links a { color: #F2A385; text-decoration: none; }
+.about-links a:hover { text-decoration: underline; }
 .about-result { margin: 14px 0 0; font-size: 13.5px; line-height: 1.5; }
 .about-result a { color: #F2A385; }
 .eng.err { color: #E06C6C; font-size: 12px; max-height: 72px; overflow: hidden; }

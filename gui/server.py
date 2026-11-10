@@ -24,6 +24,7 @@ from pydantic import BaseModel, ConfigDict
 
 from . import i18n, paths
 from .backend import get_backend
+from .changelog import ChangelogError, load_changelog
 from .jobs import JobManager
 from .modeditor import router as modeditor_router
 
@@ -1280,6 +1281,15 @@ def post_settings(req: SettingsReq):
 @app.get("/api/version")
 def version():
     return {"name": "DeckBench", "version": _sim_version()}
+
+
+@app.get("/api/changelog")
+def changelog():
+    """最新一节更新日志，解析成文本结构。不返回 HTML，也不读网络。"""
+    try:
+        return load_changelog(_sim_version())
+    except ChangelogError:
+        raise HTTPException(404, T("err.noChangelog")) from None
 
 
 @app.post("/api/updates/check")

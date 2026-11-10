@@ -38,13 +38,15 @@
 - **看死因**：统计在哪种怪、哪场战斗死得最多，快速找到卡组的短板。
 - **单卡 A/B**：同样的种子，一组加某张卡、一组不加，直接看这张卡让胜率和层数变了多少。
 - **测你自己的 mod**：内置示例 mod（Claude娘，原创内容），也可以上传自己写的 YAML mod 跑战斗测试。
-- **图形界面，全在本机**：点选参数、一键运行、实时进度、图表报告、历史记录。模拟和结果留在本机，不会上传。页脚显示版本；「关于」里的「检查更新」默认不跑，只有点击才查询 GitHub Releases。
+- **图形界面，全在本机**：点选参数、一键运行、实时进度、图表报告、历史记录。模拟和结果留在本机，不会上传。页脚显示版本；「关于」里的「检查更新」默认不跑，只有点击才查询 GitHub Releases。页脚和「关于」也可以打开「本版更新」（`#/whatsnew`），关掉之后按版本记住。
+- **组牌对打和单卡贡献**：两份已保存的预设可以打同一份遭遇，打完打开对比。一份预设可以做留一法，看每张牌对胜率、掉血和回合的影响，全体不超过 400 场。
+- **进度、取消和并行场次**：长测试显示打到第几场。取消发生在两场之间，正在打的那场会打完。战斗批量的 `workers` 默认是 1，上限是 CPU 数和 8 里较小的那个；每场种子不变。
 - **四种界面语言**：简体中文、English、日本語、한국어。第一次打开跟着系统语言走，左下角随时可以切换（会记住你的选择）；卡牌、角色、敌人的名字也跟着切换，从你自己的游戏安装里读。
 - **导入真游戏的一局**：只读打开存档里的对局记录，看种子、路线、选牌和遗物。
 - **校准真对局和模拟**：同一颗种子、同一个角色、同一条选牌路径上，按每场战斗比较真机掉血和模拟掉血的分布。对不上的层标成未匹配，不拿旁边的战斗来凑。
 - **种子预览**：给一个种子，不打完整的一局，先看地图、怪物分布和开局奖励。
 
-*Win rate and floors reached for full runs at any ascension; death causes; same-seed single-card A/B tests; test your own mods; a local desktop app with charts and history. Nothing is uploaded. Check for updates runs only when you click it.*
+*Win rate and floors reached for full runs at any ascension; death causes; same-seed single-card A/B tests; test your own mods; a local desktop app with charts and history. Nothing is uploaded. Check for updates runs only when you click it. What's new (`#/whatsnew`) is dismissible per version. Two saved decks can be compared, a saved deck can show leave-one-out card impact, long tests show progress and cancel between fights, and combat batches can set `workers` (default 1).*
 
 ## 开始使用（Windows） / Getting started (Windows)
 
@@ -146,8 +148,9 @@ python tools/import_dll_mod.py "/path/to/Slay the Spire 2/mods/MyMod" --out mods
 - 第二行不打完整的一局，先看地图、遭遇队列和开局选项。需要已经从你的游戏生成本机数据。第 2 幕及以后是投影。界面 `#/preview`，带种子用 `#/preview?seed=`。
 - 后两行把已经装好的游戏 mod（清单 JSON + DLL）读成 YAML。DLL 不执行。界面在「模组编辑器 → 导入游戏 mod」。
 - 要用 `mentor-full` 挑录像种子：官方安装包可以接上，但不附带 spire-mentor。在程序旁边放 `mentor.local.json`（`site`、`py`、`python`），`python` 指向构建 `sts2_rs` 的解释器。回退接近 100% 时不要用那次胜率。见 [docs/DEVELOPER.md](docs/DEVELOPER.md)。
+- 发布说明的 #59–#64：浏览器冒烟结束时会放开 Playwright 的事件循环；两份已保存的牌组可以对打（`#/decks`）；长测试有进度，取消发生在两场之间；留一法看单卡贡献；Windows 包用仓库里已有的 `0.1.5`，检查更新仍是手动；战斗批量可以设 `workers`（默认 1）。
 
-*From the repo root. Release notes: [docs/RELEASE_0.1.5.md](docs/RELEASE_0.1.5.md). The first command reads a run (the sample needs no game). The second previews a seed without a full AI run (needs local data). The last two turn an installed mod DLL into YAML without executing it. GUI: `#/import`, `#/import?path=`, `#/preview`, `#/preview?seed=`. `mentor-full` in the official package still needs your own spire-mentor build via `mentor.local.json`.*
+*From the repo root. Release notes: [docs/RELEASE_0.1.5.md](docs/RELEASE_0.1.5.md). The first command reads a run (the sample needs no game). The second previews a seed without a full AI run (needs local data). The last two turn an installed mod DLL into YAML without executing it. GUI: `#/import`, `#/import?path=`, `#/preview`, `#/preview?seed=`. `mentor-full` in the official package still needs your own spire-mentor build via `mentor.local.json`. Notes for #59–#64: the browser smoke releases the Playwright event loop when that module finishes; two saved decks can run a head-to-head (`#/decks`); a long test shows progress and cancels between fights; leave-one-out card impact; the Windows package stamps the existing `0.1.5` and the update check stays manual; combat batches can set `workers` (default 1).*
 
 ## 导入真游戏的一局 / Import a real run
 

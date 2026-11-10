@@ -62,6 +62,8 @@ foreach ($f in $files) {
 }
 Copy-Item -Recurse (Join-Path $Repo "gui\web\dist") (Join-Path $src "gui\web\dist")
 foreach ($f in "launcher.py", "DeckBench.spec", "icon.ico") { Copy-Item (Join-Path $PSScriptRoot $f) $src }
+# Offline What's new. The spec bundles this copy; a second copy is placed beside the exe below.
+Copy-Item (Join-Path $Repo "CHANGELOG.md") (Join-Path $src "CHANGELOG.md")
 
 Write-Host "[3/5] PyInstaller"
 $verInfo = Join-Path $src "file_version_info.txt"
@@ -85,6 +87,7 @@ if ($Decompiler) {
 $cfg = '<?xml version="1.0" encoding="utf-8"?><configuration><runtime><loadFromRemoteSources enabled="true"/></runtime></configuration>'
 [IO.File]::WriteAllText((Join-Path $app "DeckBench.exe.config"), $cfg, (New-Object Text.UTF8Encoding $false))
 Copy-Item (Join-Path $Repo "LICENSE") (Join-Path $app "LICENSE.txt")
+Copy-Item (Join-Path $Repo "CHANGELOG.md") (Join-Path $app "CHANGELOG.md")
 Copy-Item (Join-Path $PSScriptRoot "README-win.txt") (Join-Path $app "README.txt")
 Copy-Item (Join-Path $PSScriptRoot "THIRD-PARTY-NOTICES.txt") $app
 Copy-Item -Recurse (Join-Path $PSScriptRoot "notices") (Join-Path $app "notices")
