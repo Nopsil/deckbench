@@ -636,3 +636,53 @@ def test_deck_builder_saves_two_encounters_and_runs_them(gui):
     decided = [row for row in fights if row["result"] in ("win", "loss")]
     assert decided and len(decided) * 2 >= len(fights)
     _assert_clean(gui, "two-encounter-run")
+
+
+def test_deck_head_to_head_opens_compare(gui):
+    """存两套牌，对打一场木桩，直接落到对比页，两场都在。"""
+    page = gui.page
+    page.goto(gui.base + "/#/decks", wait_until="domcontentloaded")
+    gui.expect(page.locator("[data-page='decks']")).to_be_visible()
+    search = page.locator("[data-deck='search'] input")
+    search.fill("YIHESHI")
+    first = page.locator("[data-card='claude_v34:YIHESHI']")
+    gui.expect(first).to_be_visible()
+    first.locator("[data-add]").click()
+    search.fill("XIAOBENBEN")
+    second = page.locator("[data-card='claude_v34:XIAOBENBEN']")
+    gui.expect(second).to_be_visible()
+    second.locator("[data-add]").click()
+    page.locator("[data-deck='id'] input").fill("h2ha")
+    page.locator("[data-deck='name'] input").fill("Head A")
+    page.locator("[data-deck='save'] button").click()
+    gui.expect(page.locator("[data-deck='saved']")).to_have_text("Saved preset h2ha")
+    page.locator("[data-deck='id'] input").fill("h2hb")
+    page.locator("[data-deck='name'] input").fill("Head B")
+    page.locator("[data-deck='save'] button").click()
+    gui.expect(page.locator("[data-deck='saved']")).to_have_text("Saved preset h2hb")
+
+    page.locator("[data-deck='h2h']").scroll_into_view_if_needed()
+    page.locator("[data-deck='h2h-a'] .n-base-selection").click()
+    option_a = page.locator(".n-base-select-option").filter(has_text="Head A").last
+    gui.expect(option_a).to_be_visible()
+    option_a.click()
+    page.keyboard.press("Escape")
+    page.locator("[data-deck='h2h-b'] .n-base-selection").click()
+    option_b = page.locator(".n-base-select-option").filter(has_text="Head B").last
+    gui.expect(option_b).to_be_visible()
+    option_b.click()
+    gui.expect(page.locator("[data-deck='h2h-run'] button")).to_be_enabled()
+    page.locator("[data-deck='h2h-run'] button").click()
+    from playwright.sync_api import TimeoutError as PlaywrightTimeout
+    try:
+        page.wait_for_url("**/#/compare?*", timeout=180_000)
+    except PlaywrightTimeout as exc:
+        raise AssertionError("head-to-head did not open compare\n" + _run_log_tail(gui.data)) from exc
+    gui.expect(page.locator("[data-page='compare']")).to_be_visible()
+    gui.expect(page.locator("h1")).to_have_text("Compare runs")
+    gui.expect(page.get_by_text("A · Head A", exact=True)).to_be_visible()
+    gui.expect(page.get_by_text("B · Head B", exact=True)).to_be_visible()
+    gui.expect(page.locator("[data-table='cells']")).to_be_visible(timeout=30_000)
+    gui.expect(page.get_by_text("Head A / Head B").first).to_be_visible()
+    _save_shot(page, "head-to-head.png")
+    _assert_clean(gui, "head-to-head")

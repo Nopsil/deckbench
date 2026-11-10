@@ -624,3 +624,160 @@ def test_mcp_lists_encounters_and_saves_them(allowed, codex):
     assert missing["ok"] is False and missing["error"] == "unknown_encounter"
     assert SECRET not in json.dumps(missing)
     assert not (allowed / "presets" / "mcpbad.yaml").exists()
+
+
+def _h2h_body(pid, seed, turns, name=None):
+    body = _payload(pid)
+    body["name"] = name or pid
+    body["seed"] = seed
+    body["max_turns"] = turns
+    body["encounters"] = [{"id": "DUMMY", "fights": 1}]
+    return body
+
+
+def _runs_dir(allowed, monkeypatch):
+    from gui import paths
+    runs = allowed / "runs"
+    runs.mkdir(exist_ok=True)
+    monkeypatch.setattr(paths, "RUNS_DIR", str(runs))
+    return runs
+
+
+def _experiment(runs, rid):
+    import yaml
+    text = (runs / rid / "experiment.yaml").read_text(encoding="utf-8")
+    return yaml.safe_load(text)
+
+
+def test_head_to_head_plan_uses_the_first_preset_unless_overridden(client, allowed, codex):
+    from sts2sim.deckpresets import DeckPresetError, head_to_head_plan
+    saved_a = client.post("/api/decks", headers=EN, json={
+        **_payload("plana"),
+        "name": "Plan A",
+        "seed": 11,
+        "max_turns": 6,
+        "encounters": [{"id": "NIB_ELITE_A", "fights": 2}],
+    })
+    assert saved_a.status_code == 200, saved_a.text
+    saved_b = client.post("/api/decks", headers=EN, json=_h2h_body("planb", 3, 1, "Plan B"))
+    assert saved_b.status_code == 200, saved_b.text
+    plan = head_to_head_plan({"a": "plana", "b": "planb"})
+    assert plan["seed"] == 11 and plan["max_turns"] == 6
+    assert plan["encounters"] == [{"id": "NIB_ELITE_A", "fights": 2}]
+    assert plan["fights"] == 2
+    overridden = head_to_head_plan({
+        "a": "plana",
+        "b": "planb",
+        "seed": 5,
+        "max_turns": 2,
+        "encounters": [{"id": "DUMMY", "fights": 1}],
+    })
+    assert overridden["seed"] == 5 and overridden["max_turns"] == 2
+    assert overridden["encounters"] == [{"id": "DUMMY", "fights": 1}]
+    try:
+        head_to_head_plan({"a": "plana", "b": "plana"})
+    except DeckPresetError as err:
+        assert err.code == "same_deck"
+    else:
+        raise AssertionError("the same preset was accepted")
+    assert codex
+
+
+def test_head_to_head_rejects_bad_input_before_a_run(client, allowed, monkeypatch):
+    before_quick = _read(QUICK)
+    runs = _runs_dir(allowed, monkeypatch)
+    client.post("/api/decks", headers=EN, json=_h2h_body("goodh", 1, 1, "Good"))
+    same = client.post("/api/decks/head_to_head", headers=EN, json={"a": "goodh", "b": "goodh"})
+    assert same.status_code == 400
+    assert _detail(same) == "Pick two different presets."
+    missing = client.post("/api/decks/head_to_head", headers=EN, json={"a": "goodh"})
+    assert missing.status_code == 400
+    assert "b" in _detail(missing)
+    typed = client.post("/api/decks/head_to_head", headers=EN, json={"a": "goodh", "b": 2})
+    assert typed.status_code == 400
+    assert "b" in _detail(typed)
+    unknown = client.post("/api/decks/head_to_head", headers=EN, json={"a": "goodh", "b": "nosuchdeck"})
+    assert unknown.status_code == 400
+    _detail(unknown)
+    climbed = client.post("/api/decks/head_to_head", headers=EN, json={"a": "../quick", "b": "goodh"})
+    assert climbed.status_code == 400
+    assert ".." not in climbed.text
+    leaked = client.post("/api/decks/head_to_head", headers=EN, json={"a": "goodh", "b": "nosuchdeck", "path": SECRET})
+    assert leaked.status_code == 400
+    assert SECRET not in leaked.text and "Traceback" not in leaked.text
+    other = client.post("/api/decks", headers=EN, json=_h2h_body("otherh", 1, 1, "Other"))
+    assert other.status_code == 200, other.text
+    turns = client.post("/api/decks/head_to_head", headers=EN, json={"a": "goodh", "b": "otherh", "max_turns": 0})
+    assert turns.status_code == 400
+    assert "1" in _detail(turns)
+    monkeypatch.setattr("sts2sim.deckpresets.MAX_FIGHTS_TOTAL", 1)
+    capped = client.post("/api/decks/head_to_head", headers=EN, json={
+        "a": "goodh",
+        "b": "otherh",
+        "encounters": [{"id": "DUMMY", "fights": 2}],
+    })
+    assert capped.status_code == 400
+    assert "1" in _detail(capped)
+    assert list(runs.iterdir()) == []
+    assert _read(QUICK) == before_quick
+    broken = client.post("/api/decks/head_to_head", headers={**EN, "content-type": "application/json"}, content=b"{")
+    assert broken.status_code == 400
+    assert "Traceback" not in broken.text
+
+
+def test_head_to_head_runs_both_decks_and_compares(client, allowed, monkeypatch):
+    before_quick = _read(QUICK)
+    before_names = set(os.listdir(os.path.join(ROOT, "experiments")))
+    runs = _runs_dir(allowed, monkeypatch)
+    left = client.post("/api/decks", headers=EN, json=_h2h_body("h2ha", 11, 4, "Head A"))
+    right = client.post("/api/decks", headers=EN, json=_h2h_body("h2hb", 99, 1, "Head B"))
+    assert left.status_code == 200 and right.status_code == 200
+    res = client.post("/api/decks/head_to_head", headers=EN, json={"a": "h2ha", "b": "h2hb"})
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["ok"] is True
+    assert body["seed"] == 11 and body["max_turns"] == 4
+    assert body["encounters"] == ["DUMMY"] and body["fights"] == 1
+    assert body["compare"] == f"/#/compare?a={body['a']}&b={body['b']}"
+    assert "Traceback" not in res.text
+    exp_a = _experiment(runs, body["a"])
+    exp_b = _experiment(runs, body["b"])
+    assert exp_a["seed"] == exp_b["seed"] == 11
+    assert exp_a["max_turns"] == exp_b["max_turns"] == 4
+    assert exp_a["decks"] == ["h2ha"] and exp_b["decks"] == ["h2hb"]
+    assert [row["encounter"] for row in exp_a["extra"]] == ["DUMMY"]
+    assert [row["encounter"] for row in exp_b["extra"]] == ["DUMMY"]
+    assert exp_a["extra"][0]["max_turns"] == exp_b["extra"][0]["max_turns"] == 4
+    raw_a = json.loads((runs / body["a"] / "out" / "raw.jsonl").read_text(encoding="utf-8").splitlines()[0])
+    raw_b = json.loads((runs / body["b"] / "out" / "raw.jsonl").read_text(encoding="utf-8").splitlines()[0])
+    assert raw_a["encounter"] == raw_b["encounter"] == "DUMMY"
+    assert raw_a["deck"] == "h2ha" and raw_b["deck"] == "h2hb"
+    compared = client.get("/api/runs/compare", headers=EN, params={"a": body["a"], "b": body["b"]})
+    assert compared.status_code == 200, compared.text
+    cells = compared.json()["cells"]
+    assert cells and cells[0]["deck_id"] == "h2ha/h2hb"
+    assert cells[0]["room"] == "probe"
+    assert _read(QUICK) == before_quick
+    assert set(os.listdir(os.path.join(ROOT, "experiments"))) == before_names
+
+
+def test_mcp_head_to_head_matches_the_endpoint(client, allowed, monkeypatch):
+    from tools import mcp_server as mcp
+    runs = _runs_dir(allowed, monkeypatch)
+    assert client.post("/api/decks", headers=EN, json=_h2h_body("mcpa", 4, 1, "MCP A")).status_code == 200
+    assert client.post("/api/decks", headers=EN, json=_h2h_body("mcpb", 8, 9, "MCP B")).status_code == 200
+    doc = json.loads(mcp.head_to_head("mcpa", "mcpb", max_turns=2, seed=6))
+    assert doc["ok"] is True
+    assert doc["seed"] == 6 and doc["max_turns"] == 2 and doc["encounters"] == ["DUMMY"]
+    assert doc["compare"].startswith("/#/compare?a=")
+    exp_a = _experiment(runs, doc["a"])
+    exp_b = _experiment(runs, doc["b"])
+    assert exp_a["seed"] == exp_b["seed"] == 6
+    assert exp_a["extra"][0]["max_turns"] == 2
+    same = json.loads(mcp.head_to_head("mcpa", "mcpa"))
+    assert same["ok"] is False and same["error"] == "same_deck"
+    assert "Traceback" not in json.dumps(same)
+    bad = json.loads(mcp.head_to_head("mcpa", "mcpb", encounters="{"))
+    assert bad["ok"] is False and bad["error"] == "bad_json"
+    typed = json.loads(mcp.head_to_head("mcpa", "mcpb", encounters=12))
+    assert typed["ok"] is False and typed["error"] == "bad_type" and typed["field"] == "encounters"

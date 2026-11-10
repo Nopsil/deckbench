@@ -73,6 +73,25 @@ def client():
         yield c
 
 
+def test_different_decks_on_the_same_room_line_up(tmp_path):
+    """卡组 id 不同、幕和房间相同、每一侧只有一套牌时，仍然给出 B−A。同一侧两套牌就不猜。"""
+    left = tmp_path / "left"
+    right = tmp_path / "right"
+    mixed = tmp_path / "mixed"
+    _write_raw(str(left), _fights(4, 1, 0, 3, 2, 5, 1, deck="decka", card="YIHESHI"))
+    _write_raw(str(right), _fights(4, 3, 0, 1, 2, 9, 2, deck="deckb", card="YIHESHI"))
+    body = compare_dirs(str(left), str(right))
+    assert len(body["cells"]) == 1
+    cell = body["cells"][0]
+    assert cell["deck_id"] == "decka/deckb"
+    assert cell["deck"] == "decka / deckb"
+    assert cell["act"] == 1 and cell["room"] == "Monster"
+    assert cell["metrics"]["win"]["delta"] == pytest.approx(0.5)
+    assert any(row["card"] == "YIHESHI" and row["deck_id"] == "decka/deckb" for row in body["cards"])
+    _write_raw(str(mixed), _fights(2, 1, 0, 1, 1, 1, 1, deck="decka") + _fights(2, 1, 0, 1, 1, 1, 1, deck="deckc"))
+    assert compare_dirs(str(mixed), str(right))["cells"] == []
+
+
 def test_welch_matches_a_known_student_t():
     """[1..5] 对 [3..7]，t=2、df=8，双侧 p 约 0.0805。"""
     report = welch_ttest([1, 2, 3, 4, 5], [3, 4, 5, 6, 7])

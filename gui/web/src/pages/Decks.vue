@@ -94,6 +94,28 @@
           <div class="hint">{{ t('deck.runHint') }}</div>
           <div v-if="deckMod" class="hint">{{ t('deck.mod') }}: <span class="mono">{{ deckMod }}</span></div>
         </div>
+
+        <div class="panel" data-deck="h2h">
+          <h3>{{ t('deck.h2h') }}</h3>
+          <div class="hint">{{ t('deck.h2hHint') }}</div>
+          <div v-if="savedPresets.length < 2" class="hint">{{ t('deck.h2hNeed') }}</div>
+          <div class="field" data-deck="h2h-a">
+            <div class="label">A</div>
+            <n-select v-model:value="h2hA" :options="presetOptions" :placeholder="t('deck.h2hPick')" />
+          </div>
+          <div class="field" data-deck="h2h-b">
+            <div class="label">B</div>
+            <n-select v-model:value="h2hB" :options="presetOptions" :placeholder="t('deck.h2hPick')" />
+          </div>
+          <label class="check">
+            <input v-model="h2hOverride" data-deck="h2h-override" type="checkbox" />
+            {{ t('deck.h2hOverride') }}
+          </label>
+          <div v-if="h2hErr" class="hint warn" data-deck="h2h-error">{{ h2hErr }}</div>
+          <div data-deck="h2h-run">
+            <n-button type="primary" block :loading="h2hRunning" :disabled="!canH2h" @click="runHeadToHead">{{ t('deck.h2hRun') }}</n-button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -101,12 +123,14 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { NButton, NInput, NSelect, useMessage } from 'naive-ui'
 import EncounterPicker from '../components/EncounterPicker.vue'
 import { api, store } from '../api'
 import { t, tr, lang } from '../i18n'
 
 const msg = useMessage()
+const router = useRouter()
 const draft = ref('')
 const q = ref('')
 const character = ref('')
@@ -132,6 +156,11 @@ const turnsTouched = ref(false)
 const turnsReady = ref(false)
 const saving = ref(false)
 const savedId = ref('')
+const h2hA = ref(null)
+const h2hB = ref(null)
+const h2hOverride = ref(false)
+const h2hRunning = ref(false)
+const h2hErr = ref('')
 let timer
 function onlyDummy(list) {
   return (list || []).length > 0 && list.every((row) => row.id === 'DUMMY')
@@ -280,6 +309,12 @@ const splitSegs = computed(() => {
   }).filter((seg) => seg.w > 0)
 })
 const canSave = computed(() => /^[A-Za-z][A-Za-z0-9_]{0,31}$/.test(deckId.value.trim()) && deckName.value.trim() && rows.value.length > 0 && !!deckMod.value && encounters.value.length > 0 && !saving.value)
+const savedPresets = computed(() => ((store.catalog && store.catalog.experiments) || []).filter((item) => item.user))
+const presetOptions = computed(() => savedPresets.value.map((item) => ({
+  label: `${item.title || item.name || item.id} (${item.id})`,
+  value: item.id,
+})))
+const canH2h = computed(() => !!h2hA.value && !!h2hB.value && h2hA.value !== h2hB.value && !h2hRunning.value)
 
 async function save() {
   if (!canSave.value) return
@@ -303,7 +338,27 @@ async function save() {
     saving.value = false
   }
 }
-onMounted(() => { load(); loadTurnCap() })
+async function runHeadToHead() {
+  if (!canH2h.value) return
+  h2hRunning.value = true
+  h2hErr.value = ''
+  try {
+    const body = { a: h2hA.value, b: h2hB.value }
+    if (h2hOverride.value) {
+      body.encounters = encounters.value.map((row) => ({ id: row.id, fights: Number(row.fights) || 1 }))
+      body.max_turns = maxTurns.value
+    }
+    const saved = await api.post('/api/decks/head_to_head', body)
+    await store.loadRuns()
+    router.push({ path: '/compare', query: { a: saved.a, b: saved.b } })
+  } catch (e) {
+    h2hErr.value = e.message
+    msg.error(e.message)
+  } finally {
+    h2hRunning.value = false
+  }
+}
+onMounted(() => { load(); loadTurnCap(); store.loadCatalog() })
 </script>
 
 <style scoped>
@@ -333,6 +388,8 @@ svg { width: 100%; height: auto; display: block; margin: 4px 0 10px; }
 .field input[type="number"] { width: 100%; box-sizing: border-box; background: #1A1A1E; color: #EDE9E3; border: 1px solid #2E2E34; border-radius: 8px; padding: 6px 8px; font: inherit; }
 .hint.warn { color: #E0A86C; }
 .hint.ok { color: #8FBF8F; }
+.check { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0 12px; font-size: 13px; color: #B9B4AC; }
+.check input { margin-top: 2px; }
 @media (max-width: 980px) {
   .layout { grid-template-columns: 1fr; }
   .filters { grid-template-columns: 1fr 1fr; }

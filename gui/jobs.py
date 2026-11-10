@@ -163,6 +163,19 @@ class JobManager:
         threading.Thread(target=self._run, args=(j, argv, env, cwd), daemon=True).start()
         return meta
 
+    def wait(self, rid, timeout=900):
+        """等到这次测试离开 running / queued。超时仍返回当时的 meta，不另开模拟。"""
+        deadline = time.monotonic() + timeout
+        while True:
+            meta = self.get(rid)
+            if not isinstance(meta, dict):
+                return None
+            if meta.get("status") not in ("running", "queued"):
+                return meta
+            if time.monotonic() >= deadline:
+                return meta
+            time.sleep(0.05)
+
     def _run(self, j, argv, env, cwd):
         logf = open(os.path.join(j.dir, "run.log"), "w", encoding="utf-8")
         kw = {}

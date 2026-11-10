@@ -243,6 +243,36 @@ async def save_deck(request: Request):
         raise HTTPException(400, _deck_http(err)) from err
 
 
+@app.post("/api/decks/head_to_head")
+async def decks_head_to_head(request: Request):
+    """两份用户预设打同一份遭遇、同一颗种子，打完返回两次测试的 id。
+
+    不写 encounters / gauntlet / max_turns 时用第一份预设里存的。
+    名单合计超过 400 场、预设对不上、类型不对，是 400，一句说明，没有堆栈。
+    """
+    from gui.headtohead import run_pair
+    from sts2sim import deckpresets as decks
+
+    length = request.headers.get("content-length")
+    if length and length.isdigit() and int(length) > decks.MAX_BYTES:
+        raise HTTPException(400, T("deck.err.too_big", n=decks.MAX_BYTES))
+    chunks = []
+    total = 0
+    async for block in request.stream():
+        if total + len(block) > decks.MAX_BYTES:
+            raise HTTPException(400, T("deck.err.too_big", n=decks.MAX_BYTES))
+        chunks.append(block)
+        total += len(block)
+    try:
+        payload = json.loads(b"".join(chunks).decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError):
+        raise HTTPException(400, T("deck.err.bad_json")) from None
+    try:
+        return await asyncio.to_thread(run_pair, payload)
+    except decks.DeckPresetError as err:
+        raise HTTPException(400, _deck_http(err)) from err
+
+
 @app.get("/api/catalog")
 def catalog(refresh: bool = False, lang: str | None = None):
     try:

@@ -124,3 +124,21 @@
 `list_cards` 和 `GET /api/cards` 是同一份牌。`list_encounters` 和 `GET /api/encounters` 是同一份遭遇，含 `gauntlets`。成功时 `ok` 和 `read_only` 都是 true。`save_deck(deck)` 的 `deck` 是上面的 JSON 文本（也可以是对象），可以带 `encounters` 和 `gauntlet`。成功时 `ok` 为 true，并带 `file`（只有文件名）和 `encounters`。三条在 `--import-only` 里也有，因为它们不需要本机游戏数据；没有怪物数据时遭遇名单只有训练木桩。失败是 `{"ok": false, "error": "..."}`，不抛异常。
 
 *`list_cards` is the same list as `GET /api/cards`. `list_encounters` is the same list as `GET /api/encounters`, including `gauntlets`. On success `ok` and `read_only` are both true. `save_deck(deck)` takes the JSON above as text (or as an object), including optional `encounters` and `gauntlet`. On success `ok` is true, `file` is the file name only, and `encounters` lists the ids. All three tools are on `--import-only`, because they do not need a local game install. With no monster codex the encounter list is only the training dummy. A failure is `{"ok": false, "error": "..."}` and does not raise.*
+
+## 对打 / Head-to-head
+
+组牌页上「卡组 A 对卡组 B」选两份已经保存的用户预设。`POST /api/decks/head_to_head` 用界面已有的战斗测试各跑一遍：同一份遭遇、同一个回合上限、同一颗种子。不写 `encounters` / `gauntlet` / `max_turns` / `seed` 时，用第一份预设（A）里存的那些。自己写了才覆盖。名单的规则和保存预设一样：遭遇必须是模拟器会打的，每种 1–100 场，最多 40 种，合计最多 400 场。两套牌各打这一份名单。种子写进两份实验的 `seed`，战斗仍走 `sts2sim.runner` 原来的播种（种子、卡组、幕、房间、场次、遭遇一起算），不另写一套随机。
+
+打完两场都是 `done` 之后，返回 `a`、`b`（两次测试的 id）、`seed`、`max_turns`、`encounters`、`fights` 和 `compare`（`/#/compare?a=&b=`）。页面点「对打」就打开这一页。对比仍是原来的格子和单卡差值。两套牌的 id 不一样，所以格子按幕和房间配对（这一侧只有一套牌时）；同一侧有不止一套牌就不猜。见 [COMPARE.md](COMPARE.md)。
+
+同一份预设选两次、预设不存在、不是用户预设、`..`、空字节、类型不对、回合不在 1–200、超过 400 场，都是 400，一句说明，没有堆栈，也不回显提交的原文。有一场没打完也是 400。不改出厂预设、`mods/`、种子算法或 AI。
+
+MCP `head_to_head(a, b, encounters="", gauntlet="", max_turns=None, seed=None)` 做同一件事。`encounters` 是上面的 JSON 数组文本。成功的 JSON 和 HTTP 相同。失败是 `{"ok": false, "error": "..."}`，不抛异常。`--import-only` 也有这个工具：训练木桩不需要本机游戏数据，真正开打用的仍是原来的战斗测试。
+
+*Deck builder has **Deck A vs deck B**. Pick two saved user presets. `POST /api/decks/head_to_head` runs each one with the combat test the GUI already uses: the same encounters, the same turn cap, and the same seed. Omit `encounters`, `gauntlet`, `max_turns` and `seed` to keep what the first preset (A) stored. An override uses the same rules as saving a preset: an encounter the simulator runs, 1–100 fights each, at most 40 encounters, and at most 400 fights in total. Each deck runs that list. The seed is written on both experiments. Fights still use `sts2sim.runner`'s existing seeding (seed, deck, act, room, index, encounter together). There is no second random source.*
+
+*When both tests are `done`, the body has `a` and `b` (the two test ids), `seed`, `max_turns`, `encounters`, `fights` and `compare` (`/#/compare?a=&b=`). **Run head-to-head** on the page opens that view. The comparison is still the existing cell and card deltas. The two deck ids differ, so a cell lines up by act and room when that side has one deck there. More than one deck on a side is not guessed. See [COMPARE.md](COMPARE.md).*
+
+*The same preset twice, an unknown id, a preset that is not a saved user deck, `..`, a null byte, a wrong type, a turn cap outside 1–200, or more than 400 fights is a 400 with one sentence and no stack trace. The submitted text is not echoed. A run that does not finish is a 400 too. Shipped presets, `mods/`, the seeding, and the AI are unchanged.*
+
+*MCP `head_to_head(a, b, encounters="", gauntlet="", max_turns=None, seed=None)` does the same thing. `encounters` is the JSON array above, as text. Success is the same JSON as HTTP. A failure is `{"ok": false, "error": "..."}` and does not raise. `--import-only` exposes this tool too. A training dummy does not need a local game install. The fights themselves are still the existing combat test.*

@@ -181,6 +181,37 @@ def _apply_run_encounters(exp, params):
     exp["rooms"] = []
 
 
+def _apply_shared_plan(exp, params):
+    """对打时两套牌共用同一份遭遇、回合上限。出厂预设的房间抽取不受影响。"""
+    if not isinstance(params, dict) or not params.get("shared_plan"):
+        return
+    from sts2sim.deckpresets import (
+        MAX_FIGHTS_TOTAL,
+        DeckPresetError,
+        fight_rows,
+        preset_turns,
+        resolve_encounters,
+    )
+    try:
+        chosen = resolve_encounters({"encounters": params.get("encounters")}, allow_default=False)
+    except DeckPresetError as err:
+        raise _deck_run_error(err) from err
+    if not chosen:
+        raise _deck_run_error(DeckPresetError("no_encounter"))
+    decks = [deck for deck in (exp.get("decks") or []) if isinstance(deck, str) and deck]
+    total = sum(item["fights"] for item in chosen)
+    if len(decks) != 1 or total < 1 or total > MAX_FIGHTS_TOTAL:
+        raise _deck_run_error(DeckPresetError("too_many_fights", n=MAX_FIGHTS_TOTAL))
+    try:
+        turns = preset_turns({"max_turns": params.get("max_turns")}, chosen)
+    except DeckPresetError as err:
+        raise _deck_run_error(err) from err
+    exp["max_turns"] = turns
+    exp["extra"] = fight_rows(decks, chosen, turns)
+    exp["rooms"] = []
+    exp["fights"] = 1
+
+
 def worker_env(agent=""):
     env = dict(os.environ)
     gui_parent = os.path.dirname(paths.APP_DIR) if not paths.FROZEN else ""
@@ -406,6 +437,7 @@ class LocalPythonBackend(SimBackend):
             exp["agent"] = p.get("agent") or exp.get("agent", "heuristic")
             exp.pop("user_deck", None)
             _apply_run_encounters(exp, p)
+            _apply_shared_plan(exp, p)
             ef = os.path.join(run_dir, "experiment.yaml")
             yaml.safe_dump(exp, open(ef, "w", encoding="utf-8"), allow_unicode=True, sort_keys=False)
             argv = worker_argv("combat", ef, "--jobs", str(int(p.get("procs") or os.cpu_count() or 1)),
