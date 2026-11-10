@@ -368,6 +368,7 @@ class LocalPythonBackend(SimBackend):
         return out
 
     def catalog(self, refresh=False, lang=None):
+        from gui.fightworkers import worker_cap
         lang = lang if lang in i18n.LANGS else i18n.current()
         c = self._cards(refresh)
         chars = [{"id": k, "name": char_name(k, lang)} for k in c.get("characters", [])]
@@ -391,6 +392,7 @@ class LocalPythonBackend(SimBackend):
                 "characters": chars, "agents_batch": agents_batch(lang), "agents_combat": agents_combat(lang), "styles": styles(lang),
                 "variants": variants, "cards": cards, "starters": c["starters"], "rooms": ROOMS,
                 "experiments": self.experiments(lang), "mods": self.mods(), "cpu": os.cpu_count() or 1,
+                "worker_cap": worker_cap(),
                 "encounters": self.encounter_names(lang)}
 
     # ---------------- 运行
@@ -443,8 +445,16 @@ class LocalPythonBackend(SimBackend):
             _apply_shared_plan(exp, p)
             ef = os.path.join(run_dir, "experiment.yaml")
             yaml.safe_dump(exp, open(ef, "w", encoding="utf-8"), allow_unicode=True, sort_keys=False)
-            argv = worker_argv("combat", ef, "--jobs", str(int(p.get("procs") or os.cpu_count() or 1)),
+            from gui.fightworkers import WorkersError, fight_chain, workers_from_params
+            try:
+                workers = workers_from_params(p)
+            except WorkersError as err:
+                expected = i18n.t("api.type.integer")
+                raise ValueError(i18n.t("api.err.bad_type", field=err.field, expected=expected)) from err
+            argv = worker_argv("combat", ef, "--workers", str(workers),
                                "--out", os.path.join(run_dir, "out"))
+            if fight_chain(p, exp):
+                argv.append("--chain")
             env = worker_env()
             if mod_parent:
                 env["STS2SIM_USER_MODS"] = mod_parent

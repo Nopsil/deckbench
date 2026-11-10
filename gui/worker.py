@@ -9,6 +9,8 @@
 进度协议（stdout 单独一行）：@@PROGRESS {"done": n, "total": m, "encounter": id, "encounter_name": name}；
 结束：@@DONE {...}。环境变量 DECKBENCH_CANCEL_FILE 指向的文件一旦出现，就不再派发新的一场，
 已经在打的那场打完，然后把打完的结果写下来并标成 partial。
+combat 的 ``--workers`` 默认 1（和一场接一场相同），上限是 min(cpu_count, 8)。
+大于 1 时用 spawn 进程池。``--chain`` 把连战按种子串起来：同一条种子里的遭遇不并行。
 """
 import argparse
 import json
@@ -262,12 +264,6 @@ def cmd_batch(a):
 
 
 # ---------------------------------------------------------------- 战斗实验
-def _combat_init():
-    paths.setup_sys_path()
-    from gui import modpatch
-    modpatch.apply()
-
-
 def cmd_combat(a):
     import yaml
     from gui import modpatch
@@ -290,32 +286,38 @@ def cmd_combat(a):
         os.environ["DECKBENCH_EXPLAIN"] = "1"
     M = R.get_modset(exp["mods"])
     tasks = R.plan(exp, M, a.fights)
-    jobs = a.jobs or os.cpu_count() or 1
+    from gui.fightworkers import WorkersError, checked_workers, combat_initializer, combat_task, run_indexed
+
     T = i18n.t
+    try:
+        jobs = checked_workers(a.workers if a.workers is not None else a.jobs)
+    except WorkersError as err:
+        print(T("api.err.bad_type", field=err.field, expected=T("api.type.integer")), flush=True)
+        sys.exit(2)
     print(T("log.combatStart", title=exp.get("title") or exp["name"], n=len(tasks), agent=exp.get("agent", "heuristic"), procs=jobs), flush=True)
     hint = _combat_hint(tasks[0]) if tasks else ""
     _emit_progress(0, len(tasks), hint=hint)
     t0 = time.time()
-    ordered = {}
-    partial = False
-    approx = []
-    pool = mp.Pool(jobs, initializer=_combat_init)
-    try:
-        for i, r in _iter_indexed(pool, R._task, tasks, jobs):
-            ordered[i] = r
-            _emit_progress(len(ordered), len(tasks), hint=hint, result=r)
-            print(f"[{len(ordered)}/{len(tasks)}] " + T("log.progressDone"), flush=True)
-        partial = _cancel_requested() or len(ordered) < len(tasks)
-        if not partial:
-            approx = pool.map(R._collect_approx, range(jobs * 4))
-    finally:
-        pool.close()
-        pool.join()
-    results = [ordered[i] for i in range(len(tasks)) if i in ordered]
-    allapprox = {}
-    for x in approx:
-        allapprox.update(x)
-    allapprox.update(EN.APPROX)
+
+    def _on_fight(_pos, result, done):
+        _emit_progress(done, len(tasks), hint=hint, result=result)
+        print(f"[{done}/{len(tasks)}] " + T("log.progressDone"), flush=True)
+
+    ordered, approx = run_indexed(
+        combat_task, tasks, jobs, chain=bool(a.chain), on_each=_on_fight,
+        initializer=combat_initializer, cancel=_cancel_requested,
+    )
+    partial = _cancel_requested() or len(ordered) < len(tasks)
+    results = []
+    for i in range(len(tasks)):
+        if i not in ordered:
+            continue
+        payload = ordered[i]
+        results.append(payload[0] if isinstance(payload, tuple) else payload)
+    allapprox = dict(EN.APPROX)
+    for key, text in approx.items():
+        allapprox.setdefault(key, text)
+    allapprox = {key: allapprox[key] for key in sorted(allapprox)}
     wall = time.time() - t0
     os.makedirs(a.out, exist_ok=True)
     meta = {"exp": exp, "n_tasks": len(results), "planned": len(tasks), "wall_secs": wall, "jobs": jobs, "approx": allapprox}
@@ -477,7 +479,11 @@ def main(argv=None):
     c = sub.add_parser("combat")
     c.add_argument("experiment")
     c.add_argument("--fights", type=int)
-    c.add_argument("--jobs", type=int)
+    c.add_argument("--jobs", type=int, default=None)
+    c.add_argument("--workers", type=int, default=None,
+                   help="并行进程数。默认 1。与 --jobs 同时给出时以 --workers 为准。上限是 min(cpu_count, 8)。")
+    c.add_argument("--chain", action="store_true",
+                   help="连战：同一条种子上的遭遇按顺序打，不同种子可以并行。")
     c.add_argument("--seed", type=int)
     c.add_argument("--agent")
     c.add_argument("--out", required=True)
@@ -497,5 +503,8 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    mp.freeze_support()
-    main()
+    from gui.fightworkers import support_spawn
+
+    support_spawn()
+    if mp.parent_process() is None:
+        main()

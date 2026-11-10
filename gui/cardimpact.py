@@ -12,7 +12,7 @@ import threading
 from sts2sim.cardimpact import build_report, plan_ablation
 from sts2sim.deckpresets import MAX_BYTES, DeckPresetError
 
-_REQUEST_KEYS = ("plus", "scale", "encounters", "gauntlet", "max_turns", "seed", "fights")
+_REQUEST_KEYS = ("plus", "scale", "encounters", "gauntlet", "max_turns", "seed", "fights", "workers")
 _RESULT_NAME = "card_impact.json"
 
 
@@ -139,6 +139,100 @@ def _parent_cancelled(job):
     return bool(job.cancelled or cancel_requested(job.dir))
 
 
+def _worker_plan(payload, fights_each):
+    """返回 (每个变体内部的进程数, 同时开几个变体)。
+
+    每个变体只有一场时，进程用来同时跑不同变体。变体里有多场时，进程用在这一场变体内部，
+    变体仍一个接一个，避免进程数乘在一起。
+    """
+    from gui.fightworkers import WorkersError, checked_workers
+    raw = None
+    if isinstance(payload, dict) and "workers" in payload:
+        raw = payload.get("workers")
+    try:
+        count = checked_workers(raw)
+    except WorkersError as err:
+        raise DeckPresetError("bad_type", field="workers", expected="integer") from err
+    per = int(fights_each or 1)
+    if count > 1 and per <= 1:
+        return 1, count
+    return count, 1
+
+
+def _drive_wide(job, plan, children, outcomes, jobs, lang, total):
+    """同时跑几个变体。每个变体自己的战斗仍是一场接一场。结果按下标对齐。"""
+    from gui import i18n
+    width = int((job.meta.get("params") or {}).get("variant_width") or 1)
+    done_fights = 0
+    stopped = False
+    failed = None
+    pending = list(enumerate(zip(plan["variants"], children)))
+    inflight = []
+
+    def _live():
+        extra = 0
+        enc = ""
+        label = ""
+        for index, spec, child in inflight:
+            view = jobs.progress(child.meta["id"]) or {}
+            extra += int(view.get("done") or 0)
+            if view.get("encounter"):
+                enc = str(view.get("encounter") or "")
+                label = view.get("encounter_name") or _card_label(spec, lang)
+            elif spec is not None:
+                label = _card_label(spec, lang)
+                enc = spec.get("card_id") or "baseline"
+        shown = min(total, done_fights + extra) if total else done_fights + extra
+        jobs.update_progress(job, shown, total, enc, label)
+
+    while pending or inflight:
+        if _parent_cancelled(job):
+            stopped = True
+        while pending and len(inflight) < width and not stopped:
+            index, (spec, child) = pending.pop(0)
+            label = _card_label(spec, lang)
+            jobs.log_line(job, i18n.t("deck.impactLog", lang, card=_safe(label)))
+            if not jobs.launch(child.meta["id"]):
+                meta = jobs.get(child.meta["id"]) or {}
+                outcomes[index] = _outcome(jobs, spec, child.meta["id"])
+                if meta.get("status") == "cancelled" or _parent_cancelled(job):
+                    stopped = True
+                else:
+                    failed = _public_error(meta.get("error"), lang)
+                    stopped = True
+                continue
+            inflight.append((index, spec, child))
+        if failed:
+            stopped = True
+        still = []
+        for index, spec, child in inflight:
+            meta = jobs.get(child.meta["id"]) or {}
+            status = meta.get("status") or ""
+            if _parent_cancelled(job) and status in ("running", "queued"):
+                jobs.cancel(child.meta["id"])
+                stopped = True
+            if status in ("running", "queued"):
+                still.append((index, spec, child))
+                continue
+            outcome = _outcome(jobs, spec, child.meta["id"])
+            outcomes[index] = outcome
+            done_fights += len(outcome["fights"])
+            if outcome["status"] == "failed":
+                failed = _public_error((jobs.get(child.meta["id"]) or {}).get("error"), lang)
+                stopped = True
+            elif outcome["status"] == "cancelled" or _parent_cancelled(job):
+                stopped = True
+        inflight = still
+        _live()
+        _publish(job, plan, outcomes, status="running", partial=stopped or _parent_cancelled(job))
+        if not inflight:
+            if stopped or not pending:
+                break
+            continue
+        threading.Event().wait(0.05)
+    return stopped, failed, done_fights
+
+
 def _run(job, plan, children):
     from gui import i18n
     jobs = _jobs()
@@ -149,45 +243,50 @@ def _run(job, plan, children):
     stopped = False
     failed = None
     try:
-        for index, (spec, child) in enumerate(zip(plan["variants"], children)):
-            if _parent_cancelled(job):
-                stopped = True
-                break
-            label = _card_label(spec, lang)
-            encounter = spec.get("card_id") or "baseline"
-            jobs.update_progress(job, done_fights, total, encounter, label)
-            jobs.log_line(job, i18n.t("deck.impactLog", lang, card=_safe(label)))
-            if not jobs.launch(child.meta["id"]):
-                meta = jobs.get(child.meta["id"]) or {}
-                if meta.get("status") == "cancelled" or _parent_cancelled(job):
+        if int((job.meta.get("params") or {}).get("variant_width") or 1) > 1:
+            stopped, failed, done_fights = _drive_wide(
+                job, plan, children, outcomes, jobs, lang, total,
+            )
+        else:
+            for index, (spec, child) in enumerate(zip(plan["variants"], children)):
+                if _parent_cancelled(job):
                     stopped = True
+                    break
+                label = _card_label(spec, lang)
+                encounter = spec.get("card_id") or "baseline"
+                jobs.update_progress(job, done_fights, total, encounter, label)
+                jobs.log_line(job, i18n.t("deck.impactLog", lang, card=_safe(label)))
+                if not jobs.launch(child.meta["id"]):
+                    meta = jobs.get(child.meta["id"]) or {}
+                    if meta.get("status") == "cancelled" or _parent_cancelled(job):
+                        stopped = True
+                        outcomes[index] = _outcome(jobs, spec, child.meta["id"])
+                        break
+                    failed = _public_error(meta.get("error"), lang)
                     outcomes[index] = _outcome(jobs, spec, child.meta["id"])
                     break
-                failed = _public_error(meta.get("error"), lang)
-                outcomes[index] = _outcome(jobs, spec, child.meta["id"])
-                break
-            while True:
-                meta = jobs.get(child.meta["id"]) or {}
-                status = meta.get("status") or ""
-                view = jobs.progress(child.meta["id"]) or {}
-                child_done = int(view.get("done") or 0)
-                jobs.update_progress(job, done_fights + child_done, total, encounter, label)
-                if _parent_cancelled(job) and status in ("running", "queued"):
-                    jobs.cancel(child.meta["id"])
-                if status not in ("running", "queued"):
+                while True:
+                    meta = jobs.get(child.meta["id"]) or {}
+                    status = meta.get("status") or ""
+                    view = jobs.progress(child.meta["id"]) or {}
+                    child_done = int(view.get("done") or 0)
+                    jobs.update_progress(job, done_fights + child_done, total, encounter, label)
+                    if _parent_cancelled(job) and status in ("running", "queued"):
+                        jobs.cancel(child.meta["id"])
+                    if status not in ("running", "queued"):
+                        break
+                    threading.Event().wait(0.05)
+                outcome = _outcome(jobs, spec, child.meta["id"])
+                outcomes[index] = outcome
+                done_fights += len(outcome["fights"])
+                _publish(job, plan, outcomes, status="running", partial=_parent_cancelled(job))
+                status = outcome["status"]
+                if status == "failed":
+                    failed = _public_error((jobs.get(child.meta["id"]) or {}).get("error"), lang)
                     break
-                threading.Event().wait(0.05)
-            outcome = _outcome(jobs, spec, child.meta["id"])
-            outcomes[index] = outcome
-            done_fights += len(outcome["fights"])
-            _publish(job, plan, outcomes, status="running", partial=_parent_cancelled(job))
-            status = outcome["status"]
-            if status == "failed":
-                failed = _public_error((jobs.get(child.meta["id"]) or {}).get("error"), lang)
-                break
-            if status == "cancelled" or _parent_cancelled(job):
-                stopped = True
-                break
+                if status == "cancelled" or _parent_cancelled(job):
+                    stopped = True
+                    break
         for index, (child, outcome) in enumerate(zip(children, outcomes)):
             if outcome is None:
                 jobs.drop_queued(child.meta["id"])
@@ -229,6 +328,7 @@ def start(deck_id, payload=None):
     """校验后马上返回父任务 id 和每个变体的测试 id。不等它们打完。"""
     from gui import i18n
     plan = plan_ablation(deck_id, payload)
+    child_workers, width = _worker_plan(payload, plan["fights"])
     lang = _lang()
     jobs = _jobs()
     request = _stored_request(payload if isinstance(payload, dict) else {})
@@ -245,6 +345,8 @@ def start(deck_id, payload=None):
         "scale": plan["scale"],
         "scaled": plan["scaled"],
         "cap": plan["cap"],
+        "workers": max(child_workers, width),
+        "variant_width": width,
         "request": request,
     }
     title = i18n.t("deck.impactTitle", lang, name=_safe(plan["title"]))
@@ -256,12 +358,14 @@ def start(deck_id, payload=None):
                 "preset": plan["deck"],
                 "seed": plan["seed"],
                 "agent": plan["agent"],
-                "procs": 1,
+                "workers": child_workers,
                 "fights": 1,
                 "max_turns": plan["max_turns"],
                 "shared_plan": True,
                 "encounters": plan["encounters"],
             }
+            if isinstance(payload, dict) and isinstance(payload.get("gauntlet"), str) and payload["gauntlet"].strip():
+                params["gauntlet"] = payload["gauntlet"].strip()
             if spec.get("change") != "baseline":
                 params["deck_cards"] = list(spec.get("cards") or [])
             child = jobs.prepare(
@@ -311,6 +415,7 @@ def start(deck_id, payload=None):
         "scaled": plan["scaled"],
         "plus": plan["plus"],
         "cap": plan["cap"],
+        "workers": max(child_workers, width),
         "skipped": plan["skipped"],
     }
 

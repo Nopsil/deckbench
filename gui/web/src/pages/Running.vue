@@ -124,7 +124,7 @@ const paramChips = computed(() => {
     if (p.variants?.length) x.push(t('chip.variant', { v: p.variants.join('+') }))
     return x
   }
-  return [t('kind.combat'), p.preset ? t('chip.preset', { id: p.preset }) : t('nt.nDecks', { n: (p.decks || []).length }), t('chip.perCell', { n: p.fights }), store.agentName('combat', p.agent), t('chip.seed', { s: p.seed })]
+  return [t('kind.combat'), p.preset ? t('chip.preset', { id: p.preset }) : t('nt.nDecks', { n: (p.decks || []).length }), t('chip.perCell', { n: p.fights }), store.agentName('combat', p.agent), t('chip.seed', { s: p.seed }), t('chip.parallel', { n: p.workers || p.procs || 1 })]
 })
 // 日志行按所有语言的「胜利/完成」「出错/失败」词着色（日志是开始运行时的语言，界面语言之后可能换过）
 const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

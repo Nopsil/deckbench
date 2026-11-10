@@ -610,12 +610,15 @@ def cancel_run(run_id: str = "") -> str:
 
 
 def head_to_head(a: str, b: str, encounters: str = "", gauntlet: str = "",
-                 max_turns: int | None = None, seed: int | None = None) -> str:
+                 max_turns: int | None = None, seed: int | None = None,
+                 workers: int | None = None) -> str:
     """两份已保存的牌组预设对打。马上返回两次战斗测试的 id，不等它们打完。
 
     a、b 是用户预设 id。两套牌打同一份遭遇、同一个回合上限、同一颗种子，用的是界面已有的战斗测试。
     encounters / gauntlet / max_turns 省略时用 a 这份预设里存的。encounters 是 JSON 数组（{id, fights} 或 id）。
     seed 省略时也用 a 的种子。一份名单合计最多 400 场。
+    workers 是同时打的进程数，省略是 1。大于 min(cpu_count, 8) 时收到这个上限。
+    连战的同一条种子仍按顺序打，不同种子可以并行。
     成功是 JSON：ok、status（running）、a、b、seed、max_turns、encounters、fights、compare（#/compare?a=&b=）。
     进度用 run_progress，停下用 cancel_run。两场都变成 done 之后再 compare_runs。
     失败也是 JSON（ok 为 false，error 为 same_deck / preset / bad_id / path / unknown_encounter /
@@ -641,6 +644,8 @@ def head_to_head(a: str, b: str, encounters: str = "", gauntlet: str = "",
         payload["max_turns"] = max_turns
     if seed is not None:
         payload["seed"] = seed
+    if workers is not None:
+        payload["workers"] = workers
     try:
         from gui.headtohead import run_pair
         saved = run_pair(payload)
@@ -653,13 +658,15 @@ def head_to_head(a: str, b: str, encounters: str = "", gauntlet: str = "",
 
 def card_impact(deck: str = "", job: str = "", plus: bool = False, scale: bool = True,
                  encounters: str = "", gauntlet: str = "", max_turns: int | None = None,
-                 seed: int | None = None) -> str:
+                 seed: int | None = None, workers: int | None = None) -> str:
     """一份已保存的牌组，留一法看每张牌对胜率、掉血和回合的影响。
 
     不写 job 时马上开跑：基线，加上每种牌少一张（plus 为真时再加每种多一张）。
     遭遇、种子、回合上限和卡组 id 都相同，用的是已有的战斗测试。马上返回父任务 id（id / job）
     和每个变体的 run id。进度用 run_progress(父任务 id)，停下用 cancel_run(父任务 id)。
     encounters / gauntlet / max_turns / seed 省略时用这份预设里存的。
+    workers 省略是 1，上限 min(cpu_count, 8)。每个变体有多场时，进程用在这个变体里面；
+    每个变体只有一场时，用来同时跑不同变体。连战的同一条种子仍按顺序打。
     全体变体合计最多 400 场。scale 默认真：按比例缩小每种遭遇的场数。scale 为假，
     或者缩到每个变体一场仍超过 400，是 too_many_fights。
     写了 job 就不再开跑，返回那一次的结果：每一行是变体减基线的 delta_win、delta_hp_lost、
@@ -705,6 +712,8 @@ def card_impact(deck: str = "", job: str = "", plus: bool = False, scale: bool =
         payload["max_turns"] = max_turns
     if seed is not None:
         payload["seed"] = seed
+    if workers is not None:
+        payload["workers"] = workers
     try:
         from gui.cardimpact import start as start_impact
         saved = start_impact(deck.strip(), payload)

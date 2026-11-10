@@ -17,7 +17,7 @@ cd gui/web && npm install && npm run build         # 改了前端后重新构建
 ## 结构
 
 - `backend.py`：**SimBackend** 抽象（catalog / build_command / summarize / ab）。第一期实现 `LocalPythonBackend`；以后发布版引擎（sts2-cli 分支，跑真实游戏 DLL）只要实现同样接口即可替换。
-- `worker.py`：子进程。`batch` 复用 `tools/batch.py` 的 `_init/_one/force_cards_hook`（imap 逐局报进度；Windows 无 SIGALRM，去掉超时）；`combat` 复用 `sts2sim.runner` 的 `plan/_task` 和 `report.make_report`；`cards` 列卡牌/变体/起始牌组；`validate-mod` 用 ModSet 试加载上传的 mod。
+- `worker.py`：子进程。`batch` 复用 `tools/batch.py` 的 `_init/_one/force_cards_hook`（imap 逐局报进度；Windows 无 SIGALRM，去掉超时）；`combat` 复用 `sts2sim.runner` 的 `plan/_task` 和 `report.make_report`。`combat` 的 `--workers` 默认 1，上限 `min(cpu_count, 8)`，大于 1 时用 spawn 进程池（`gui/fightworkers.py`）；`--chain` 让连战的同一条种子按顺序打。`cards` 列卡牌/变体/起始牌组；`validate-mod` 用 ModSet 试加载上传的 mod。
 - `modpatch.py`：运行时让 `modloader` 也能从用户 mod 目录加载（不改模拟器源码）。
 - `metrics.py`：只从真实输出（runs.jsonl、cells.csv）算指标；配对差算法同 `tools/ab_card.py`。
 - `jobs.py`：运行管理、日志、进度、在两场之间取消（留下部分结果）、历史持久化。`server.py`：API + 静态前端。`app.py`：入口（窗口 / 浏览器 / 子进程模式）。

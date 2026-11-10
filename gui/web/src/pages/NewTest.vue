@@ -148,7 +148,11 @@
               <div><div class="label">{{ t('nt.fightsPerCell') }}</div><n-input-number v-model:value="c.fights" :min="1" :max="5000" /></div>
               <div><div class="label">{{ t('nt.seed') }}</div><n-input-number v-model:value="c.seed" :min="0" /></div>
               <div><div class="label">{{ t('nt.ai') }}</div><n-select v-model:value="c.agent" :options="cat.agents_combat.map(a => ({ label: a.name, value: a.id }))" /></div>
-              <div><div class="label">{{ t('nt.parallel') }} <b class="accent">{{ c.procs }}</b></div><n-slider v-model:value="c.procs" :min="1" :max="cat.cpu" /></div>
+              <div data-workers="combat">
+                <div class="label">{{ t('nt.workers') }} <b class="accent">{{ c.workers }}</b><span class="faint"> {{ t('nt.cores', { n: workerCap }) }}</span></div>
+                <n-slider v-model:value="c.workers" :min="1" :max="workerCap" :step="1" />
+                <div class="hint">{{ t('nt.workersHint') }}</div>
+              </div>
             </div>
           </div>
 
@@ -192,6 +196,7 @@
               <div v-if="c.source === 'custom' && c.encounters.length"><span>{{ t('nt.encounters') }}</span><b>{{ c.encounters.length }}</b></div>
               <div><span>{{ t('nt.perCell') }}</span><b>{{ t('nt.nFights', { n: c.fights }) }}</b></div>
               <div><span>{{ t('nt.ai') }}</span><b>{{ store.agentName('combat', c.agent) }}</b></div>
+              <div><span>{{ t('nt.workers') }}</span><b>{{ c.workers }}</b></div>
               <div v-if="c.source === 'custom'"><span>{{ t('nt.totalFights') }}</span><b>{{ combatTotal }}</b></div>
             </template>
           </div>
@@ -229,7 +234,8 @@ const liveStatus = ref('')
 const uploading = ref(false)
 const saved = JSON.parse(localStorage.getItem('nt.form') || '{}')
 const b = reactive({ char: 'Ironclad', asc: 0, n: 100, start: 0, procs: 4, agent: 'heuristic', style: 'standard', variants: [], force: [], replace: [], gameSeed: '', ...(saved.b || {}) })
-const c = reactive({ source: 'preset', preset: 'quick', mods: ['vanilla'], decks: [], rooms: ['普通', '精英', '首领'], max_turns: 30, fights: 20, seed: 1, agent: 'heuristic', procs: 4, encounters: [], ...(saved.c || {}) })
+const c = reactive({ source: 'preset', preset: 'quick', mods: ['vanilla'], decks: [], rooms: ['普通', '精英', '首领'], max_turns: 30, fights: 20, seed: 1, agent: 'heuristic', workers: 1, encounters: [], ...(saved.c || {}) })
+if (!Number.isInteger(c.workers) || c.workers < 1) c.workers = 1
 if (!Array.isArray(c.encounters)) c.encounters = []
 watch([b, c, kind], () => {
   localStorage.setItem('nt.form', JSON.stringify({ b, c }))
@@ -238,7 +244,6 @@ watch([b, c, kind], () => {
 watch(cat, (v) => {
   if (!v) return
   if (!saved.b) b.procs = v.cpu
-  if (!saved.c) c.procs = v.cpu
   if (!v.mods.find((m) => m.id === 'vanilla')) c.mods = []
   c.mods = c.mods.filter((x) => v.mods.find((m) => m.id === x))
 }, { immediate: true })
@@ -277,6 +282,8 @@ function selDecks(g, how) {
   if (how === 'start') rest = rest.concat(g.decks.filter((d) => String(d.stage).includes('起始')).map((d) => d.id))
   c.decks = rest
 }
+const workerCap = computed(() => Math.max(1, Math.min(Number(cat.value && (cat.value.worker_cap || cat.value.cpu)) || 1, 8)))
+watch(cat, () => { if (cat.value && c.workers > workerCap.value) c.workers = workerCap.value }, { immediate: true })
 const combatTotal = computed(() => {
   if (c.encounters.length) {
     const fights = c.encounters.reduce((sum, row) => sum + (Number(row.fights) || 0), 0)
@@ -306,9 +313,9 @@ async function start() {
   try {
     let params
     if (kind.value === 'batch') params = { char: b.char, asc: b.asc, n: gameSeedCanon.value ? 1 : b.n, start: b.start, procs: b.procs, agent: b.agent, style: b.style || 'standard', variants: b.char === 'Claude' ? b.variants : [], force: b.force, replace: b.replace, ...(gameSeedCanon.value ? { game_seed: gameSeedCanon.value } : {}) }
-    else if (c.source === 'preset') params = { preset: c.preset, fights: c.fights, seed: c.seed, agent: c.agent, procs: c.procs }
+    else if (c.source === 'preset') params = { preset: c.preset, fights: c.fights, seed: c.seed, agent: c.agent, workers: c.workers }
     else {
-      params = { mods: c.mods, decks: c.decks, rooms: c.rooms, max_turns: c.max_turns, fights: c.fights, seed: c.seed, agent: c.agent, procs: c.procs }
+      params = { mods: c.mods, decks: c.decks, rooms: c.rooms, max_turns: c.max_turns, fights: c.fights, seed: c.seed, agent: c.agent, workers: c.workers }
       if (c.encounters.length) params.encounters = c.encounters.map((row) => ({ id: row.id, fights: Number(row.fights) || 1 }))
     }
     const m = await api.post('/api/runs', { kind: kind.value, params, title: title.value || autoTitle.value })

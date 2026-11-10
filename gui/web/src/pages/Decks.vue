@@ -95,6 +95,12 @@
           <div v-if="deckMod" class="hint">{{ t('deck.mod') }}: <span class="mono">{{ deckMod }}</span></div>
         </div>
 
+        <div class="panel" data-deck="workers">
+          <div class="label">{{ t('deck.workers') }} <b>{{ workers }}</b><span class="hint"> {{ t('nt.cores', { n: workerCap }) }}</span></div>
+          <input data-deck="workers-range" type="range" :min="1" :max="workerCap" :value="workers" @input="onWorkers" />
+          <div class="hint">{{ t('deck.workersHint') }}</div>
+        </div>
+
         <div class="panel" data-deck="h2h">
           <h3>{{ t('deck.h2h') }}</h3>
           <div class="hint">{{ t('deck.h2hHint') }}</div>
@@ -189,6 +195,7 @@ const turnsTouched = ref(false)
 const turnsReady = ref(false)
 const saving = ref(false)
 const savedId = ref('')
+const workers = ref(1)
 const h2hA = ref(null)
 const h2hB = ref(null)
 const h2hOverride = ref(false)
@@ -212,6 +219,11 @@ function applyTurnDefault() {
   maxTurns.value = onlyDummy(encounters.value) ? 1 : fullTurns.value
 }
 watch(encounters, () => { savedId.value = ''; applyTurnDefault() }, { deep: true })
+const workerCap = computed(() => Math.max(1, Math.min(Number((store.catalog && (store.catalog.worker_cap || store.catalog.cpu)) || 1), 8)))
+function onWorkers(event) {
+  const n = Number.parseInt(event.target.value, 10)
+  workers.value = Math.max(1, Math.min(workerCap.value, Number.isFinite(n) ? n : 1))
+}
 function onTurns(event) {
   turnsTouched.value = true
   savedId.value = ''
@@ -402,7 +414,7 @@ async function runHeadToHead() {
   h2hRunning.value = true
   h2hErr.value = ''
   try {
-    const body = { a: h2hA.value, b: h2hB.value }
+    const body = { a: h2hA.value, b: h2hB.value, workers: workers.value }
     if (h2hOverride.value) {
       body.encounters = encounters.value.map((row) => ({ id: row.id, fights: Number(row.fights) || 1 }))
       body.max_turns = maxTurns.value
@@ -438,6 +450,7 @@ async function runImpact() {
   try {
     const saved = await api.post('/api/decks/' + encodeURIComponent(impactDeck.value) + '/card_impact', {
       plus: impactPlus.value,
+      workers: workers.value,
     })
     impactState.value = null
     impactJob.value = saved.id || saved.job
