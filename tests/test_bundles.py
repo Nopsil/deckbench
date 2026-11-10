@@ -9,12 +9,14 @@ import json
 import os
 import shutil
 import zipfile
+from pathlib import PureWindowsPath
 
 import pytest
 
 from sts2sim.bundle import (
     SCHEMA,
     BundleError,
+    _member_name,
     export_bundle_json,
     export_compare_bytes,
     export_run_bytes,
@@ -79,10 +81,12 @@ def _combat(root, rid, rows, title, *, preset="", shared=False):
         "params": params,
         "argv": ["python", "-c", SECRET],
     }
-    with open(os.path.join(run, "meta.json"), "w", encoding="utf-8") as handle:
+    with open(os.path.join(run, "meta.json"), "w", encoding="utf-8", newline="\n") as handle:
         json.dump(meta, handle)
-    with open(os.path.join(out, "raw.jsonl"), "w", encoding="utf-8") as handle:
-        handle.writelines(json.dumps(row) + "\n" for row in rows)
+        handle.write("\n")
+    payload = "".join(json.dumps(row) + "\n" for row in rows).encode("utf-8")
+    with open(os.path.join(out, "raw.jsonl"), "wb") as handle:
+        handle.write(payload)
     return run
 
 
@@ -189,17 +193,25 @@ def test_round_trip_compare_is_equal_and_collision_gets_a_new_id(client, runs):
     assert (runs / "base").is_dir() and (runs / renamed[0]["id"]).is_dir()
 
 
-def test_single_run_bundle_keeps_the_preset_as_data(client, runs, tmp_path):
+def test_single_run_bundle_keeps_the_preset_as_data(client, runs, tmp_path, monkeypatch):
     preset = tmp_path / "data" / "presets"
     preset.mkdir(parents=True)
     text = "name: probe\ntitle: Probe deck\ndecks:\n  - id: probe\n"
-    (preset / "probe.yaml").write_text(text, encoding="utf-8")
+    lf = text.encode("utf-8")
+    # 文本模式在 Windows 上会把 \\n 写成 \\r\\n。预设必须按字节写，包里才和这里一致。
+    (preset / "probe.yaml").write_bytes(lf)
     _combat(str(runs), "solo", _rows(3, 5, 4, 2, "Elite"), "Solo")
+    _force_text_newlines(monkeypatch)
     exported = client.get("/api/runs/solo/bundle", headers=EN)
     assert exported.status_code == 200, exported.text[:400]
     blob = exported.content
     assert _manifest(blob)["kind"] == "run"
-    assert _member(blob, "runs/solo/preset.yaml") == text.encode("utf-8")
+    stored_preset = _member(blob, "runs/solo/preset.yaml")
+    assert stored_preset == lf
+    assert b"\r\n" not in stored_preset
+    row = next(item for item in _manifest(blob)["files"] if item["path"] == "runs/solo/preset.yaml")
+    assert row["sha256"] == hashlib.sha256(lf).hexdigest()
+    assert row["bytes"] == len(lf)
     assert b"!!python" not in blob
     shutil.rmtree(runs / "solo")
     poisoned = (text + "!!python/object/apply:os.system ['echo pwned']\n").encode("utf-8")
@@ -208,9 +220,73 @@ def test_single_run_bundle_keeps_the_preset_as_data(client, runs, tmp_path):
     imported = import_zip_bytes(blob, filename="solo.deckbench.zip")
     assert imported["runs"][0]["id"] == "solo"
     stored = (runs / "solo" / "preset.yaml").read_bytes()
-    assert stored.startswith(b"name: probe")
+    assert stored == poisoned
+    assert stored.startswith(b"name: probe\n")
+    assert b"\r" not in stored
     assert b"os.system" in stored
     assert not (tmp_path / "data" / "presets" / "solo.yaml").exists()
+
+
+def test_crlf_preset_is_hashed_as_stored_bytes(client, runs, tmp_path, monkeypatch):
+    """磁盘上已经是 CRLF 时按原字节进出，不在导出或导入时改成 LF。"""
+    preset = tmp_path / "data" / "presets"
+    preset.mkdir(parents=True)
+    crlf = b"name: probe\r\ntitle: Probe deck\r\n"
+    (preset / "probe.yaml").write_bytes(crlf)
+    _combat(str(runs), "solo", _rows(1, 1, 1, 1, "Elite"), "Solo")
+    _force_text_newlines(monkeypatch)
+    blob = export_run_bytes("solo", lang="en")[0]
+    assert _member(blob, "runs/solo/preset.yaml") == crlf
+    row = next(item for item in _manifest(blob)["files"] if item["path"].endswith("preset.yaml"))
+    assert row["sha256"] == hashlib.sha256(crlf).hexdigest()
+    shutil.rmtree(runs / "solo")
+    imported = import_zip_bytes(blob, filename="crlf.deckbench.zip")
+    assert imported["runs"][0]["id"] == "solo"
+    assert (runs / "solo" / "preset.yaml").read_bytes() == crlf
+
+
+def _force_text_newlines(monkeypatch):
+    """文本模式一律按 Windows 换行翻译。二进制读写必须不受影响。"""
+    from sts2sim import bundle
+    real_open = open
+
+    def translating_open(file, mode="r", *args, **kwargs):
+        if "b" not in str(mode):
+            handle = real_open(file, mode, *args, **kwargs)
+            return _NewlineFile(handle)
+        return real_open(file, mode, *args, **kwargs)
+
+    monkeypatch.setattr(bundle, "open", translating_open, raising=False)
+
+
+class _NewlineFile:
+    """模拟 Windows 文本模式：写出时 \\n → \\r\\n，读入时去掉 \\r。"""
+
+    def __init__(self, raw):
+        self._raw = raw
+
+    def write(self, data):
+        if isinstance(data, str):
+            data = data.replace("\n", "\r\n")
+        else:
+            data = data.replace(b"\n", b"\r\n")
+        return self._raw.write(data)
+
+    def read(self, n=-1):
+        data = self._raw.read(n)
+        if isinstance(data, str):
+            return data.replace("\r\n", "\n")
+        return data.replace(b"\r\n", b"\n")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self._raw.close()
+        return False
+
+    def close(self):
+        self._raw.close()
 
 
 def _swap_preset(blob, new_preset):
@@ -278,24 +354,86 @@ def test_tampered_hash_is_rejected_and_writes_nothing(client, runs):
     assert set(os.listdir(runs)) == before
 
 
+def _hostile_zip(name):
+    """把成员名原样写进 zip。ZipInfo 构造函数在 Windows 上会把反斜杠换成 /。"""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as archive:
+        info = zipfile.ZipInfo("placeholder")
+        info.filename = name
+        info.orig_filename = name
+        archive.writestr(info, b"pwned")
+        archive.writestr("manifest.json", b'{"schema": 1}')
+    blob = buf.getvalue()
+    assert name.encode("utf-8") in blob
+    return blob
+
+
 def test_zip_slip_and_absolute_paths_are_rejected(runs, tmp_path):
     outside = tmp_path / "evil.txt"
     slip = tmp_path / "nested" / "evil.txt"
     absolute = "/tmp/deckbench-slip-not-created.txt"
-    for name in ("../evil.txt", "runs/solo/../../evil.txt", absolute, "C:/evil.txt", "runs\\solo\\meta.json"):
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, "w") as archive:
-            info = zipfile.ZipInfo(name)
-            archive.writestr(info, b"pwned")
-            archive.writestr("manifest.json", b'{"schema": 1}')
-        stored = zipfile.ZipFile(io.BytesIO(buf.getvalue())).namelist()
+    back = "\\"
+    names = (
+        "../evil.txt",
+        "runs/solo/../../evil.txt",
+        absolute,
+        "C:/evil.txt",
+        "C:" + back + "evil.txt",
+        "runs" + back + "solo" + back + "meta.json",
+    )
+    for name in names:
+        blob = _hostile_zip(name)
         with pytest.raises(BundleError) as caught:
-            import_zip_bytes(buf.getvalue())
-        assert caught.value.code == "zip_slip", (name, stored, caught.value.code)
+            import_zip_bytes(blob)
+        assert caught.value.code == "zip_slip", (name, caught.value.code)
         assert not outside.exists()
         assert not slip.exists()
         assert not os.path.exists(absolute)
     assert list(runs.iterdir()) == []
+
+
+def test_windows_sanitized_backslash_name_is_still_zip_slip(monkeypatch):
+    """Windows 读 zip 时 filename 已变成正斜杠，orig_filename 仍带反斜杠。
+
+    PureWindowsPath 会把这条路径看成普通的 runs/solo/meta.json。判定必须看原始字符串。
+    """
+    raw = "runs" + "\\" + "solo" + "\\" + "meta.json"
+    assert "\\" in raw and "/" not in raw
+    posed = PureWindowsPath(raw)
+    assert posed.as_posix() == "runs/solo/meta.json"
+    assert posed.is_absolute() is False
+    info = zipfile.ZipInfo("placeholder")
+    info.orig_filename = raw
+    info.filename = posed.as_posix()
+    with pytest.raises(BundleError) as caught:
+        _member_name(info)
+    assert caught.value.code == "zip_slip"
+
+    # zipfile 自己的规范化：os.sep 是反斜杠时，ZipInfo 会改 filename，留下 orig_filename。
+    import zipfile as zipfile_mod
+    monkeypatch.setattr(zipfile_mod.os, "sep", "\\")
+    monkeypatch.setattr(zipfile_mod.os, "altsep", "/")
+    built = zipfile.ZipInfo(raw)
+    assert built.filename == "runs/solo/meta.json"
+    assert built.orig_filename == raw
+    with pytest.raises(BundleError) as caught:
+        _member_name(built)
+    assert caught.value.code == "zip_slip"
+    blob = _hostile_zip(raw)
+    # 读回时也走同一套 ZipInfo。这里 os.sep 仍是反斜杠，和 Windows 一样。
+    with pytest.raises(BundleError) as caught:
+        import_zip_bytes(blob)
+    assert caught.value.code == "zip_slip"
+
+    drive = "C:/evil.txt"
+    win = PureWindowsPath(drive)
+    assert win.is_absolute() is True and win.drive == "C:"
+    info = zipfile.ZipInfo("placeholder")
+    info.orig_filename = drive
+    info.filename = win.as_posix()
+    with pytest.raises(BundleError) as caught:
+        _member_name(info)
+    assert caught.value.code == "zip_slip"
 
 
 def test_extra_file_is_rejected_and_not_executed(runs):
@@ -369,11 +507,11 @@ def test_head_to_head_and_card_impact_bundle(client, runs):
             {"id": child_b, "role": "variant", "change": "remove", "card_id": "STRIKE", "status": "done"},
         ],
     }
-    (parent / "card_impact.json").write_text(json.dumps(doc), encoding="utf-8")
-    (parent / "meta.json").write_text(json.dumps({
+    (parent / "card_impact.json").write_bytes((json.dumps(doc) + "\n").encode("utf-8"))
+    (parent / "meta.json").write_bytes((json.dumps({
         "id": "impact", "kind": "card_impact", "title": "Impact job", "status": "done",
         "created": "2026-01-02T00:00:00+00:00", "params": {"deck": "probe", "preset": "probe", "seed": 1},
-    }), encoding="utf-8")
+    }) + "\n").encode("utf-8"))
     exported = client.get("/api/runs/impact/bundle", headers=EN)
     assert exported.status_code == 200, exported.text[:400]
     packed = _manifest(exported.content)

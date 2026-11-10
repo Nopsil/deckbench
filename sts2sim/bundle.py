@@ -387,6 +387,7 @@ def _read_inside(path, root, limit):
 
 
 def _read_capped(path, limit):
+    """按字节读。不用文本模式，避免 Windows 把 ``\\n`` 换成 ``\\r\\n`` 之后哈希对不上。"""
     try:
         size = os.path.getsize(path)
     except OSError as err:
@@ -639,21 +640,42 @@ def _read_zip(data):
     return members
 
 
+def _zip_name_fields(info):
+    """原始名和规范化名都要看。
+
+    Windows 上 ``ZipInfo`` 会把反斜杠换成 ``/`` 再放进 ``filename``，
+    ``orig_filename`` 仍是包里的原字符串。只看 ``filename`` 时，
+    ``runs\\solo\\meta.json`` 会变成合法成员，后面才因清单不合格变成 ``not_bundle``。
+    """
+    found = []
+    for attr in ("orig_filename", "filename"):
+        value = getattr(info, attr, None)
+        if isinstance(value, bytes):
+            value = value.decode("utf-8", "surrogateescape")
+        if isinstance(value, str) and value not in found:
+            found.append(value)
+    return found
+
+
+def _unsafe_zip_name(name):
+    """反斜杠、``..``、绝对路径、盘符。在清单和允许名单之前判定。"""
+    if not isinstance(name, str) or not name or "\x00" in name:
+        return True
+    if "\\" in name or ":" in name or name.startswith(("/", "\\")):
+        return True
+    parts = name.split("/")
+    return any(part in ("", ".", "..") for part in parts)
+
+
 def _member_name(info):
-    mode = (info.external_attr >> 16) & 0o170000
+    mode = (getattr(info, "external_attr", 0) >> 16) & 0o170000
     if mode == 0o120000:
         raise BundleError("zip_slip")
+    names = _zip_name_fields(info)
+    if not names or any(_unsafe_zip_name(name) or len(name) > 180 for name in names):
+        raise BundleError("zip_slip")
     name = info.filename
-    if not isinstance(name, str) or not name or "\x00" in name:
-        raise BundleError("zip_slip")
-    if "\\" in name or name.startswith("/") or ":" in name:
-        raise BundleError("zip_slip")
-    parts = name.split("/")
-    if any(part in ("", ".", "..") for part in parts):
-        raise BundleError("zip_slip")
-    if len(name) > 180:
-        raise BundleError("zip_slip")
-    if not _MEMBER.fullmatch(name):
+    if not isinstance(name, str) or not _MEMBER.fullmatch(name):
         raise BundleError("extra")
     return name
 
@@ -963,6 +985,9 @@ def _upload_name(filename):
 
 
 def _write_bytes(path, data):
+    """按字节写。文本模式会在 Windows 上改换行，清单里的 SHA-256 就不再跨平台。"""
+    if isinstance(data, str):
+        raise BundleError("manifest")
     parent = os.path.dirname(path)
     os.makedirs(parent, exist_ok=True)
     tmp = path + ".tmp"

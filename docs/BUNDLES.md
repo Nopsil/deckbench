@@ -46,6 +46,10 @@
 
 *In a card-impact bundle the first id is the parent and the rest are the variants. A compare bundle and a head-to-head bundle each hold two combat tests. A head-to-head (both sides stored `shared_plan`) uses `kind` `head_to_head` and the same layout as a compare.*
 
+文件按字节进出，不改换行。Windows 文本模式会把 `\n` 写成 `\r\n`，那样 SHA-256 就和别的系统对不上，所以读写都用二进制。成员名里的反斜杠、`..`、绝对路径和盘符在看清单之前就拒绝；Windows 的 `ZipInfo` 会把反斜杠先换成 `/`，判定仍看包里的原始名字。
+
+*Files go in and out as bytes. Newlines are not rewritten. Windows text mode turns `\n` into `\r\n`, which would change the SHA-256, so reads and writes are binary. A backslash, `..`, an absolute path, or a drive letter in a member name is rejected before the manifest is trusted. Windows `ZipInfo` rewrites a backslash to `/` first; the check still uses the name stored in the zip.*
+
 版本号只作记录。换了一版 DeckBench 仍然能导入，只要 `schema` 还是 1。`schema` 不是 1 时拒绝，说明里写明当前只读 schema 1。
 
 *The version is recorded, not a gate. A bundle from another DeckBench release still imports while `schema` is 1. Any other schema is refused, and the message says this DeckBench only reads schema 1.*
