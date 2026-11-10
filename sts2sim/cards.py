@@ -208,6 +208,7 @@ def op_apply(ctx, eff):
     C = ctx.combat
     spec = eff.get("target", "target")
     multi = eff.get("multi", spec in ("all", "others"))
+    wrote = False
     for t in _targets(ctx, spec):
         if t is None or not t.alive:
             continue
@@ -219,6 +220,10 @@ def op_apply(ctx, eff):
         ctx.target = old
         if eff.get("save"):
             ctx.locals[eff["save"]] = ctx.locals.get(eff["save"], 0) + d
+            wrote = True
+    # 一个活着的目标都没有时，循环一次都不会走。save 仍要是 0，后面的表达式才读得到。
+    if eff.get("save") and not wrote:
+        ctx.locals.setdefault(eff["save"], 0)
 
 
 def op_remove(ctx, eff):
@@ -369,7 +374,10 @@ def play_card(C, card, target, free=False, from_hand=True):
         ctx.replay_index = i
         if i > 0:
             ctx.target = ctx.chosen_target
+            # 重放是同一次打出：清掉上一遍 set 出来的局部变量。X 是这次付出的能量，要留着。
             ctx.locals = {"first_play_this_turn": first_this_turn}
+            if card.d.cost_x:
+                ctx.locals["X"] = paid
         run_effects(ctx, effects)
         if C.result is not None or ctx.end_turn:
             break

@@ -124,11 +124,12 @@ def current():
     return normalize(o) if o else DEFAULT
 
 
-def t(key, lang=None, **kw):
+def t(msg_id, lang=None, **kw):
+    """翻译 msg_id。占位符走 kw，所以文案里可以用 {key}。"""
     lang = lang or current()
-    s = messages(lang).get(key)
+    s = messages(lang).get(msg_id)
     if s is None:
-        s = messages(DEFAULT).get(key, key)
+        s = messages(DEFAULT).get(msg_id, msg_id)
     if kw:
         try:
             s = s.format(**kw)

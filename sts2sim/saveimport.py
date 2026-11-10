@@ -84,9 +84,10 @@ def _as_id(v):
     if isinstance(v, (int, float)) and not isinstance(v, bool):
         return str(int(v)) if float(v).is_integer() else str(v)
     if isinstance(v, dict):
-        for k in ("id", "entry", "model_id", "modelId", "name"):
+        for k in ("id", "model_id", "modelId", "name"):
             if _get(v, k) is not None and not isinstance(_get(v, k), (dict, list)):
                 return _as_id(_get(v, k))
+        # {category, entry} 要拼成 CATEGORY.ENTRY。entry 自己已经带点时就用 entry。
         cat = _get(v, "category")
         ent = _get(v, "entry")
         if isinstance(ent, str) and ent.strip():
@@ -855,6 +856,8 @@ def _floor_reached(run):
 
 def _vitals(run):
     for fl in reversed(run.get("route") or []):
+        if not isinstance(fl, dict):
+            continue
         for st in fl.get("stats") or []:
             if isinstance(st, dict) and any(st.get(k) is not None for k in ("current_hp", "max_hp", "gold")):
                 return st.get("current_hp"), st.get("max_hp"), st.get("gold")
