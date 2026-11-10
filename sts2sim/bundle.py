@@ -347,7 +347,12 @@ def _run_files(rid):
     if kind == "combat":
         raw = _find_raw(folder)
         if raw is None:
-            raise BundleError("no_result")
+            # 取消发生在这一变体开打之前时，目录里还没有 raw.jsonl。
+            # 整份单卡贡献仍要能打包：空文件表示 0 场，已经打完的变体仍用自己的记录。
+            if meta.get("status") == "cancelled":
+                raw = b""
+            else:
+                raise BundleError("no_result")
         files[f"runs/{rid}/raw.jsonl"] = raw
     elif kind == "batch":
         path = os.path.join(folder, "runs.jsonl")
@@ -478,12 +483,16 @@ def _preset_bytes(meta, folder):
         found = _preset_file(preset.strip())
         if found is not None:
             return found
-    exp = os.path.join(folder, "experiment.yaml")
-    if os.path.isfile(exp) and not os.path.islink(exp):
+    # 导入只把预设写成测试目录里的 preset.yaml，不写回预设目录，也没有 experiment.yaml。
+    # 本机预设已经不在，或示例包的 meta 里没有 preset id 时，用这一份，避免再导出把牌组丢掉。
+    for name in ("experiment.yaml", "preset.yaml"):
+        path = os.path.join(folder, name)
+        if not os.path.isfile(path) or os.path.islink(path):
+            continue
         try:
-            return _read_inside(exp, folder, 1024 * 1024)
+            return _read_inside(path, folder, 1024 * 1024)
         except BundleError:
-            return None
+            continue
     return None
 
 
