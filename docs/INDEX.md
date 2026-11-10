@@ -14,7 +14,7 @@
 | [MODDING.md](MODDING.md) | 中文 + English | YAML mod 的格式：整局，以及旧版战斗模拟器 |
 | [DLL_MODS.md](DLL_MODS.md) | 中文 + English | 把已经写好的游戏 mod DLL 读成 YAML。DLL 不执行 |
 | [SAVE_FORMAT.md](SAVE_FORMAT.md) | 中文 + English | 对局记录的两种 JSON、批量摘要、种子预览 |
-| [CALIBRATION.md](CALIBRATION.md) | 中文 + English | 真对局对照同一条选牌路径上的模拟掉血：匹配规则、百分位、界面和 HTTP、MCP |
+| [CALIBRATION.md](CALIBRATION.md) | 中文 + English | 真对局对照同一条选牌路径上的模拟掉血：匹配规则、百分位、界面和 HTTP、MCP，以及 `tools/gap_triage.py` 的缺口分诊 |
 | [MCP.md](MCP.md) | 中文 + English | MCP 对战，以及只读的 `import_save`、`import_history_batch`、`batch_run_summary`、`card_ab`、`explain_fight`、`calibrate` |
 | [PERFORMANCE.md](PERFORMANCE.md) | 中文 + English | `python tools/bench.py` 的样本、场/秒和内部战斗引擎改了什么 |
 | [COVERAGE.md](COVERAGE.md) | 中文 + English | 补测试那一次的语句覆盖率快照，以及当时修的五处边界 |

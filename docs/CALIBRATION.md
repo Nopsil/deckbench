@@ -131,3 +131,26 @@ python tools/calibrate.py path/to/current_run.save path/to/run_dir --json /tmp/c
 `calibrate(real, sim)` 返回和上面相同的 JSON 文本。失败也是 JSON（`ok: false`），不抛异常。`sim` 受允许目录限制；`real` 的读法和 `import_save` 相同。`python tools/mcp_server.py --import-only` 也提供这个工具。不新开模拟，不写文件。
 
 *MCP `calibrate(real, sim)` returns the same JSON, including `ok: false` on failure. It is on `--import-only`. The sim path is restricted; `real` is read like `import_save`.*
+
+## 缺口分诊 / Gap triage
+
+`python tools/gap_triage.py` 读一份或多份上面的校准 JSON（`tools/calibrate.py --json` 写下的那种），把 `likely_sim_gap` 按遭遇 ID、以及这场遭遇涉及到的敌人能力 / 机制汇总。不新开模拟，不改种子，不改 AI，也不改校准 JSON。
+
+*Gap triage reads one or more calibration JSON files (what `tools/calibrate.py --json` writes) and totals `likely_sim_gap` by encounter id and by the enemy power or mechanic involved. It does not start a simulation, and it does not change seeds, AI, or the calibration JSON.*
+
+```bash
+python tools/calibrate.py tests/fixtures/calibrate/real.run tests/fixtures/calibrate/sims.jsonl --json /tmp/calibration.json
+python tools/gap_triage.py /tmp/calibration.json
+python tools/gap_triage.py a.json b.json --catalog tests/fixtures/gap_triage/catalog.json --out triage.md
+python tools/gap_triage.py tests/fixtures/gap_triage --catalog tests/fixtures/gap_triage/catalog.json --json -
+```
+
+- 一场战斗要 `status` 是 `compared` 才进分母。`unmatched` 和 `not_a_fight` 只计数，不参与排名。
+- `likely_sim_gap` 为真，并且真机掉血 **高于** 这一场的 `p95`：模拟偏乐观（真机掉得更多）。**低于** `p5`：模拟偏悲观（真机掉得更少）。落在 `p5` 或 `p95` 上不算外面；标记为真但数字对不上时，方向记成不明，不进两侧的排名。
+- 同一遭遇在多份报告里的对上的场次相加。排名先看这一侧的场次 / 对上的场次，再看场次，最后看 ID。`--min-compared`（默认 1）少于此数的遭遇不进排名。`--top`（默认 10）只截 Markdown，JSON 仍是完整排名。
+- 能力从三处拼，同名只留一次：`--catalog` 名册、报告里 `real_path` 还读得开时那份真对局的 `monster_ids`、以及本机已经导出的怪物 / 遭遇数据（没有就跳过，不报错）。`sts2sim/enemies.py` 里写好的 `ENCOUNTER_SETUP` / `ROTATING_START` 会标成开场字段机制。`BACK_ATTACK_LEFT` / `BACK_ATTACK_RIGHT` 额外标成「后方攻击始终按背后结算」。
+- 名册是一份 JSON 对象。`encounters` 和 `monsters` 的值可以带 `powers`、`mechanics`、`monsters`。能力 ID 用引擎里的写法，例如 `CONSTRICT`、`THORNS`。机制名用 `summon_skipped`、`status_card`、`conditional_branch`、`encounter_setup`、`rotating_start`、`back_attack_always`。夹具 `tests/fixtures/gap_triage/` 里的遭遇 ID 是虚构的。
+- Markdown 里每个能力指向实现它的类：敌人专属能力在 `sts2sim/powers_enemy.py`，双方都会用到的（含荆棘）在 `sts2sim/powers.py`，意图、召唤不生成新敌人、Status 塞晕眩和开场字段在 `sts2sim/enemies.py`。名册里有、源码里没有的能力，指向 `enemies.py` 里「没实现就只记层数」的 `take_turn`。荆棘再加一条 `sts2sim/ai/base.py` 的 `mechanic_adjust`（可选，默认关；开关在 `sts2sim/ai/heuristic.py` 的 `mechanic_aware`）。
+- 目录参数只读这一层的 `*.json`。不是校准报告的对象跳过；坏 JSON、找不到的路径、写成 `.run` / `.save` 的输出，退出码 2。`--json -` 只打汇总 JSON。`--json <路径>` 写 JSON，标准输出仍是 Markdown。
+
+*A fight counts only when `status` is `compared`. `unmatched` and `not_a_fight` are counted and are not ranked. `likely_sim_gap` with real HP lost above that fight's `p95` means the sim was too optimistic (the real fight lost more). Below `p5` means too pessimistic (the real fight lost less). A value on `p5` or `p95` is not outside. A flag whose numbers do not decide a side is an unknown direction and is left out of both rankings. Fights for one encounter add across reports. Rank is that side's fights over compared fights, then the count, then the id. `--min-compared` (default 1) leaves smaller encounters out of the ranking. `--top` (default 10) trims the Markdown only; the JSON keeps the full ranking. Powers are the union of the `--catalog` file, monster ids on a `real_path` that can still be read, and a local monster/encounter export when one is present (missing data is skipped). `ENCOUNTER_SETUP` / `ROTATING_START` in `sts2sim/enemies.py` are tagged as start-flag mechanics. `BACK_ATTACK_LEFT` / `BACK_ATTACK_RIGHT` are also tagged as back attack always counting as from behind. The catalog is one JSON object; `encounters` and `monsters` may list `powers`, `mechanics` and `monsters`. Power ids are the engine ids, such as `CONSTRICT` and `THORNS`. Mechanic names are `summon_skipped`, `status_card`, `conditional_branch`, `encounter_setup`, `rotating_start` and `back_attack_always`. Encounter ids in `tests/fixtures/gap_triage/` are fictional. The Markdown points each power at the class that implements it: enemy-only powers in `sts2sim/powers_enemy.py`, powers used on either side (including Thorns) in `sts2sim/powers.py`, and intents, summon-not-adding-enemies, Status-adds-Dazed and start flags in `sts2sim/enemies.py`. A catalog power with no class points at `take_turn` in `enemies.py`, where an unimplemented power only stores stacks. Thorns also points at `mechanic_adjust` in `sts2sim/ai/base.py` (optional, off by default; the switch is `mechanic_aware` in `sts2sim/ai/heuristic.py`). A directory argument reads `*.json` in that directory only. A JSON object that is not a calibration report is skipped. Broken JSON, a missing path, or an output named `.run` / `.save` exits 2. `--json -` prints only the summary JSON. `--json <path>` writes that JSON and still prints the Markdown.*

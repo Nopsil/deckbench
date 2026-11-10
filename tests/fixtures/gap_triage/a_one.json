@@ -1,0 +1,57 @@
+{
+  "ok": true,
+  "read_only": true,
+  "v": 1,
+  "alignment": "floor_room_encounter",
+  "seed": "GAPSEED1",
+  "character": "Ironclad",
+  "ascension": 0,
+  "fights": [
+    {
+      "floor": 2,
+      "room": "Elite",
+      "encounter": "SAMPLE_ELITE",
+      "status": "compared",
+      "real_hp_lost": 40,
+      "p5": 4,
+      "p95": 20,
+      "likely_sim_gap": true
+    },
+    {
+      "floor": 3,
+      "room": "Monster",
+      "encounter": "SAMPLE_FIGHT",
+      "status": "compared",
+      "real_hp_lost": 8,
+      "p5": 2,
+      "p95": 12,
+      "likely_sim_gap": false
+    },
+    {
+      "floor": 5,
+      "room": "Monster",
+      "encounter": "SAMPLE_GLOOM",
+      "status": "compared",
+      "real_hp_lost": 1,
+      "p5": 9,
+      "p95": 22,
+      "likely_sim_gap": true
+    },
+    {
+      "floor": 6,
+      "room": "Boss",
+      "encounter": "SAMPLE_BOSS",
+      "status": "unmatched",
+      "reason": "missing_hp",
+      "real_hp_lost": null,
+      "likely_sim_gap": false
+    },
+    {
+      "floor": 1,
+      "room": "Ancient",
+      "encounter": null,
+      "status": "not_a_fight",
+      "likely_sim_gap": false
+    }
+  ]
+}
