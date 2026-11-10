@@ -592,7 +592,7 @@ def _check_run_meta(run_dir, field):
     if not isinstance(meta, dict):
         return
     status = meta.get("status")
-    if isinstance(status, str) and status != "done":
+    if isinstance(status, str) and status not in ("done", "cancelled"):
         raise AnalysisError("not_done", field=field)
     kind = meta.get("kind")
     if isinstance(kind, str) and kind != "combat":
@@ -635,8 +635,29 @@ def _resolve_combat(token, field):
     return _combat_folder(resolve_read(text), field)
 
 
+def _dir_partial(folder):
+    """结果目录旁边的 meta 若是取消，对比要标明部分结果。读不开就当不是。"""
+    if not folder:
+        return False
+    run_dir = os.path.dirname(folder) if os.path.basename(folder) == "out" else folder
+    path = os.path.join(run_dir, "meta.json")
+    if not os.path.isfile(path):
+        return False
+    try:
+        with open(path, encoding="utf-8") as handle:
+            meta = json.loads(handle.read())
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return False
+    if not isinstance(meta, dict):
+        return False
+    return bool(meta.get("partial") or meta.get("status") == "cancelled")
+
+
 def compare_runs(a, b):
-    """两次已完成的战斗实验。a、b 是运行 id，或结果目录 / raw.jsonl / cells.csv。"""
+    """两次战斗实验。a、b 是运行 id，或结果目录 / raw.jsonl / cells.csv。
+
+    已经取消、但留下了部分结果的也可以比。还在跑的是 not_done。
+    """
     from sts2sim.runcompare import CompareError, compare_dirs
     if isinstance(a, str) and isinstance(b, str) and a.strip() and a.strip() == b.strip():
         raise AnalysisError("same_run")
@@ -650,6 +671,7 @@ def compare_runs(a, b):
         raise AnalysisError(exc.code, **exc.params) from exc
     body["ok"] = True
     body["read_only"] = True
+    body["partial"] = _dir_partial(left) or _dir_partial(right)
     body["a"] = left
     body["b"] = right
     return body

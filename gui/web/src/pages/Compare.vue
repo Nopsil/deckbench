@@ -23,6 +23,7 @@
     <div v-else-if="!R" class="panel empty"><div class="big">{{ t('cmp.empty') }}</div><div>{{ t('cmp.emptyHint') }}</div></div>
 
     <template v-else>
+      <div v-if="R.partial || (R.a && R.a.partial) || (R.b && R.b.partial)" class="panel hint warn" data-partial>{{ t('run.partialHint') }}</div>
       <div class="grid g2">
         <div class="side A"><span class="tagA">A</span><div><div class="st">{{ runTitle(R.a) }}</div><div class="sp">{{ fmt.time(R.a.created) }}</div></div></div>
         <div class="side B"><span class="tagB">B</span><div><div class="st">{{ runTitle(R.b) }}</div><div class="sp">{{ fmt.time(R.b.created) }}</div></div></div>
@@ -130,8 +131,8 @@ const b = ref(route.query.b || null)
 const R = ref(null)
 const err = ref('')
 const loading = ref(false)
-const done = computed(() => store.runs.filter((r) => r.status === 'done' && r.kind === 'combat'))
-const label = (r) => `${runTitle(r)}  ·  ${fmt.time(r.created)}`
+const done = computed(() => store.runs.filter((r) => r.kind === 'combat' && (r.status === 'done' || r.status === 'cancelled')))
+const label = (r) => `${runTitle(r)}  ·  ${fmt.time(r.created)}${r.status === 'cancelled' || r.partial ? ' · ' + t('run.partial') : ''}`
 const optsA = computed(() => done.value.map((r) => ({ label: label(r), value: r.id })))
 const optsB = computed(() => done.value.filter((r) => r.id !== a.value).map((r) => ({ label: label(r), value: r.id })))
 const exportHref = computed(() => {

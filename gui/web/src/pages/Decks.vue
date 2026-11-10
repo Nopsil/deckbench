@@ -115,6 +115,13 @@
           <div data-deck="h2h-run">
             <n-button type="primary" block :loading="h2hRunning" :disabled="!canH2h" @click="runHeadToHead">{{ t('deck.h2hRun') }}</n-button>
           </div>
+          <div v-if="h2hIds" data-h2h-progress>
+            <div class="label">{{ t('deck.h2hProgress') }}</div>
+            <run-progress :run-id="h2hIds.a" :cancellable="false" @update="(view) => onH2h('a', view)" />
+            <run-progress :run-id="h2hIds.b" :cancellable="false" @update="(view) => onH2h('b', view)" />
+            <n-button v-if="h2hActive" secondary type="error" block data-action="cancel" @click="cancelHeadToHead">{{ t('deck.h2hCancel') }}</n-button>
+            <div v-if="h2hPartial" class="hint warn" data-partial>{{ t('run.partialHint') }}</div>
+          </div>
         </div>
       </div>
     </div>
@@ -126,6 +133,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { NButton, NInput, NSelect, useMessage } from 'naive-ui'
 import EncounterPicker from '../components/EncounterPicker.vue'
+import RunProgress from '../components/RunProgress.vue'
 import { api, store } from '../api'
 import { t, tr, lang } from '../i18n'
 
@@ -161,6 +169,9 @@ const h2hB = ref(null)
 const h2hOverride = ref(false)
 const h2hRunning = ref(false)
 const h2hErr = ref('')
+const h2hIds = ref(null)
+const h2hState = ref({ a: null, b: null })
+let h2hLeft = false
 let timer
 function onlyDummy(list) {
   return (list || []).length > 0 && list.every((row) => row.id === 'DUMMY')
@@ -314,7 +325,18 @@ const presetOptions = computed(() => savedPresets.value.map((item) => ({
   label: `${item.title || item.name || item.id} (${item.id})`,
   value: item.id,
 })))
-const canH2h = computed(() => !!h2hA.value && !!h2hB.value && h2hA.value !== h2hB.value && !h2hRunning.value)
+const h2hActive = computed(() => {
+  const a = h2hState.value.a
+  const b = h2hState.value.b
+  const live = (row) => row && (row.status === 'running' || row.status === 'queued')
+  return !!(h2hIds.value && (live(a) || live(b) || !a || !b))
+})
+const h2hPartial = computed(() => {
+  const a = h2hState.value.a
+  const b = h2hState.value.b
+  return !!((a && (a.partial || a.status === 'cancelled')) || (b && (b.partial || b.status === 'cancelled')))
+})
+const canH2h = computed(() => !!h2hA.value && !!h2hB.value && h2hA.value !== h2hB.value && !h2hRunning.value && !h2hActive.value)
 
 async function save() {
   if (!canSave.value) return
@@ -349,13 +371,37 @@ async function runHeadToHead() {
       body.max_turns = maxTurns.value
     }
     const saved = await api.post('/api/decks/head_to_head', body)
+    h2hLeft = false
+    h2hState.value = { a: null, b: null }
+    h2hIds.value = { a: saved.a, b: saved.b }
     await store.loadRuns()
-    router.push({ path: '/compare', query: { a: saved.a, b: saved.b } })
   } catch (e) {
     h2hErr.value = e.message
     msg.error(e.message)
   } finally {
     h2hRunning.value = false
+  }
+}
+function onH2h(side, view) {
+  h2hState.value = { ...h2hState.value, [side]: view }
+  const a = h2hState.value.a
+  const b = h2hState.value.b
+  if (h2hLeft || !a || !b) return
+  if ([a.status, b.status].some((status) => status === 'running' || status === 'queued')) return
+  h2hLeft = true
+  if (a.status === 'done' && b.status === 'done') {
+    router.push({ path: '/compare', query: { a: a.id, b: b.id } })
+  }
+}
+async function cancelHeadToHead() {
+  const ids = h2hIds.value
+  if (!ids) return
+  try {
+    await api.post('/api/runs/' + encodeURIComponent(ids.a) + '/cancel')
+    await api.post('/api/runs/' + encodeURIComponent(ids.b) + '/cancel')
+  } catch (e) {
+    h2hErr.value = e.message
+    msg.error(e.message)
   }
 }
 onMounted(() => { load(); loadTurnCap(); store.loadCatalog() })

@@ -301,8 +301,19 @@ def _compare_http(exc):
     return T("err.compareNoData")
 
 
+def _partial(meta):
+    return bool(meta.get("partial") or meta.get("status") == "cancelled")
+
+
+def _settled(meta):
+    """打完，或者已经取消并留下部分结果。还在跑的不算。"""
+    return meta.get("status") in ("done", "cancelled")
+
+
 def _run_brief(meta):
-    return {key: meta.get(key) for key in ("id", "kind", "title", "status", "created")}
+    brief = {key: meta.get(key) for key in ("id", "kind", "title", "status", "created")}
+    brief["partial"] = _partial(meta)
+    return brief
 
 
 @app.get("/api/runs/compare")
@@ -337,7 +348,7 @@ def runs_compare(request: Request):
     right = jobs.get(b)
     if not left or not right:
         raise HTTPException(400, T("err.compareUnknown"))
-    if left.get("status") != "done" or right.get("status") != "done":
+    if not _settled(left) or not _settled(right):
         raise HTTPException(400, T("err.abNotDone"))
     if left.get("kind") != right.get("kind"):
         raise HTTPException(400, T("err.abKind"))
@@ -354,6 +365,7 @@ def runs_compare(request: Request):
     body["ok"] = True
     body["read_only"] = True
     body["kind"] = "combat"
+    body["partial"] = _partial(left) or _partial(right)
     body["a"] = _run_brief(left)
     body["b"] = _run_brief(right)
     return body
@@ -458,6 +470,16 @@ def run(rid: str):
     return _need(rid)
 
 
+@app.get("/api/runs/{rid}/progress")
+def run_progress(rid: str):
+    """这一次测试打到第几场、当前遭遇、已经用了多久。轮询即可。不新开模拟。"""
+    _need(rid)
+    view = jobs.progress(rid)
+    if not view:
+        raise HTTPException(404, T("err.runNotFound"))
+    return view
+
+
 @app.patch("/api/runs/{rid}")
 def rename(rid: str, req: TitleReq):
     _need(rid)
@@ -490,7 +512,7 @@ def rerun(rid: str):
 @app.get("/api/runs/{rid}/summary")
 def summary(rid: str):
     m = _need(rid)
-    if m.get("status") != "done":
+    if not _settled(m):
         raise HTTPException(409, T("err.notDone"))
     return {"meta": m, "summary": backend.summarize(m["kind"], jobs.run_dir(rid))}
 
@@ -504,7 +526,7 @@ def run_export(rid: str, request: Request):
     from sts2sim.htmlreport import export_filename, render_html
     lang = _export_lang(request)
     meta = _need(rid)
-    if meta.get("status") != "done":
+    if not _settled(meta):
         raise HTTPException(409, T("err.notDone"))
     summary = backend.summarize(meta.get("kind"), jobs.run_dir(rid))
     if not summary:

@@ -6,10 +6,13 @@
   validate-mod —— 用模拟器的 ModSet 试加载一个 mod
   mod-check —— 检查 / 试注册一个 YAML 数据 mod（整局用），输出问题、提醒、角色和每张牌在游戏里的 ID（JSON）
 
-进度协议（stdout 单独一行）：@@PROGRESS {"done": n, "total": m}；结束：@@DONE {...}
+进度协议（stdout 单独一行）：@@PROGRESS {"done": n, "total": m, "encounter": id, "encounter_name": name}；
+结束：@@DONE {...}。环境变量 DECKBENCH_CANCEL_FILE 指向的文件一旦出现，就不再派发新的一场，
+已经在打的那场打完，然后把打完的结果写下来并标成 partial。
 """
 import argparse
 import json
+import math
 import multiprocessing as mp
 import os
 import sys
@@ -25,6 +28,112 @@ paths.setup_sys_path()
 
 def emit(tag, obj):
     print(f"@@{tag} " + json.dumps(obj, ensure_ascii=False), flush=True)
+
+
+def _cancel_requested():
+    """父进程写下取消文件之后，不再开新的一场。正在打的那场继续打完。"""
+    path = os.environ.get("DECKBENCH_CANCEL_FILE") or ""
+    if not path or "\x00" in path:
+        return False
+    return os.path.isfile(path)
+
+
+def _fight_gap():
+    """测试可以在两场之间留一点空档，方便取消。默认是 0，不改变出牌。"""
+    raw = os.environ.get("DECKBENCH_FIGHT_GAP") or ""
+    try:
+        gap = float(raw)
+    except ValueError:
+        return 0.0
+    if math.isnan(gap) or gap < 0:
+        return 0.0
+    return min(gap, 2.0)
+
+
+def _iter_indexed(pool, fn, tasks, width):
+    """按完成顺序交出 (下标, 结果)。同时在飞的不超过 width 场。
+
+    取消文件出现后不再提交新任务，已经提交的那场会打完再返回。
+    """
+    pending = []
+    index = 0
+    total = len(tasks)
+    limit = max(1, int(width or 1))
+
+    def submit():
+        nonlocal index
+        while index < total and len(pending) < limit and not _cancel_requested():
+            pending.append((index, pool.apply_async(fn, (tasks[index],))))
+            index += 1
+
+    submit()
+    while pending:
+        ready = None
+        for slot, (_i, ar) in enumerate(pending):
+            if ar.ready():
+                ready = slot
+                break
+        if ready is None:
+            pending[0][1].wait(0.05)
+            if not _cancel_requested():
+                submit()
+            continue
+        i, ar = pending.pop(ready)
+        yield i, ar.get()
+        gap = _fight_gap()
+        if gap and not _cancel_requested():
+            time.sleep(gap)
+        if not _cancel_requested():
+            submit()
+
+
+def _encounter_fields(hint, result):
+    enc = ""
+    name = ""
+    if isinstance(result, dict):
+        if result.get("encounter"):
+            enc = str(result.get("encounter") or "")
+            name = str(result.get("enc_name") or "")
+        else:
+            room = result.get("death_room")
+            if isinstance(room, (list, tuple)) and len(room) >= 3 and room[2]:
+                enc = str(room[2])
+                kind = "events" if room[1] == "Event" else "encounters"
+                name = i18n.game_text(kind, enc) or enc
+    if not enc and hint:
+        enc = str(hint)
+    return enc, name
+
+
+def _combat_hint(task):
+    if isinstance(task, tuple) and len(task) >= 2 and isinstance(task[1], dict):
+        enc = task[1].get("encounter_id")
+        if enc:
+            return str(enc)
+    return ""
+
+
+def _emit_progress(done, total, hint="", result=None):
+    enc, name = _encounter_fields(hint, result)
+    emit("PROGRESS", {
+        "done": int(done),
+        "total": int(total),
+        "encounter": enc,
+        "encounter_name": name,
+    })
+
+
+def _mark_partial_report(out_dir, translate):
+    path = os.path.join(out_dir, "report.md")
+    if not os.path.isfile(path):
+        return
+    with open(path, encoding="utf-8") as handle:
+        body = handle.read()
+    note = translate("log.partialNote").strip()
+    if not note or body.startswith(note):
+        return
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write(note + "\n\n" + body)
 
 
 # ---------------------------------------------------------------- 整局批量
@@ -103,11 +212,13 @@ def cmd_batch(a):
             force=i18n.join(cfg["force"]) or none, replace=i18n.join(cfg["replace"]) or none, procs=a.procs), flush=True)
     sty = next((s["name"] for s in _style_list() if s["id"] == cfg["style"]), cfg["style"])
     print(T("log.style", style=sty), flush=True)
-    emit("PROGRESS", {"done": 0, "total": len(jobs)})
+    _emit_progress(0, len(jobs))
     t = time.time()
     res = []
-    with mp.Pool(a.procs, initializer=_batch_init, initargs=(cfg,)) as pool:
-        for r in pool.imap_unordered(_one_safe, jobs, chunksize=1):
+    partial = False
+    pool = mp.Pool(a.procs, initializer=_batch_init, initargs=(cfg,))
+    try:
+        for _i, r in _iter_indexed(pool, _one_safe, jobs, a.procs):
             res.append(r)
             tag = T("log.win") if r.get("victory") else (T("log.error") if r.get("error") else T("log.diedAt", floor=r.get("floor")))
             dr = r.get("death_room")
@@ -116,7 +227,11 @@ def cmd_batch(a):
                 enc = i18n.game_text("events" if dr[1] == "Event" else "encounters", str(dr[2])) or str(dr[2])
                 where = f" ({i18n.tr('room.', dr[1])} {enc})"
             print(f"[{len(res)}/{len(jobs)}] {r['seed']}: {tag}{where}", flush=True)
-            emit("PROGRESS", {"done": len(res), "total": len(jobs)})
+            _emit_progress(len(res), len(jobs), result=r)
+        partial = _cancel_requested() or len(res) < len(jobs)
+    finally:
+        pool.close()
+        pool.join()
     order = {s: i for i, (_, _, s) in enumerate(jobs)}
     res.sort(key=lambda r: order.get(r["seed"], 0))
     dt = time.time() - t
@@ -140,7 +255,10 @@ def cmd_batch(a):
                 print(T("log.mentorAllFallback"), flush=True)
             if info["ppo_net"] == 0 and info["ppo_fb"] > 0:
                 print(T("log.mentorPpoFallback"), flush=True)
-    emit("DONE", {"secs": dt, "out": a.out})
+    if partial:
+        print(T("log.partialNote"), flush=True)
+    emit("DONE", {"secs": dt, "out": a.out, "cancelled": partial, "partial": partial,
+                  "done": len(res), "total": len(jobs)})
 
 
 # ---------------------------------------------------------------- 战斗实验
@@ -175,26 +293,35 @@ def cmd_combat(a):
     jobs = a.jobs or os.cpu_count() or 1
     T = i18n.t
     print(T("log.combatStart", title=exp.get("title") or exp["name"], n=len(tasks), agent=exp.get("agent", "heuristic"), procs=jobs), flush=True)
-    emit("PROGRESS", {"done": 0, "total": len(tasks)})
+    hint = _combat_hint(tasks[0]) if tasks else ""
+    _emit_progress(0, len(tasks), hint=hint)
     t0 = time.time()
-    results = []
-    with mp.Pool(jobs, initializer=_combat_init) as pool:
-        cs = max(1, len(tasks) // (jobs * 8))
-        last = 0
-        for r in pool.imap(R._task, tasks, chunksize=cs):
-            results.append(r)
-            if len(results) - last >= max(1, len(tasks) // 50) or len(results) == len(tasks):
-                last = len(results)
-                emit("PROGRESS", {"done": len(results), "total": len(tasks)})
-                print(f"[{len(results)}/{len(tasks)}] " + T("log.progressDone"), flush=True)
-        approx = pool.map(R._collect_approx, range(jobs * 4))
+    ordered = {}
+    partial = False
+    approx = []
+    pool = mp.Pool(jobs, initializer=_combat_init)
+    try:
+        for i, r in _iter_indexed(pool, R._task, tasks, jobs):
+            ordered[i] = r
+            _emit_progress(len(ordered), len(tasks), hint=hint, result=r)
+            print(f"[{len(ordered)}/{len(tasks)}] " + T("log.progressDone"), flush=True)
+        partial = _cancel_requested() or len(ordered) < len(tasks)
+        if not partial:
+            approx = pool.map(R._collect_approx, range(jobs * 4))
+    finally:
+        pool.close()
+        pool.join()
+    results = [ordered[i] for i in range(len(tasks)) if i in ordered]
     allapprox = {}
     for x in approx:
         allapprox.update(x)
     allapprox.update(EN.APPROX)
     wall = time.time() - t0
     os.makedirs(a.out, exist_ok=True)
-    meta = {"exp": exp, "n_tasks": len(tasks), "wall_secs": wall, "jobs": jobs, "approx": allapprox}
+    meta = {"exp": exp, "n_tasks": len(results), "planned": len(tasks), "wall_secs": wall, "jobs": jobs, "approx": allapprox}
+    if partial:
+        meta["partial"] = True
+        meta["status"] = "cancelled"
     if explain_on:
         meta["explain"] = True
     explain_rows = []
@@ -208,11 +335,21 @@ def cmd_combat(a):
         path = os.path.join(a.out, "explain.jsonl")
         EX.write_jsonl(path, explain_rows)
         print(f"explain: {path}", flush=True)
-    json.dump(meta, open(os.path.join(a.out, "meta.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    with open(os.path.join(a.out, "meta.json"), "w", encoding="utf-8") as handle:
+        json.dump(meta, handle, ensure_ascii=False, indent=1)
     print(T("log.makingReport"), flush=True)
-    make_report(a.out, M)
-    print(T("log.combatDone", n=len(tasks), secs=f"{wall:.1f}"), flush=True)
-    emit("DONE", {"secs": wall, "out": a.out})
+    try:
+        make_report(a.out, M)
+    except Exception:
+        if not partial:
+            raise
+    if partial:
+        _mark_partial_report(a.out, T)
+        print(T("log.partialNote"), flush=True)
+    else:
+        print(T("log.combatDone", n=len(results), secs=f"{wall:.1f}"), flush=True)
+    emit("DONE", {"secs": wall, "out": a.out, "cancelled": partial, "partial": partial,
+                  "done": len(results), "total": len(tasks)})
 
 
 # ---------------------------------------------------------------- 卡牌列表

@@ -129,16 +129,28 @@
 
 组牌页上「卡组 A 对卡组 B」选两份已经保存的用户预设。`POST /api/decks/head_to_head` 用界面已有的战斗测试各跑一遍：同一份遭遇、同一个回合上限、同一颗种子。不写 `encounters` / `gauntlet` / `max_turns` / `seed` 时，用第一份预设（A）里存的那些。自己写了才覆盖。名单的规则和保存预设一样：遭遇必须是模拟器会打的，每种 1–100 场，最多 40 种，合计最多 400 场。两套牌各打这一份名单。种子写进两份实验的 `seed`，战斗仍走 `sts2sim.runner` 原来的播种（种子、卡组、幕、房间、场次、遭遇一起算），不另写一套随机。
 
-打完两场都是 `done` 之后，返回 `a`、`b`（两次测试的 id）、`seed`、`max_turns`、`encounters`、`fights` 和 `compare`（`/#/compare?a=&b=`）。页面点「对打」就打开这一页。对比仍是原来的格子和单卡差值。两套牌的 id 不一样，所以格子按幕和房间配对（这一侧只有一套牌时）；同一侧有不止一套牌就不猜。见 [COMPARE.md](COMPARE.md)。
+请求在两场都**开始**之后就返回，不等它们打完。正文有 `status: "running"`、`a`、`b`（两次测试的 id）、`seed`、`max_turns`、`encounters`、`fights` 和 `compare`（`/#/compare?a=&b=`）。页面上是进度条和「取消两边」。`GET /api/runs/<id>/progress` 看每一侧打完几场、当前遭遇和用时。两场都变成 `done` 之后才打开对比。对比仍是原来的格子和单卡差值。两套牌的 id 不一样，所以格子按幕和房间配对（这一侧只有一套牌时）；同一侧有不止一套牌就不猜。见 [COMPARE.md](COMPARE.md)。
 
-同一份预设选两次、预设不存在、不是用户预设、`..`、空字节、类型不对、回合不在 1–200、超过 400 场，都是 400，一句说明，没有堆栈，也不回显提交的原文。有一场没打完也是 400。不改出厂预设、`mods/`、种子算法或 AI。
+同一份预设选两次、预设不存在、不是用户预设、`..`、空字节、类型不对、回合不在 1–200、超过 400 场，都是 400，一句说明，没有堆栈，也不回显提交的原文。不改出厂预设、`mods/`、种子算法或 AI。
 
-MCP `head_to_head(a, b, encounters="", gauntlet="", max_turns=None, seed=None)` 做同一件事。`encounters` 是上面的 JSON 数组文本。成功的 JSON 和 HTTP 相同。失败是 `{"ok": false, "error": "..."}`，不抛异常。`--import-only` 也有这个工具：训练木桩不需要本机游戏数据，真正开打用的仍是原来的战斗测试。
+MCP `head_to_head(a, b, encounters="", gauntlet="", max_turns=None, seed=None)` 做同一件事，也是马上返回。`encounters` 是上面的 JSON 数组文本。成功的 JSON 和 HTTP 相同。失败是 `{"ok": false, "error": "..."}`，不抛异常。`--import-only` 也有这个工具：训练木桩不需要本机游戏数据，真正开打用的仍是原来的战斗测试。进度和取消是 `run_progress` / `cancel_run`。
+
+## 进度和取消 / Progress and cancel
+
+新建测试、组牌预设、连战和对打都可以是几百场。页面不再干等。`GET /api/runs/<id>/progress` 返回 `done`、`total`、`encounter`、`encounter_name`、`elapsed`（秒）、`status`、`partial`。轮询即可。新建测试（`#/new`）、组牌（`#/decks`）和对打面板上有进度条和取消。运行页（`#/run/<id>`）也显示当前遭遇。
+
+`POST /api/runs/<id>/cancel` 和 MCP `cancel_run` 不杀进程。工人在两场之间停下：正在打的那场打完，还没开始的不再派发。状态记成 `cancelled`，`partial` 为 true。打完的场次留在 `raw.jsonl` 或 `runs.jsonl` 里，报告开头写明是部分结果。对比和导出读这些结果，不抛栈；还在跑的仍是 400 / 409。见 [COMPARE.md](COMPARE.md)、[EXPORT.md](EXPORT.md)、[MCP.md](MCP.md)。
 
 *Deck builder has **Deck A vs deck B**. Pick two saved user presets. `POST /api/decks/head_to_head` runs each one with the combat test the GUI already uses: the same encounters, the same turn cap, and the same seed. Omit `encounters`, `gauntlet`, `max_turns` and `seed` to keep what the first preset (A) stored. An override uses the same rules as saving a preset: an encounter the simulator runs, 1–100 fights each, at most 40 encounters, and at most 400 fights in total. Each deck runs that list. The seed is written on both experiments. Fights still use `sts2sim.runner`'s existing seeding (seed, deck, act, room, index, encounter together). There is no second random source.*
 
-*When both tests are `done`, the body has `a` and `b` (the two test ids), `seed`, `max_turns`, `encounters`, `fights` and `compare` (`/#/compare?a=&b=`). **Run head-to-head** on the page opens that view. The comparison is still the existing cell and card deltas. The two deck ids differ, so a cell lines up by act and room when that side has one deck there. More than one deck on a side is not guessed. See [COMPARE.md](COMPARE.md).*
+*The request returns as soon as both tests have **started**. It does not wait for them to finish. The body has `status: "running"`, `a` and `b` (the two test ids), `seed`, `max_turns`, `encounters`, `fights` and `compare` (`/#/compare?a=&b=`). The page shows a progress bar and **Cancel both**. `GET /api/runs/<id>/progress` is how far each side has got, the current encounter, and the elapsed time. The comparison opens when both are `done`. It is still the existing cell and card deltas. The two deck ids differ, so a cell lines up by act and room when that side has one deck there. More than one deck on a side is not guessed. See [COMPARE.md](COMPARE.md).*
 
-*The same preset twice, an unknown id, a preset that is not a saved user deck, `..`, a null byte, a wrong type, a turn cap outside 1–200, or more than 400 fights is a 400 with one sentence and no stack trace. The submitted text is not echoed. A run that does not finish is a 400 too. Shipped presets, `mods/`, the seeding, and the AI are unchanged.*
+*The same preset twice, an unknown id, a preset that is not a saved user deck, `..`, a null byte, a wrong type, a turn cap outside 1–200, or more than 400 fights is a 400 with one sentence and no stack trace. The submitted text is not echoed. Shipped presets, `mods/`, the seeding, and the AI are unchanged.*
 
-*MCP `head_to_head(a, b, encounters="", gauntlet="", max_turns=None, seed=None)` does the same thing. `encounters` is the JSON array above, as text. Success is the same JSON as HTTP. A failure is `{"ok": false, "error": "..."}` and does not raise. `--import-only` exposes this tool too. A training dummy does not need a local game install. The fights themselves are still the existing combat test.*
+*MCP `head_to_head(a, b, encounters="", gauntlet="", max_turns=None, seed=None)` does the same thing and also returns immediately. `encounters` is the JSON array above, as text. Success is the same JSON as HTTP. A failure is `{"ok": false, "error": "..."}` and does not raise. `--import-only` exposes this tool too. A training dummy does not need a local game install. The fights themselves are still the existing combat test. Progress and cancel are `run_progress` / `cancel_run`.*
+
+## Progress and cancel
+
+*New test, a saved deck, a gauntlet and a head-to-head can be hundreds of fights. The page does not sit and wait. `GET /api/runs/<id>/progress` returns `done`, `total`, `encounter`, `encounter_name`, `elapsed` (seconds), `status` and `partial`. Polling is enough. **New test** (`#/new`), **Deck builder** (`#/decks`) and the head-to-head panel show a progress bar and Cancel. The run page (`#/run/<id>`) shows the current encounter too.*
+
+*`POST /api/runs/<id>/cancel` and MCP `cancel_run` do not kill the process. The worker stops between fights: the one in progress finishes, and fights that have not started are not dispatched. The status is `cancelled` and `partial` is true. Finished fights stay in `raw.jsonl` or `runs.jsonl`, and the report says the result is partial. Compare and export read those results and do not raise. A test that is still running is still a 400 / 409. See [COMPARE.md](COMPARE.md), [EXPORT.md](EXPORT.md) and [MCP.md](MCP.md).*

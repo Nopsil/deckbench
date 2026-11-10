@@ -138,6 +138,8 @@ def _server_env(data, tmp):
     env["PYTHONUNBUFFERED"] = "1"
     env["PYTHONUTF8"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
+    # 只在这场浏览器测试里，在两场之间留空档，进度才来得及被看到。不改变出牌。
+    env["DECKBENCH_FIGHT_GAP"] = "0.25"
     return env
 
 
@@ -374,9 +376,9 @@ def test_dummy_combat_from_the_gui_reaches_done(gui):
     gui.expect(page.locator(".form .n-select").filter(has_text="browser_smoke")).to_be_visible()
     gui.expect(page.get_by_text("Browser dummy smoke", exact=True).first).to_be_visible()
     page.get_by_role("button", name="Start", exact=True).click()
-    page.wait_for_url("**/#/run/*")
     from playwright.sync_api import TimeoutError as PlaywrightTimeout
     try:
+        page.wait_for_url("**/#/run/*", timeout=120_000)
         page.get_by_role("button", name="View report").wait_for(timeout=120_000)
     except PlaywrightTimeout as exc:
         raise AssertionError(
@@ -563,9 +565,9 @@ def test_deck_builder_saves_a_preset_and_starts_a_dummy_run(gui):
     page.locator(".n-base-select-option").filter(has_text="browserdeck").click()
     gui.expect(page.get_by_text("Browser deck", exact=True).first).to_be_visible()
     page.get_by_role("button", name="Start", exact=True).click()
-    page.wait_for_url("**/#/run/*")
     from playwright.sync_api import TimeoutError as PlaywrightTimeout
     try:
+        page.wait_for_url("**/#/run/*", timeout=120_000)
         page.get_by_role("button", name="View report").wait_for(timeout=120_000)
     except PlaywrightTimeout as exc:
         raise AssertionError(
@@ -619,9 +621,9 @@ def test_deck_builder_saves_two_encounters_and_runs_them(gui):
     page.locator(".n-base-select-option").filter(has_text="twoenc").click()
     gui.expect(page.get_by_text("Two encounters", exact=True).first).to_be_visible()
     page.get_by_role("button", name="Start", exact=True).click()
-    page.wait_for_url("**/#/run/*")
     from playwright.sync_api import TimeoutError as PlaywrightTimeout
     try:
+        page.wait_for_url("**/#/run/*", timeout=120_000)
         page.get_by_role("button", name="View report").wait_for(timeout=120_000)
     except PlaywrightTimeout as exc:
         raise AssertionError(
@@ -686,3 +688,77 @@ def test_deck_head_to_head_opens_compare(gui):
     gui.expect(page.get_by_text("Head A / Head B").first).to_be_visible()
     _save_shot(page, "head-to-head.png")
     _assert_clean(gui, "head-to-head")
+
+
+def test_multi_fight_run_shows_progress_then_cancel(gui):
+    """多场木桩：进度会往前走，取消后页面停在 cancelled，并标明部分结果。"""
+    page = gui.page
+    page.goto(gui.base + "/#/decks", wait_until="domcontentloaded")
+    gui.expect(page.locator("[data-page='decks']")).to_be_visible()
+    search = page.locator("[data-deck='search'] input")
+    search.fill("YIHESHI")
+    first = page.locator("[data-card='claude_v34:YIHESHI']")
+    gui.expect(first).to_be_visible()
+    first.locator("[data-add]").click()
+    fights = page.locator("[data-fights='DUMMY']")
+    fights.fill("30")
+    fights.press("Tab")
+    gui.expect(page.locator("[data-enc-total]")).to_contain_text("30")
+    page.locator("[data-deck='id'] input").fill("progdeck")
+    page.locator("[data-deck='name'] input").fill("Progress deck")
+    page.locator("[data-deck='save'] button").click()
+    gui.expect(page.locator("[data-deck='saved']")).to_have_text("Saved preset progdeck")
+
+    page.evaluate(
+        """() => {
+          localStorage.setItem('nt.kind', 'combat');
+          localStorage.setItem('nt.form', JSON.stringify({
+            b: {},
+            c: {
+              source: 'preset', preset: 'progdeck', procs: 1, fights: 1, seed: 1,
+              agent: 'heuristic', mods: ['vanilla'], decks: [], encounters: [],
+              rooms: ['普通', '精英', '首领'], max_turns: 1
+            }
+          }));
+        }"""
+    )
+    page.goto(gui.base + "/#/new", wait_until="domcontentloaded")
+    gui.expect(page.get_by_text("Combat test", exact=True).first).to_be_visible()
+    page.locator("button.mode").filter(has_text="Combat test").click()
+    gui.expect(page.get_by_text("Progress deck", exact=True).first).to_be_visible()
+    page.get_by_role("button", name="Start", exact=True).click()
+    bar = page.locator("[data-progress]")
+    gui.expect(bar).to_be_visible()
+    gui.expect(bar.locator("[data-action='cancel']")).to_be_visible()
+    page.wait_for_function(
+        """() => {
+          const el = document.querySelector('[data-progress-done]');
+          return el && Number(el.textContent) >= 1;
+        }""",
+        timeout=90_000,
+    )
+    first_done = int(page.locator("[data-progress-done]").inner_text())
+    page.wait_for_function(
+        """(n) => {
+          const el = document.querySelector('[data-progress-done]');
+          return el && Number(el.textContent) > n;
+        }""",
+        arg=first_done,
+        timeout=90_000,
+    )
+    gui.expect(page.locator("[data-progress-encounter]")).to_have_attribute("data-encounter", "DUMMY")
+    gui.expect(page.locator("[data-progress-total]")).to_have_text("30")
+    _save_shot(page, "run-progress.png")
+    bar.locator("[data-action='cancel']").click()
+    gui.expect(bar).to_have_attribute("data-status", "cancelled", timeout=90_000)
+    gui.expect(bar).to_have_attribute("data-partial", "1")
+    gui.expect(bar.get_by_text("Partial.", exact=True)).to_be_visible()
+    _save_shot(page, "run-cancelled.png")
+    runs = list((gui.data / "runs").glob("*/meta.json"))
+    assert runs
+    meta = json.loads(max(runs, key=lambda path: path.stat().st_mtime).read_text(encoding="utf-8"))
+    assert meta["status"] == "cancelled" and meta["partial"] is True
+    raw = (gui.data / "runs" / meta["id"] / "out" / "raw.jsonl").read_text(encoding="utf-8")
+    done = len([line for line in raw.splitlines() if line.strip()])
+    assert 1 <= done < 30
+    _assert_clean(gui, "progress-cancel")
