@@ -1,0 +1,81 @@
+{
+  "ok": true,
+  "read_only": true,
+  "v": 1,
+  "alignment": "floor_room_encounter",
+  "seed": "GAPSEED2",
+  "character": "Silent",
+  "ascension": 1,
+  "fights": [
+    {
+      "floor": 4,
+      "room": "Elite",
+      "encounter": "SAMPLE_ELITE",
+      "status": "compared",
+      "real_hp_lost": 30,
+      "p5": 5,
+      "p95": 18,
+      "likely_sim_gap": true
+    },
+    {
+      "floor": 3,
+      "room": "Monster",
+      "encounter": "SAMPLE_FIGHT",
+      "status": "compared",
+      "real_hp_lost": 1,
+      "p5": 5,
+      "p95": 15,
+      "likely_sim_gap": true
+    },
+    {
+      "floor": 7,
+      "room": "Monster",
+      "encounter": "SAMPLE_WIDE",
+      "status": "compared",
+      "real_hp_lost": 28,
+      "p5": 4,
+      "p95": 16,
+      "likely_sim_gap": true
+    },
+    {
+      "floor": 8,
+      "room": "Monster",
+      "encounter": "SAMPLE_WIDE",
+      "status": "compared",
+      "real_hp_lost": 10,
+      "p5": 4,
+      "p95": 16,
+      "likely_sim_gap": false
+    },
+    {
+      "floor": 9,
+      "room": "Elite",
+      "encounter": "SAMPLE_WIDE",
+      "status": "compared",
+      "real_hp_lost": 11,
+      "p5": 4,
+      "p95": 16,
+      "likely_sim_gap": false
+    },
+    {
+      "floor": 10,
+      "room": "Monster",
+      "encounter": "SAMPLE_EDGE",
+      "status": "compared",
+      "real_hp_lost": 12,
+      "p5": 4,
+      "p95": 12,
+      "likely_sim_gap": true
+    },
+    {
+      "floor": 11,
+      "room": "Boss",
+      "encounter": "SAMPLE_BARE",
+      "status": "compared",
+      "real_hp_lost": 3,
+      "p5": 8,
+      "p95": 20,
+      "likely_sim_gap": true
+    }
+  ]
+}

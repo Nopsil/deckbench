@@ -1,0 +1,25 @@
+{
+  "v": 1,
+  "encounters": {
+    "SAMPLE_ELITE": {
+      "powers": ["CONSTRICT", "SUCK"],
+      "mechanics": ["summon_skipped"],
+      "monsters": ["SAMPLE_STRANGLER"]
+    },
+    "SAMPLE_FIGHT": {
+      "powers": ["THORNS"]
+    },
+    "SAMPLE_GLOOM": {
+      "powers": ["NOT_A_REAL_POWER"],
+      "mechanics": ["status_card"]
+    },
+    "SAMPLE_WIDE": {
+      "powers": ["BACK_ATTACK_LEFT"]
+    }
+  },
+  "monsters": {
+    "SAMPLE_STRANGLER": {
+      "powers": ["CONSTRICT"]
+    }
+  }
+}
