@@ -946,5 +946,13 @@
  "exp.err.bad_limit": "Page size must be at least 1.",
  "exp.err.bad_seed": "Seed must be text.",
  "exp.err.fight_out_of_range": "No fight {fight} ({fight_count} fights).",
- "exp.err.failed": "Could not read the explanation log: {err}"
+ "exp.err.failed": "Could not read the explanation log: {err}",
+ "cal.err.need_real": "Enter the path to a real run.",
+ "cal.err.need_sim": "Enter the path to simulated runs (runs.jsonl, or a folder that contains it).",
+ "cal.err.one_run": "Calibration needs one run file, not a folder.",
+ "cal.err.multiplayer": "This is a multiplayer run. It is not matched to one simulated character.",
+ "cal.err.no_seed": "This run has no seed, so it cannot be lined up with simulations.",
+ "cal.err.no_character": "This run has no character, so it cannot be lined up with simulations.",
+ "cal.err.no_ascension": "This run has no ascension, so it cannot be lined up with simulations.",
+ "cal.err.not_found": "Path not found: {path}"
 }

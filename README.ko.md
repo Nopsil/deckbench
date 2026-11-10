@@ -39,6 +39,7 @@ Slay the Spire 2 모드 제작자와 플레이어를 위한 비공식 밸런스 
 - **그래픽 화면, 모든 작업은 내 PC에서**: 클릭으로 설정, 버튼 한 번으로 실행, 실시간 진행 상황, 그래프 보고서, 기록 보기까지. 인터넷에 연결하지 않고 아무것도 업로드하지 않습니다.
 - **4가지 언어**: 한국어, English, 简体中文, 日本語. 프로그램 안에서 바꿀 수 있고, 카드·캐릭터·적 이름도 설치된 게임에서 같은 언어로 읽어 옵니다.
 - **실제 런 가져오기**: 끝난 런이나 진행 중 세이브를 읽기 전용으로 열어 시드, 경로, 카드 선택, 유물을 봅니다.
+- **실제 런과 시뮬레이션 교정**: 같은 시드, 같은 캐릭터, 같은 카드 선택 순서로, 전투마다 잃은 HP를 시뮬레이션 분포와 비교합니다. 맞지 않는 층은 미일치로 두고, 옆 전투로 채우지 않습니다.
 - **시드 미리보기**: 시드를 넣으면 한 판을 끝까지 돌리지 않고 맵, 적 분포, 초반 보상을 봅니다.
 
 ## 시작하기 (Windows)
@@ -139,6 +140,19 @@ python tools/import_dll_mod.py "/path/to/Slay the Spire 2/mods/MyMod" --out mods
 왼쪽 **「런 가져오기」**에서 끝난 런(`history/*.run`)이나 진행 중 세이브(`current_run.save`)를 읽기 전용으로 엽니다. 시드, 승천, 지나간 방, 각 층에서 고른 카드, 유물, 덱을 볼 수 있습니다. 세이브는 바꾸지 않습니다.
 명령줄: `python tools/import_run.py <파일 또는 폴더>`. 파일이 어디 있는지, JSON이 두 가지인 이유는 [docs/SAVE_FORMAT.md](docs/SAVE_FORMAT.md)(중국어·영어)를 보세요.
 
+## 실제 런과 시뮬레이션 교정
+
+가져온 실제 런을 **같은 시드, 같은 캐릭터, 같은 카드 선택 순서**의 시뮬레이션과, 전투마다 잃은 HP로 비교합니다. 각 전투는 실제 HP 손실, 시뮬레이션 평균, p10, p90, 그리고 실제 값이 샘플에서 어느 백분위인지(midrank)를 보여 줍니다. 실제 값이 시뮬레이션 p5–p95 밖이면 시뮬 모델 간격으로 표시합니다.
+
+맞추려면 층 번호, 전투 방(일반 / 엘리트 / 보스), 조우 ID가 모두 같아야 합니다. 조우 ID가 없거나, ID가 다르거나, 시뮬레이션에 그 전투가 없으면 `unmatched`입니다. 옆 층이나 다른 조우로 채우지 않습니다. 카드 순서는 각 층에서 `was_picked`인 카드이며, 앞의 `CARD.`는 뺍니다. 시뮬레이션 `picked`가 그 순서와 완전히 같을 때만 씁니다.
+
+```bash
+python tools/calibrate.py tests/fixtures/calibrate/real.run tests/fixtures/calibrate/sims.jsonl
+python tools/calibrate.py path/to/history/123.run path/to/runs.jsonl --json -
+```
+
+`POST /api/calibrate`, 본문 `{"real","sim"}`. `sim`은 `batch_run_summary`와 같은 허용 디렉터리 안이어야 합니다. `real`은 런 파일 하나입니다. MCP `calibrate(real, sim)`은 읽기 전용이고 `--import-only`에도 있습니다. 새 시뮬레이션을 시작하지 않고 세이브도 바꾸지 않습니다. 픽스처 ID는 가상입니다.
+
 ## 시드를 먼저 보기
 
 왼쪽 **「시드 미리보기」**에 게임 시드(캐릭터, 승천도 함께)를 넣으면, AI가 한 판을 끝까지 돌리지 않아도 각 막의 맵, 일반/엘리트/보스 순서, 시작 선택지, 첫 일반 전투의 보상을 볼 수 있습니다. 영상용 시드를 고르거나 경로를 짤 때 씁니다. 2막 이후 맵은 추정이고, 1막은 게임 스크린샷과 비교할 수 있습니다.
@@ -155,7 +169,7 @@ python tools/import_dll_mod.py "/path/to/Slay the Spire 2/mods/MyMod" --out mods
 ## AI 비서에게 한 수씩 플레이시키기 (MCP)
 
 Claude나 Cursor처럼 MCP를 지원하는 AI 비서를 쓰고 있다면, 시뮬레이터 안에서 직접 한 판을 플레이하게 할 수 있습니다. 상황을 보고, 선택지를 고르고, 이유를 적고, 되돌려서 다시 할 수도 있습니다. 마지막에는 조작 목록을 내보낼 수 있어서, 같은 시드로 실제 게임에서 그대로 따라 할 수 있습니다.
-지금은 소스에서 실행할 때만 됩니다: `pip install -r requirements-mcp.txt` 다음에 `python tools/mcp_server.py`. 카드 이름은 실행할 때 여러분이 설치한 게임에서 읽어 옵니다. 같은 서버는 GUI 없이 이미 끝난 결과도 읽습니다. `batch_run_summary`(승률, Wilson 구간, `sample_warning`), `card_ab`(이미 끝난 두 결과의 `p_value`. 새 시뮬레이션은 시작하지 않습니다), `explain_fight`(`--explain` 로그의 한 전투를 페이지로 읽기). 경로는 허용된 디렉터리 안이어야 합니다. 자세한 내용은 [docs/MCP.md](docs/MCP.md)를 참고하세요.
+지금은 소스에서 실행할 때만 됩니다: `pip install -r requirements-mcp.txt` 다음에 `python tools/mcp_server.py`. 카드 이름은 실행할 때 여러분이 설치한 게임에서 읽어 옵니다. 같은 서버는 GUI 없이 이미 끝난 결과도 읽습니다. `batch_run_summary`(승률, Wilson 구간, `sample_warning`), `card_ab`(이미 끝난 두 결과의 `p_value`. 새 시뮬레이션은 시작하지 않습니다), `explain_fight`(`--explain` 로그의 한 전투를 페이지로 읽기), `calibrate`(같은 카드 선택 순서에서 실제 HP 손실과 시뮬레이션을 비교. 맞지 않는 층은 `unmatched`). 경로는 허용된 디렉터리 안이어야 합니다. 자세한 내용은 [docs/MCP.md](docs/MCP.md)를 참고하세요.
 
 ## 결과 보는 법
 

@@ -39,6 +39,7 @@
 - **图形界面，全在本机**：点选参数、一键运行、实时进度、图表报告、历史记录，不联网也不上传任何东西。
 - **四种界面语言**：简体中文、English、日本語、한국어。第一次打开跟着系统语言走，左下角随时可以切换（会记住你的选择）；卡牌、角色、敌人的名字也跟着切换，从你自己的游戏安装里读。
 - **导入真游戏的一局**：只读打开存档里的对局记录，看种子、路线、选牌和遗物。
+- **校准真对局和模拟**：同一颗种子、同一个角色、同一条选牌路径上，按每场战斗比较真机掉血和模拟掉血的分布。对不上的层标成未匹配，不拿旁边的战斗来凑。
 - **种子预览**：给一个种子，不打完整的一局，先看地图、怪物分布和开局奖励。
 
 *Win rate and floors reached for full runs at any ascension; death causes; same-seed single-card A/B tests; test your own mods; a local desktop app with charts and history (nothing is uploaded).*
@@ -153,6 +154,21 @@ python tools/import_dll_mod.py "/path/to/Slay the Spire 2/mods/MyMod" --out mods
 
 *The **Import run** page reads a finished `history/*.run` or an in-progress `current_run.save` from your own install: seed, ascension, route, card picks, relics and deck. Read-only. CLI: `python tools/import_run.py`. Paths and the two JSON shapes: docs/SAVE_FORMAT.md.*
 
+## 校准：真对局对照模拟 / Calibrate a real run against simulations
+
+把导入的一局真对局，和**同一颗种子、同一个角色、同一条选牌路径**上的模拟结果比掉血。每一场战斗给出真机失去的生命、模拟掉血的均值、p10、p90，以及真值落在模拟样本里的百分位（midrank）。真值落在模拟 p5–p95 之外时，记成疑似模拟模型缺口。
+
+对得上的条件是层数、战斗房间（普通 / 精英 / 首领）和遭遇 ID 都一致。真机这一层没有遭遇 ID、遭遇对不上、或模拟里没有这场战斗，就标成 `unmatched`，不会改用旁边的层或别的遭遇来凑。选牌路径是按层记下的、`was_picked` 的牌（去掉 `CARD.` 前缀）；模拟结果里的 `picked` 必须整段相同，少一段或多一张都不算同一条路径。
+
+```bash
+python tools/calibrate.py tests/fixtures/calibrate/real.run tests/fixtures/calibrate/sims.jsonl
+python tools/calibrate.py path/to/history/123.run path/to/runs.jsonl --json -
+```
+
+接口 `POST /api/calibrate`，正文 `{"real","sim"}`。`sim` 必须在允许的目录里（和 `batch_run_summary` 相同）；`real` 是一份对局文件。MCP 工具 `calibrate(real, sim)` 只读，`--import-only` 也提供。不新开模拟，不改存档。夹具里的 ID 是虚构的。
+
+*Compare an imported real run with simulations that share its seed, character and card-pick path. Each fight reports real HP lost, the simulated mean, p10 and p90, and the percentile rank of the real value. A real value outside the simulated p5–p95 band is flagged as a likely sim-model gap. A floor matches a simulated fight only when the floor number, the combat room and the encounter id all agree; otherwise it is `unmatched`. The pick path is the ordered `was_picked` cards; the simulated `picked` list has to be that same sequence. CLI as above. `POST /api/calibrate` takes `{"real","sim"}`. MCP `calibrate` is read-only and is also on `--import-only`. It does not start a simulation and does not modify saves. The fixture ids are fictional.*
+
 ## 先看种子再决定打不打 / Preview a seed
 
 左侧 **「种子预览」**：填游戏里的种子（以及角色、进阶），不让 AI 把整局打完，先看每一幕的地图、普通怪/精英/首领怎么排、开局选项和第一场普通战斗的奖励。适合挑录像用的种子、先想路线。第 2 幕往后的地图是投影，第 1 幕可以拿游戏截图对照。
@@ -173,9 +189,9 @@ python tools/import_dll_mod.py "/path/to/Slay the Spire 2/mods/MyMod" --out mods
 ## 让 AI 助手一步一步打（MCP） / Let an AI assistant play (MCP)
 
 如果你用 Claude、Cursor 之类支持 MCP 的 AI 助手，可以让它在模拟器里亲自打一局：它能看局面、选选项、写理由、撤销重来，最后导出一份操作清单，你可以拿同一个种子在真游戏里照着打。
-目前只能从源码运行：`pip install -r requirements-mcp.txt`，然后 `python tools/mcp_server.py`。卡牌的中文名会在运行时从你自己的游戏安装里读取。同一个服务也可以不打开界面，只读已经跑完的结果：`batch_run_summary`（胜率、Wilson 区间、`sample_warning`）、`card_ab`（两组已有结果的 `p_value`，不新开模拟）、`explain_fight`（`--explain` 的一场战斗，按决策分页）。路径必须在允许的目录里。详见 [docs/MCP.md](docs/MCP.md)。
+目前只能从源码运行：`pip install -r requirements-mcp.txt`，然后 `python tools/mcp_server.py`。卡牌的中文名会在运行时从你自己的游戏安装里读取。同一个服务也可以不打开界面，只读已经跑完的结果：`batch_run_summary`（胜率、Wilson 区间、`sample_warning`）、`card_ab`（两组已有结果的 `p_value`，不新开模拟）、`explain_fight`（`--explain` 的一场战斗，按决策分页）、`calibrate`（真对局和同一条选牌路径上的模拟掉血；对不上的层是 `unmatched`）。路径必须在允许的目录里。详见 [docs/MCP.md](docs/MCP.md)。
 
-*MCP clients (Claude, Cursor, …) can play a seeded run step by step: read the state, choose with a reason, undo, and export a replay list for the real game. From source only: `pip install -r requirements-mcp.txt`, then `python tools/mcp_server.py`. Card names are read from your own install at runtime. The same server can also read finished results without the GUI: `batch_run_summary` (win rate, Wilson interval, `sample_warning`), `card_ab` (a `p_value` for two result files you already have; it does not start a simulation) and `explain_fight` (one fight from an `--explain` log, one page of decisions at a time). Paths have to sit in an allowed directory. See docs/MCP.md.*
+*MCP clients (Claude, Cursor, …) can play a seeded run step by step: read the state, choose with a reason, undo, and export a replay list for the real game. From source only: `pip install -r requirements-mcp.txt`, then `python tools/mcp_server.py`. Card names are read from your own install at runtime. The same server can also read finished results without the GUI: `batch_run_summary` (win rate, Wilson interval, `sample_warning`), `card_ab` (a `p_value` for two result files you already have; it does not start a simulation), `explain_fight` (one fight from an `--explain` log, one page of decisions at a time) and `calibrate` (real HP lost against simulations on the same card-pick path; a floor that does not line up is `unmatched`). Paths have to sit in an allowed directory. See docs/MCP.md.*
 
 ## 怎么看结果 / Reading results
 

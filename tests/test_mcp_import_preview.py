@@ -340,6 +340,7 @@ def test_server_registers_preview_and_import_only_stays_import(monkeypatch):
     only_names = [t.name for t in only._tool_manager.list_tools()]
     assert only_names == [
         "import_save", "import_history_batch", "batch_run_summary", "card_ab", "explain_fight",
+        "calibrate",
     ]
     assert "new_run" not in only_names and "seed_preview" not in only_names
     assert only._resource_manager.list_resources() == []
