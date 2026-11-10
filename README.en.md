@@ -148,7 +148,7 @@ Command line: `python tools/seed_preview.py <seed> --char Ironclad --asc 0`. Thi
 
 Open **Mod editor** on the left. Fill in forms for a character (HP, energy, starting deck, starting relic), cards (pick effects from a menu, such as Deal damage, Apply a power or Draw cards, or use a template), powers and relics (when → what). **Check** points out problems in plain language.
 Then, under **Test**, start a full-run batch or a one-card A/B (same seeds, starting deck vs starting deck + this card) with one click. Import and export zips to share mods.
-The same YAML files also work from the command line: put them in `mods/` and run `python tools/batch.py --mod mods/my_mod --char MyHero --agent modai`. Format reference: [docs/MODDING.md](docs/MODDING.md).
+The same YAML files also work from the command line: put them in `mods/` and run `python tools/batch.py --mod mods/my_mod --char MyHero --agent modai`. From install to the first commands (example mod, a tiny win-rate sample, a card A/B, and why a card was played): [docs/MOD_AUTHORS.md](docs/MOD_AUTHORS.md) ([中文](docs/MOD_AUTHORS.zh-CN.md)). Format reference: [docs/MODDING.md](docs/MODDING.md).
 
 A mod already installed in the game does not have to be rewritten by hand first. In **Mod editor**, use **Import game mod** and pick that mod's zip (manifest JSON + DLL), or pick it from the dropdown of mods under the game's `mods/` folder. Cards we can read become a form. The DLL is not executed. Limits: [docs/DLL_MODS.md](docs/DLL_MODS.md).
 
@@ -194,6 +194,7 @@ After installing the .NET 9 SDK, open a **new** PowerShell window, run the `dotn
 
 - [docs/DEVELOPER.md](docs/DEVELOPER.md): command-line batch runs (all options), how the first-time data generation works, the optional spire-mentor AI, the legacy combat simulator, folder layout, tests (including Linux/macOS commands).
 - Optional stronger AI: after you build the third-party [spire-mentor](https://github.com/tfriedel/spire-mentor) yourself, the official package can run `mentor-full` / `mentor-full-ev` (MCTS for fights, PPO for out-of-combat choices; base-game characters only) without rebuilding DeckBench. spire-mentor is not shipped with this project. On the Windows package, set `python` in `mentor.local.json` to the interpreter that built `sts2_rs`. It has a known loading problem with 19 new cards from v0.111 (SIDESTEP etc.), and we provide a small local patch. Smoke steps and packaging rules: [docs/DEVELOPER.md](docs/DEVELOPER.md#可选spire-mentor更强的-ai--optional-spire-mentor).
+- [docs/MOD_AUTHORS.md](docs/MOD_AUTHORS.md) ([中文](docs/MOD_AUTHORS.zh-CN.md)): getting started for mod authors. The example is `examples/spark/`. The internal Python engine runs the tiny sample with no game install.
 - [docs/MODDING.md](docs/MODDING.md): write your own mod in YAML + Python (cards, powers, relics, decks, experiments).
 - [gui/README.md](gui/README.md): how the desktop app is structured and packaged.
 - [CONTRIBUTING.md](CONTRIBUTING.md): contribution rules (no game content of any kind).

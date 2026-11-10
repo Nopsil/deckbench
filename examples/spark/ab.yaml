@@ -1,0 +1,14 @@
+# Same seeds, two decks: baseline vs baseline plus Arc.
+# The training dummy has 9999 HP and does not attack, so both sides time out.
+# That is enough to print a Wilson interval, a p-value and the small-sample warning.
+name: spark_ab
+title: Spark example — Arc versus the baseline deck
+mods: [spark]
+seed: 1
+fights: 2
+max_turns: 1
+agent: heuristic
+decks: []
+extra:
+  - {deck: spark_base, encounter: DUMMY, fights: 2, max_turns: 1, room: 探针}
+  - {deck: spark_arc, encounter: DUMMY, fights: 2, max_turns: 1, room: 探针}

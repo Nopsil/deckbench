@@ -1,0 +1,7 @@
+- id: WARMTH
+  name: Warmth
+  type: buff
+  stack: counter
+  text: At the start of your turn, gain Block equal to Warmth.
+  triggers:
+    - {template: at_turn_start, do: [{op: block, amount: amount}]}

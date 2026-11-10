@@ -1,0 +1,8 @@
+# Defined so the file format is visible. The probe decks below do not equip it.
+# YAML relic triggers run in a full run, which needs a local game install.
+- id: MATCH
+  name: Match
+  rarity: Starter
+  text: At the start of combat, gain 3 Block.
+  triggers:
+    - {template: at_battle_start, do: [{op: block, amount: 3}]}

@@ -1,0 +1,16 @@
+# Original example for docs/MOD_AUTHORS.md. Not a game file.
+# 给 docs/MOD_AUTHORS.md 的原创示例，不是游戏文件。
+name: spark
+title: Spark (example mod)
+prefix: Spark
+characters:
+  Wick:
+    name: Wick
+    hp: 72
+    energy: 3
+    gold: 99
+    starting_deck: ["FLICK×4", "WARD×4"]
+cards: [cards.yaml]
+powers: [powers.yaml]
+relics: [relics.yaml]
+decks: [decks.yaml]

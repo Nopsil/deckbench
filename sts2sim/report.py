@@ -349,29 +349,43 @@ def make_report(out_dir, M):
     A("")
 
     # 近似清单
-    # 覆盖率
+    # 覆盖率。没有本机怪物/遭遇数据时这一节略过，不让已经打完的木桩样本退出。
     from .catalog import coverage, coverage_md, write_csvs, monsters_table_md
-    cov = coverage(M)
-    write_csvs(cov, out_dir)
+    from .gamedata import GameDataError
+    try:
+        cov = coverage(M)
+    except (GameDataError, SystemExit) as e:
+        cov = None
+        skip_reason = str(e)
+    else:
+        skip_reason = None
     A("## 6. 数据覆盖率与敌人意图来源")
     A("")
-    A("数据来源：spire-codex（数值、中文名、描述）+ Hexpion/Slay-the-spire-2 反编译镜像（commit 64ed626b，怪物状态机、遭遇组成、能力实现）。"
-      "「代码」= 出招逻辑完全按反编译状态机且没有已知近似；「代码+近似」= 状态机来自代码，但有召唤/未实现能力/无法求值的条件等近似（见说明列）。")
-    A("")
-    A(coverage_md(cov))
-    A("")
-    A("<details><summary>每个怪物的意图逻辑来源（展开）</summary>")
-    A("")
-    A(monsters_table_md(cov))
-    A("")
-    A("</details>")
-    A("")
-    miss = [r for r in cov["encounters"] if r["status"] == "缺失"]
-    if miss:
-        A("不参与模拟的遭遇：" + "；".join(f"{r['name']}（{r['id']}，{r['why']}）" for r in miss) + "。")
+    if cov is None:
+        A("本机没有怪物/遭遇数据，这一节略过。训练木桩（DUMMY）的样本不需要它。 / "
+          "No local monster codex, so this section was skipped. A training-dummy sample does not need it.")
         A("")
-    A("意图单元测试见 tests/test_intents.py（固定种子的前 N 回合出招序列、不能连续同招/最多连续 2 次、站位与开场招、血量阈值、沉睡/失衡/击晕、AI 读取意图伤害）。")
-    A("")
+        A(skip_reason)
+        A("")
+    else:
+        write_csvs(cov, out_dir)
+        A("数据来源：spire-codex（数值、中文名、描述）+ Hexpion/Slay-the-spire-2 反编译镜像（commit 64ed626b，怪物状态机、遭遇组成、能力实现）。"
+          "「代码」= 出招逻辑完全按反编译状态机且没有已知近似；「代码+近似」= 状态机来自代码，但有召唤/未实现能力/无法求值的条件等近似（见说明列）。")
+        A("")
+        A(coverage_md(cov))
+        A("")
+        A("<details><summary>每个怪物的意图逻辑来源（展开）</summary>")
+        A("")
+        A(monsters_table_md(cov))
+        A("")
+        A("</details>")
+        A("")
+        miss = [r for r in cov["encounters"] if r["status"] == "缺失"]
+        if miss:
+            A("不参与模拟的遭遇：" + "；".join(f"{r['name']}（{r['id']}，{r['why']}）" for r in miss) + "。")
+            A("")
+        A("意图单元测试见 tests/test_intents.py（固定种子的前 N 回合出招序列、不能连续同招/最多连续 2 次、站位与开场招、血量阈值、沉睡/失衡/击晕、AI 读取意图伤害）。")
+        A("")
     A("## 7. 近似清单")
     A("")
     A("### 7.1 引擎与敌人")
@@ -395,7 +409,10 @@ def make_report(out_dir, M):
     A("- cards.csv：每个卡组里每张卡（及能力/遗物来源）的使用次数、每次伤害/格挡/付费、效率倍数。")
     A("- encounters.csv：每个卡组对每个具体遭遇的胜率与回合。")
     A("- raw.jsonl：每一场的原始结果；meta.json：实验配置与用时。")
-    A("- coverage_monsters.csv / coverage_encounters.csv：每个怪物的意图逻辑来源、每个遭遇的组成来源与可模拟状态。")
+    if cov is None:
+        A("- coverage_monsters.csv / coverage_encounters.csv：本机没有怪物数据时不写。 / not written when the local monster codex is missing.")
+    else:
+        A("- coverage_monsters.csv / coverage_encounters.csv：每个怪物的意图逻辑来源、每个遭遇的组成来源与可模拟状态。")
     A("")
     A(ROADMAP)
     open(os.path.join(out_dir, "report.md"), "w", encoding="utf-8").write("\n".join(L))

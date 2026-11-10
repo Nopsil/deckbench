@@ -1,0 +1,4 @@
+# Five cards, and the character draws five: the whole deck is in hand on turn 1.
+- {id: spark_base, name: Wick baseline, character: Wick, stage: probe, acts: [1], cards: ["FLICK×3", "WARD×2"]}
+- {id: spark_arc, name: Wick plus Arc, character: Wick, stage: probe, acts: [1], cards: ["FLICK×2", "ARC", "WARD×2"]}
+- {id: spark_lantern, name: Wick plus Lantern, character: Wick, stage: probe, acts: [1], cards: ["FLICK×2", "LANTERN", "WARD×2"]}
