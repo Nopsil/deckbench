@@ -1,6 +1,6 @@
 # 导入游戏 mod 的 DLL / Importing a game mod DLL
 
-[← 写 mod](MODDING.md) · [开发者文档](DEVELOPER.md)
+[← 写 mod](MODDING.md) · [文档索引](INDEX.md) · [开发者文档](DEVELOPER.md)
 
 DeckBench 最初用来给一套原创内容（Claude娘）做数值测试。作者如果已经有一份装在游戏里的 mod，不应该为了试数字再把每张牌手写成 YAML。这一页是现在能走的路，以及为什么不能把 DLL 原样执行。
 

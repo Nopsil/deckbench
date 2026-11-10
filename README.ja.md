@@ -208,6 +208,7 @@ Steam でゲームがインストールされているか確認し、上記の `
 
 ## さらに詳しく
 
+- [docs/INDEX.md](docs/INDEX.md)：ドキュメント一覧（中国語・英語。Mod 作者向け入門には簡体字中国語版もある）。
 - [docs/DEVELOPER.md](docs/DEVELOPER.md)：コマンドラインでの一括実行（全オプション）、初回データ生成の仕組み、オプションの spire-mentor AI、旧版の戦闘シミュレーター、フォルダ構成、テスト（Linux/macOS 用コマンドを含む）。
 - オプションのより強い AI：サードパーティの [spire-mentor](https://github.com/tfriedel/spire-mentor) をご自身でビルドすれば、公式パッケージで `mentor-full` / `mentor-full-ev` を選べます（戦闘は MCTS、戦闘外は PPO。ベースゲームの 5 キャラクターのみ。DeckBench を作り直す必要はありません）。spire-mentor は同梱しません。Windows 版は `mentor.local.json` の `python` を、`sts2_rs` をビルドした Python に向けてください。v0.111 の新カード 19 枚（SIDESTEP など）には既知の読み込み問題があり、小さなローカルパッチがあります。動作確認とパッケージ時の注意は [docs/DEVELOPER.md](docs/DEVELOPER.md#可选spire-mentor更强的-ai--optional-spire-mentor)。
 - [docs/MOD_AUTHORS.md](docs/MOD_AUTHORS.md)（[中文](docs/MOD_AUTHORS.zh-CN.md)）：Mod 作者向けの入門。例は `examples/spark/`。内部の Python エンジンで小さなサンプルを回し、ゲームのインストールは不要。

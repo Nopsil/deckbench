@@ -208,6 +208,7 @@ Steam에 게임이 설치되어 있는지 확인한 다음, 위에서 설명한 
 
 ## 더 알아보기
 
+- [docs/INDEX.md](docs/INDEX.md): 문서 목록(중국어·영어. 모드 작성 안내에는 간체 중국어 판도 있다).
 - [docs/DEVELOPER.md](docs/DEVELOPER.md): 명령줄 일괄 실행(전체 옵션), 첫 데이터 생성의 내부 원리, 선택 사항인 spire-mentor AI, 구버전 전투 시뮬레이터, 폴더 구조, 테스트(Linux/macOS 명령 포함).
 - 선택 사항인 더 강한 AI: 서드파티 [spire-mentor](https://github.com/tfriedel/spire-mentor)를 직접 빌드하면 공식 패키지에서 `mentor-full` / `mentor-full-ev` 를 고를 수 있습니다 (전투는 MCTS, 전투 밖은 PPO, 기본 캐릭터 5명만. DeckBench 를 다시 빌드할 필요는 없습니다). spire-mentor 는 포함하지 않습니다. Windows 패키지는 `mentor.local.json` 의 `python` 을 `sts2_rs` 를 빌드한 Python 으로 가리키세요. v0.111 새 카드 19장(SIDESTEP 등)을 읽을 때 알려진 문제가 있어 작은 로컬 패치를 둡니다. 동작 확인과 패키징 주의는 [docs/DEVELOPER.md](docs/DEVELOPER.md#可选spire-mentor更强的-ai--optional-spire-mentor).
 - [docs/MOD_AUTHORS.md](docs/MOD_AUTHORS.md) ([中文](docs/MOD_AUTHORS.zh-CN.md)): 모드 작성자 시작 안내. 예제는 `examples/spark/`. 내부 Python 엔진으로 작은 샘플을 돌리며, 게임 설치는 필요 없다.

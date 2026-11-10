@@ -1,6 +1,6 @@
 # mod 作者入门
 
-[← README](../README.md) · [English](MOD_AUTHORS.md) · [格式说明](MODDING.md)
+[← README](../README.md) · [文档索引](INDEX.md) · [English](MOD_AUTHORS.md) · [格式说明](MODDING.md)
 
 这篇是从一份新检出的代码到能读的数字。示例 mod 在 `examples/spark/`，是 sts2sim 的 mod 格式（`sts2sim/modfmt`）写成的原创 YAML。它加了两张牌：**Arc** 和 **Lantern**，再加上整局检查所要求的那一小池（基础牌以外 2 张攻击、2 张技能、1 张能力，并且普通 / 罕见 / 稀有至少各一张）。文件夹里的卡牌文字是为这个示例写的。
 

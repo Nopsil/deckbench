@@ -1,0 +1,34 @@
+# 文档索引 / Documentation index
+
+仓库里的说明都从这里链出去。`docs/` 里多数页是中文和英文写在同一份文件里。mod 作者入门是两份：英文和简体中文。README 有四种语言。
+
+*Every guide in the repository is linked from here. Most pages under `docs/` are Chinese and English in one file. The mod-author guide is two files, English and 简体中文. The README exists in four languages.*
+
+## docs/
+
+| 文档 | 语言 | 内容 |
+| --- | --- | --- |
+| [RELEASE_0.1.5.md](RELEASE_0.1.5.md) | 中文、English | 0.1.5 发布说明，可作 GitHub Release 正文。覆盖已合并的 #4 与 #6–#39 |
+| [MOD_AUTHORS.md](MOD_AUTHORS.md) | English | mod 作者入门。示例 `examples/spark/`（Arc、Lantern）。内部 Python 引擎，不需要游戏安装 |
+| [MOD_AUTHORS.zh-CN.md](MOD_AUTHORS.zh-CN.md) | 简体中文 | 同一份入门的简体中文 |
+| [MODDING.md](MODDING.md) | 中文 + English | YAML mod 的格式：整局，以及旧版战斗模拟器 |
+| [DLL_MODS.md](DLL_MODS.md) | 中文 + English | 把已经写好的游戏 mod DLL 读成 YAML。DLL 不执行 |
+| [SAVE_FORMAT.md](SAVE_FORMAT.md) | 中文 + English | 对局记录的两种 JSON、批量摘要、种子预览 |
+| [MCP.md](MCP.md) | 中文 + English | MCP 对战，以及只读的 `import_save`、`import_history_batch`、`batch_run_summary`、`card_ab`、`explain_fight`、`calibrate` |
+| [PERFORMANCE.md](PERFORMANCE.md) | 中文 + English | `python tools/bench.py` 的样本、场/秒和内部战斗引擎改了什么 |
+| [DEVELOPER.md](DEVELOPER.md) | 中文 + English | 命令行、首次生成、spire-mentor、旧版战斗模拟器、目录、测试、Windows 打包 |
+| [patches/spire-mentor-v0111-cards.patch](patches/spire-mentor-v0111-cards.patch) | — | 打在你自己的 spire-mentor 克隆上的代码补丁。不含游戏文本或数据 |
+
+## 仓库根和界面 / Root and the desktop app
+
+| 文档 | 语言 | 内容 |
+| --- | --- | --- |
+| [CHANGELOG.md](../CHANGELOG.md) | 中文 + English | 更新日志。0.1.5 一节对齐 `main` 上的 #4 与 #6–#39 |
+| [README.md](../README.md) | 中文为主，段落附 English | 安装和使用 |
+| [README.en.md](../README.en.md) | English | 同一份说明的英文 |
+| [README.ja.md](../README.ja.md) | 日本語 | 同一份说明的日文 |
+| [README.ko.md](../README.ko.md) | 한국어 | 同一份说明的韩文 |
+| [CONTRIBUTING.md](../CONTRIBUTING.md) | English + 中文 | 贡献须知。不接受任何游戏内容 |
+| [gui/README.md](../gui/README.md) | 中文 | 桌面界面的开发运行、结构和打包 |
+| [mods/claude_v35/README.md](../mods/claude_v35/README.md) | 中文 | 示例 mod Claude娘 v3.5 接到整局引擎时的说明 |
+| [tests/fixtures/dllmod/README.md](../tests/fixtures/dllmod/README.md) | English | DLL 导入夹具是合成的，不是游戏文件 |

@@ -1,5 +1,7 @@
 # 内部战斗引擎的耗时 / Internal fight-engine timing
 
+[← 返回 README](../README.md) · [文档索引](INDEX.md)
+
 `tools/bench.py` 给内部 Python 战斗引擎计时。不读游戏安装，也不用 `mods/vanilla`。样本有两块：
 
 - **内部对战**：`sts2sim.fightcheck` 里的合成卡组和合成怪物（和固定种子的确定性测试是同一批种子）。启发式默认是 6 个种子 × 3 套牌 × 每套 3 场 = **54 场**。混入窄束搜索是 6 个种子 × 3 套牌 × 1 场 ×（启发式 + 束搜索）= **36 场**。束搜索宽度 3、深度 2。

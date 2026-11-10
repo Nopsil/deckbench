@@ -208,6 +208,7 @@ After installing the .NET 9 SDK, open a **new** PowerShell window, run the `dotn
 
 ## Advanced
 
+- [docs/INDEX.md](docs/INDEX.md): index of the docs (English and Chinese; the mod-author guide also has zh-CN).
 - [docs/DEVELOPER.md](docs/DEVELOPER.md): command-line batch runs (all options), how the first-time data generation works, the optional spire-mentor AI, the legacy combat simulator, folder layout, tests (including Linux/macOS commands).
 - Optional stronger AI: after you build the third-party [spire-mentor](https://github.com/tfriedel/spire-mentor) yourself, the official package can run `mentor-full` / `mentor-full-ev` (MCTS for fights, PPO for out-of-combat choices; base-game characters only) without rebuilding DeckBench. spire-mentor is not shipped with this project. On the Windows package, set `python` in `mentor.local.json` to the interpreter that built `sts2_rs`. It has a known loading problem with 19 new cards from v0.111 (SIDESTEP etc.), and we provide a small local patch. Smoke steps and packaging rules: [docs/DEVELOPER.md](docs/DEVELOPER.md#可选spire-mentor更强的-ai--optional-spire-mentor).
 - [docs/MOD_AUTHORS.md](docs/MOD_AUTHORS.md) ([中文](docs/MOD_AUTHORS.zh-CN.md)): getting started for mod authors. The example is `examples/spark/`. The internal Python engine runs the tiny sample with no game install.
