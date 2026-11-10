@@ -168,14 +168,16 @@ def main():
         return
     if "--game-dir" in argv:   # DeckBench.exe --game-dir "<游戏目录>"：指定非默认位置的安装（之后会记住）
         os.environ["DECKBENCH_GAME_DIR"] = argv[argv.index("--game-dir") + 1]
-    _ensure_game_or_exit()
     port = free_port()
     if "--port" in argv:
         port = int(argv[argv.index("--port") + 1])
     if "--serve" in argv:
+        # 无界面 HTTP。没有本机游戏数据也要能起来，这样打包冒烟可以打到 /api/health。
+        # 需要游戏的接口仍按原来的说明返回。双击和 --browser 仍走下面的检查。
         print(f"http://127.0.0.1:{port}/", flush=True)
         serve(port)
         return
+    _ensure_game_or_exit()
     url = f"http://127.0.0.1:{port}/"
     server = serve(port, block=False)
     use_browser = "--browser" in argv
