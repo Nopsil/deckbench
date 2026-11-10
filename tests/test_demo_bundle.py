@@ -1,4 +1,5 @@
 """内置示例结果包：脚本重新跑模拟生成，导入走普通结果包路径，对比能读。"""
+import io
 import json
 import os
 import subprocess
@@ -123,6 +124,61 @@ def test_load_demo_endpoint_and_mcp_use_the_bundle_import(tmp_path, monkeypatch)
     again = json.loads(load_demo())
     assert again["ok"] is True
     assert all(row["renamed"] for row in again["runs"])
+
+
+def test_second_demo_load_keeps_the_preset_on_reexport(tmp_path, monkeypatch):
+    """载入两次（编号冲突后换新 id）再导出，预设字节还在，对比和 zh-CN 报告也能读。"""
+    pytest.importorskip("fastapi")
+    pytest.importorskip("httpx")
+    from fastapi.testclient import TestClient
+
+    from gui import paths
+    from gui.server import app
+    from sts2sim.runcompare import compare_dirs
+
+    root = tmp_path / "runs"
+    root.mkdir()
+    monkeypatch.setattr(paths, "DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(paths, "RUNS_DIR", str(root))
+    with TestClient(app) as client:
+        first = client.post("/api/demo/load", headers={"x-lang": "en"})
+        assert first.status_code == 200, first.text
+        second = client.post("/api/demo/load", headers={"x-lang": "zh-CN"})
+        assert second.status_code == 200, second.text
+        rows = second.json()["runs"]
+        assert all(row["renamed"] for row in rows)
+        assert {row["original_id"] for row in rows} == {"demo-noengine", "demo-routed"}
+        ids = {row["original_id"]: row["id"] for row in rows}
+        compared = client.get(
+            "/api/runs/compare",
+            headers={"x-lang": "zh-CN"},
+            params={"a": ids["demo-noengine"], "b": ids["demo-routed"]},
+        )
+        assert compared.status_code == 200, compared.text
+        win = compared.json()["cells"][0]["metrics"]["win"]
+        assert win["n_a"] == 30 and win["n_b"] == 30 and win["delta"] not in (None, 0)
+        html = client.get(
+            f"/api/runs/{ids['demo-noengine']}/export.html",
+            params={"lang": "zh-CN"},
+        )
+        assert html.status_code == 200, html.text[:400]
+        assert "charset=utf-8" in html.headers["content-type"]
+        assert '<html lang="zh-CN">' in html.text
+        assert "自包含" in html.text
+        bundled = client.get(
+            f"/api/runs/{ids['demo-noengine']}/bundle",
+            params={"lang": "zh-CN"},
+        )
+        assert bundled.status_code == 200, bundled.text[:400]
+        with zipfile.ZipFile(io.BytesIO(bundled.content)) as archive:
+            packed = archive.read(f"runs/{ids['demo-noengine']}/preset.yaml")
+            report = archive.read("report.html").decode("utf-8")
+        assert packed == _member(SHIPPED, "runs/demo-noengine/preset.yaml")
+        assert '<html lang="zh-CN">' in report and "自包含" in report
+    left = root / ids["demo-noengine"] / "out"
+    right = root / ids["demo-routed"] / "out"
+    again = compare_dirs(str(left), str(right))["cells"][0]["metrics"]["win"]["delta"]
+    assert again == win["delta"]
 
 
 def test_missing_demo_bundle_is_a_sentence(tmp_path, monkeypatch):

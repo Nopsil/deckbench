@@ -2,9 +2,11 @@
 
 变体走原来的战斗测试。卡组 id、遭遇、种子、回合上限不变。不改出牌。
 """
+import io
 import json
 import os
 import time
+import zipfile
 
 import pytest
 
@@ -347,6 +349,75 @@ def test_card_impact_cancel_leaves_a_partial_export(client, allowed, monkeypatch
     assert exported.status_code == 200
     assert "Partial result" in exported.text
     assert (runs / job / "card_impact.json").is_file()
+
+
+def test_cancelled_card_impact_with_workers_still_exports(client, allowed, monkeypatch):
+    """workers>1、合计不超过 400 场时取消：没开打的变体没有 raw.jsonl，整包仍能导出再导入。"""
+    from gui.fightworkers import worker_cap
+
+    monkeypatch.setenv("DECKBENCH_FIGHT_GAP", "0.2")
+    runs = _runs_dir(allowed, monkeypatch)
+    saved = client.post("/api/decks", headers=EN, json=_payload("wimpact", fights=8, turns=1, seed=2))
+    assert saved.status_code == 200, saved.text
+    res = client.post("/api/decks/wimpact/card_impact", headers=EN, json={"workers": 4, "plus": False, "seed": 2})
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["total_fights"] <= 400
+    assert body["workers"] == min(4, worker_cap())
+    assert body["fights"] == 8 and len(body["runs"]) == 3
+    job = body["id"]
+    deadline = time.time() + 60
+    seen = None
+    while time.time() < deadline:
+        seen = client.get(f"/api/runs/{job}/progress", headers=EN).json()
+        if seen.get("done", 0) >= 1 or seen.get("status") not in ("running", "queued"):
+            break
+        time.sleep(0.05)
+    assert seen and seen.get("done", 0) >= 1 and seen.get("done", 0) < seen.get("total", 0), seen
+    cancelled = client.post(f"/api/runs/{job}/cancel", headers=EN)
+    assert cancelled.status_code == 200 and cancelled.json()["ok"] is True
+    final = _wait(client, job)
+    assert final["status"] == "cancelled" and final["partial"] is True
+    assert 1 <= final["done"] < final["total"]
+    present = []
+    missing = []
+    for row in body["runs"]:
+        raw = runs / row["id"] / "out" / "raw.jsonl"
+        if raw.is_file() and raw.stat().st_size:
+            present.append(row["id"])
+        else:
+            missing.append(row["id"])
+    assert present and missing
+    exported = client.get(f"/api/runs/{job}/bundle", headers=EN)
+    assert exported.status_code == 200, exported.text[:400]
+    assert "zip" in exported.headers["content-type"]
+    with zipfile.ZipFile(io.BytesIO(exported.content)) as archive:
+        names = set(archive.namelist())
+        assert f"runs/{job}/card_impact.json" in names
+        for rid in present:
+            packed = archive.read(f"runs/{rid}/raw.jsonl")
+            assert packed == (runs / rid / "out" / "raw.jsonl").read_bytes()
+            assert packed.strip()
+        for rid in missing:
+            assert archive.read(f"runs/{rid}/raw.jsonl") == b""
+        meta = json.loads(archive.read(f"runs/{job}/meta.json"))
+    assert meta["status"] == "cancelled" and meta["partial"] is True
+    imported = client.post(
+        "/api/bundles/import",
+        headers=EN,
+        files={"file": ("impact.deckbench.zip", exported.content, "application/zip")},
+    )
+    assert imported.status_code == 200, imported.text[:500]
+    parent = next(row for row in imported.json()["runs"] if row["kind"] == "card_impact")
+    assert parent["renamed"] is True
+    report = client.get(f"/api/runs/{parent['id']}/card_impact", headers=EN)
+    assert report.status_code == 200, report.text[:400]
+    doc = report.json()
+    assert doc["status"] == "cancelled" and doc["partial"] is True
+    assert doc["total_fights"] == body["total_fights"]
+    html = client.get(f"/api/runs/{parent['id']}/export.html", params={"lang": "zh-CN"})
+    assert html.status_code == 200, html.text[:400]
+    assert '<html lang="zh-CN">' in html.text and "部分结果" in html.text
 
 
 def test_combat_rejects_a_card_that_is_not_in_the_preset(client, allowed, monkeypatch):
