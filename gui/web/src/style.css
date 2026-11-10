@@ -53,6 +53,17 @@ html:lang(ko) body { font-family: "Inter", "Malgun Gothic", "Apple SD Gothic Neo
 .md blockquote { margin: 10px 0; padding: 6px 14px; border-left: 3px solid #D97757; background: rgba(217,119,87,.07); color: #CFCAC2; border-radius: 0 8px 8px 0; }
 .md a { color: #F0A486; }
 
+.notes { line-height: 1.65; font-size: 14px; color: #DAD5CE; }
+.notes h2 { font-size: 18px; margin: 4px 0 12px; color: #F3EFE9; }
+.notes h3 { font-size: 15.5px; margin: 20px 0 8px; color: #F0A486; }
+.notes h4 { font-size: 14px; margin: 14px 0 6px; color: #E4DFD8; }
+.notes p { margin: 0 0 10px; }
+.notes ul { margin: 0 0 12px; padding-left: 1.2em; }
+.notes li { margin: 0 0 8px; }
+.notes code, .wn code { background: #26262B; padding: 1px 6px; border-radius: 5px; font-size: 12.5px; font-family: "JetBrains Mono", "Cascadia Mono", Consolas, monospace; }
+.notes a { color: #F0A486; }
+.notes pre { white-space: pre-wrap; background: #1A1A1E; border: 1px solid #2E2E34; padding: 12px 14px; border-radius: 8px; overflow: auto; font-size: 12.5px; }
+
 .fade-enter-active, .fade-leave-active { transition: opacity .18s ease, transform .18s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(6px); }
 .empty { padding: 60px 20px; text-align: center; color: #77736C; }

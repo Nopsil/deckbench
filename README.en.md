@@ -36,7 +36,9 @@ An unofficial balance-testing tool for Slay the Spire 2 mod authors and players.
 - **Death causes**: see which enemies and which fights kill you most often, so you can quickly spot your deck's weak points.
 - **Single-card A/B**: same seeds, one group with a card added and one without — see directly how much that one card changes the win rate and floors reached.
 - **Test your own mod**: a sample mod is built in (Claude娘, original content), and you can upload your own YAML mod for combat tests.
-- **A desktop app, all on your PC**: pick settings with a few clicks, run with one button, live progress, chart reports and history. Runs stay on your PC and nothing is uploaded. The footer shows the version. **Check for updates** in About stays off until you click it, and then it only asks GitHub Releases.
+- **A desktop app, all on your PC**: pick settings with a few clicks, run with one button, live progress, chart reports and history. Runs stay on your PC and nothing is uploaded. The footer shows the version. **Check for updates** in About stays off until you click it, and then it only asks GitHub Releases. The footer and About also open **What's new** (`#/whatsnew`). Dismissing it is remembered for that version.
+- **Deck head-to-head and card impact**: two saved presets can run the same encounters and open the comparison. One preset can run leave-one-out and show how each card changes win rate, HP lost and turns. The whole run stays within 400 fights.
+- **Progress, cancel and parallel fights**: a long test shows how many fights are done. Cancel happens between fights; the fight already started finishes. Combat batches take `workers`, default 1, capped at the smaller of the CPU count and 8. Each fight keeps its seed.
 - **Four languages**: English, 简体中文, 日本語 and 한국어, switchable in the app; game names (cards, characters, enemies) come from your own install in the same language.
 - **Import a real run**: read a finished run or the in-progress save (seed, route, card picks, relics) without modifying it.
 - **Calibrate a real run against simulations**: for the same seed, character and card-pick path, compare real HP lost in each fight with the simulated distribution. A floor that does not line up is unmatched; a neighbouring fight is not used in its place.
@@ -134,6 +136,7 @@ python tools/import_dll_mod.py "/path/to/Slay the Spire 2/mods/MyMod" --out mods
 - The second line shows the map, encounter queues and opening choices without a full AI run. It needs the data generated from your install. Act 2 and later are projections. GUI: `#/preview`, or `#/preview?seed=`.
 - The last two lines turn a mod already installed in the game (manifest JSON + DLL) into YAML. The DLL is not executed. In the app: **Mod editor → Import game mod**.
 - To screen recording seeds with `mentor-full`: the official package can run it, and does not ship spire-mentor. Put `mentor.local.json` next to the app (`site`, `py`, `python`). `python` is the interpreter that built `sts2_rs`. Do not use a win rate when fallback is about 100%. See [docs/DEVELOPER.md](docs/DEVELOPER.md).
+- Release notes #59–#64: the browser smoke releases the Playwright event loop when that module finishes; two saved decks can run a head-to-head (`#/decks`); a long test shows progress and cancels between fights; leave-one-out card impact; the Windows package stamps the existing `0.1.5` and the update check stays manual; combat batches can set `workers` (default 1).
 
 ## Import a real run
 

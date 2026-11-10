@@ -23,4 +23,5 @@ sim/gui/locales/zhs.json pointer
 sim/gui/locales/ja.json pointer
 sim/gui/locales/ko.json pointer
 app/README.txt pointer
+app/CHANGELOG.md
 app/decompiler/ilspycmd-host.exe
