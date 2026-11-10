@@ -118,6 +118,16 @@ $env:DECKBENCH_GAME_DIR = "D:\SteamLibrary\steamapps\common\Slay the Spire 2"
 
 *Type a seed from the game into "Game seed" in New test → Full runs: the AI plays just that run and records every decision. Lowercase, O and I are normalized like the game does. CLI: `--seed` and `--log-dir`.*
 
+## 看 AI 为什么这么打 / Why the AI played that
+
+默认不记。打开之后，每一次出牌、选目标、喝药水、选奖励和商店都会把当时已经算好的前几名候选（牌或目标、分数、最后选中的那个）写成一行 JSONL，放在这一次输出的旁边。关着的时候走原来的代码，不抽随机数，同一颗种子的结果不变。
+
+- 整局：`python tools/batch.py --explain --out runs.jsonl`（或环境变量 `DECKBENCH_EXPLAIN=1`）→ `runs.explain.jsonl`
+- 旧版战斗实验：`python -m sts2sim experiments/quick.yaml --explain`，或实验 YAML 里 `explain: true` → 报告目录里的 `explain.jsonl`
+- 读一场战斗：`python tools/explain_fight.py runs.explain.jsonl --fight 0`
+
+*Off by default. When on, each card play, target, potion, reward and shop pick appends the top scored candidates and the choice to a JSONL file next to that run's output. Turning it on does not draw random numbers, so a fixed seed plays the same with the flag off or on. Full runs: `python tools/batch.py --explain --out runs.jsonl` (or `DECKBENCH_EXPLAIN=1`) writes `runs.explain.jsonl`. Legacy fight experiments: `--explain` or `explain: true` in the experiment YAML writes `explain.jsonl` beside `raw.jsonl`. Read one fight: `python tools/explain_fight.py runs.explain.jsonl --fight 0`.*
+
 ## 试 0.1.5 的功能 / Try 0.1.5 features
 
 在仓库根目录。发布说明（可直接贴进 GitHub Release）见 [docs/RELEASE_0.1.5.md](docs/RELEASE_0.1.5.md)。

@@ -11,7 +11,8 @@ import os
 import struct
 
 from ..rt.boot import game as G
-from .agents import HeuristicAgent, _name, card_cost, end_turn_hand_damage
+from .. import explain
+from .agents import HeuristicAgent, _name, card_cost, end_turn_hand_damage, explain_view
 from .combat import alive_enemies, legal_actions, execute, cm
 
 _F = struct.Struct("d")
@@ -132,8 +133,23 @@ class SearchAgent(HeuristicAgent):
         return HeuristicAgent.combat_action(self, cs, player, acts)
 
     def combat_action(self, cs, player, acts):
+        with explain.scope():
+            chosen, scored = self._search_action(cs, player, acts)
+            if explain.enabled() and not self._in_child:
+                try:
+                    turn = int(cs.RoundNumber)
+                except Exception:  # noqa
+                    turn = None
+                view = explain_view(chosen, cs)
+                if scored is not None:
+                    explain.publish(explain.from_steps(scored, view, turn=turn))
+                else:
+                    explain.align_action(view)
+            return chosen
+
+    def _search_action(self, cs, player, acts):
         if self._in_child or len(acts) <= 1:
-            return self.rollout_action(cs, player, acts)
+            return self.rollout_action(cs, player, acts), None
         heur = self.rollout_action(cs, player, acts)
         # 候选去重（同名同升级同费用同目标的牌等价）
         seen, cands = set(), []
@@ -148,7 +164,7 @@ class SearchAgent(HeuristicAgent):
                 seen.add(key)
                 cands.append(a)
         if len(cands) <= 1:
-            return cands[0]
+            return cands[0], None
         # 只展开启发式排序前 width 个（药水只在启发式想用时才展开）+ 结束回合 + 启发式首选
         ctx_scores = []
         for a in cands:
@@ -172,13 +188,19 @@ class SearchAgent(HeuristicAgent):
             pool.append(endact)
         base = self._base(cs, player)
         best, bv = heur, None
+        log = explain.enabled() and not self._in_child
+        scored = [] if log else None
         for a in pool:
             v = self._eval_fork(cs, player, a, base)
             if a is heur:
                 v += 0.25      # 平分时偏向启发式首选
+            if log:
+                step = explain_view(a, cs)
+                step["score"] = v
+                scored.append(step)
             if bv is None or v > bv:
                 best, bv = a, v
-        return best
+        return best, scored
 
     def _quick_score(self, a, cs, player):
         pc = player.Creature

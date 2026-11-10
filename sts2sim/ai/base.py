@@ -8,6 +8,7 @@ mod 可以在 hooks.py 里定义 state_value(combat) 给局面加分（例如给
 以及 card_worth(card) 给选牌界面用。
 """
 from ..core import POWER_TYPES
+from .. import explain
 
 RARITY_WORTH = {"基础": 1.0, "普通": 2.0, "罕见": 3.0, "稀有": 4.0, "状态": -10.0, "诅咒": -10.0}
 
@@ -36,6 +37,20 @@ def power_value(C, p, on_player):
 
 ENEMY_BUFF_VALUE = {"SLIPPERY": 4.0, "PLATING": 1.0, "ARTIFACT": 2.0, "THORNS": 1.0, "INTANGIBLE": 8.0, "RITUAL": 3.0,
                     "HARD_TO_KILL": 0.0, "CURL_UP": 0.5, "VIGOR": 1.0}
+
+
+def _step(C, kind, ident, name, target, score, value=None, hand=None):
+    step = {"kind": kind, "id": ident, "name": name, "score": score}
+    if target is not None:
+        try:
+            step["target"] = f"{target.name}#{C.enemies.index(target)}"
+        except ValueError:
+            step["target"] = getattr(target, "name", None)
+    if value is not None:
+        step["value"] = value
+    if hand is not None:
+        step["hand"] = hand
+    return step
 
 
 def resources(C):
@@ -128,6 +143,9 @@ class Agent:
             best, best_s = None, POTION_THRESHOLD + room_bonus
             if danger:
                 best_s = 0.5
+            log = explain.enabled()
+            scored = [] if log else None
+            floor = best_s
             for j, pid in enumerate(C.player.potions):
                 d = POTION_DEFS.get(pid)
                 if d is None:
@@ -138,8 +156,18 @@ class Agent:
                     ti = None if t is None else C.enemies.index(t)
                     sim.use_potion(j, None if ti is None else sim.enemies[ti])
                     sc = score_delta(C, sim, 0) - 1.5
+                    if log:
+                        scored.append(_step(C, "potion", pid, getattr(d, "name", pid), t, sc))
                     if sc > best_s:
                         best, best_s = (j, t), sc
+            if log and scored:
+                chosen = None
+                if best is not None:
+                    j, t = best
+                    pid = C.player.potions[j]
+                    d = POTION_DEFS.get(pid)
+                    chosen = _step(C, "potion", pid, getattr(d, "name", pid) if d else pid, t, best_s)
+                explain.publish(explain.from_steps(scored, chosen, turn=C.turn, threshold=floor))
             if best is not None:
                 C.use_potion(*best)
                 changed = True

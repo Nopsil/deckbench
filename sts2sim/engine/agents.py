@@ -7,6 +7,7 @@ import random
 import sys
 
 from ..rt.boot import game as G
+from .. import explain
 from .combat import alive_enemies
 from .weights import W
 
@@ -19,6 +20,91 @@ def _name(e):
         return e.name
     except AttributeError:
         return str(e)
+
+
+def _cid_up(card):
+    try:
+        return card.Id.Entry + ("+" if getattr(card, "IsUpgraded", False) else "")
+    except Exception:  # noqa
+        return "?"
+
+
+def _explain_target(t, cs=None):
+    if t is None:
+        return None
+    idx = None
+    try:
+        if cs is not None:
+            idx = list(cs.Enemies).index(t)
+    except Exception:  # noqa
+        pass
+    name = "target"
+    try:
+        mon = getattr(t, "Monster", None)
+        if mon is not None:
+            name = mon.Id.Entry
+        else:
+            name = "player"
+    except Exception:  # noqa
+        pass
+    return f"{name}#{idx}" if idx is not None else name
+
+
+def explain_view(a, cs=None):
+    """动作 → 说明日志用的普通 dict。失败时返回结束回合，不把异常抛进决策。"""
+    try:
+        if not a or a[0] == "end":
+            return {"kind": "end", "id": "end_turn"}
+        if a[0] == "play":
+            step = {"kind": "play", "id": _cid_up(a[1]), "name": a[1].Id.Entry}
+            tgt = _explain_target(a[2] if len(a) > 2 else None, cs)
+            if tgt:
+                step["target"] = tgt
+            return step
+        if a[0] == "potion":
+            step = {"kind": "potion", "id": a[1].Id.Entry, "name": a[1].Id.Entry}
+            tgt = _explain_target(a[2] if len(a) > 2 else None, cs)
+            if tgt:
+                step["target"] = tgt
+            return step
+    except Exception:  # noqa
+        pass
+    return {"kind": "end", "id": "end_turn"}
+
+
+def explain_place(agent):
+    if not explain.enabled():
+        return {}
+    run = getattr(agent, "_run", None) or getattr(agent, "_explain_run", None)
+    d = {}
+    try:
+        if run is not None:
+            d["floor"] = int(run.state.TotalFloor)
+            d["act"] = int(run.state.CurrentActIndex) + 1
+    except Exception:  # noqa
+        pass
+    return d
+
+
+def _entry_id(e):
+    if e is None:
+        return None
+    try:
+        cr = getattr(e, "CreationResult", None)
+        if cr is not None and getattr(cr, "Card", None) is not None:
+            return _cid_up(cr.Card)
+    except Exception:  # noqa
+        pass
+    try:
+        model = getattr(e, "Model", None) or getattr(e, "Relic", None) or getattr(e, "Potion", None)
+        if model is not None and getattr(model, "Id", None) is not None:
+            return model.Id.Entry
+    except Exception:  # noqa
+        pass
+    name = type(e).__name__
+    if "Removal" in name:
+        return "CARD_REMOVAL"
+    return name
 
 
 def dvar(card, key):
@@ -143,6 +229,13 @@ class Agent:
 
     def on_run_start(self, player, run):
         self.player = player
+        if explain.enabled():
+            self._explain_run = run
+            try:
+                char = run.character if isinstance(run.character, str) else str(run.character)
+                explain.set_ctx(seed=str(run.seed), char=char, asc=int(run.ascension))
+            except Exception:  # noqa
+                pass
 
     def on_combat_start(self, cs, player, room):
         pass
@@ -212,6 +305,8 @@ class HeuristicAgent(Agent):
     # ---------- 战斗 ----------
     def on_combat_start(self, cs, player, room):
         self.room_kind = _name(room.RoomType)
+        if explain.enabled():
+            explain.update_fight(room=self.room_kind)
 
     @staticmethod
     def _preview(card, target):
@@ -313,23 +408,40 @@ class HeuristicAgent(Agent):
         return s / (cost + 0.5)
 
     def combat_action(self, cs, player, acts):
-        ctx = self._make_ctx(cs, player)
-        hp = player.Creature.CurrentHp
-        best, best_s = acts[-1], 0.0
-        for a in acts:
-            if a[0] == "play":
-                s = self._score_play(a[1], a[2], cs, player, ctx)
-                if s < 0.03:
+        with explain.scope():
+            ctx = self._make_ctx(cs, player)
+            hp = player.Creature.CurrentHp
+            best, best_s = acts[-1], 0.0
+            log = explain.enabled() and not getattr(self, "_in_child", False)
+            steps = [] if log else None
+            for a in acts:
+                if a[0] == "play":
+                    s = self._score_play(a[1], a[2], cs, player, ctx)
+                    if log:
+                        step = explain_view(a, cs)
+                        step["score"] = s
+                        steps.append(step)
+                    if s < 0.03:
+                        continue
+                elif a[0] == "potion":
+                    s = self._score_potion(a[1], a[2], cs, player, ctx["need"], hp)
+                    if log:
+                        step = explain_view(a, cs)
+                        step["score"] = s
+                        steps.append(step)
+                    if s < 0.9:
+                        continue
+                else:
                     continue
-            elif a[0] == "potion":
-                s = self._score_potion(a[1], a[2], cs, player, ctx["need"], hp)
-                if s < 0.9:
-                    continue
-            else:
-                continue
-            if s > best_s:
-                best, best_s = a, s
-        return best
+                if s > best_s:
+                    best, best_s = a, s
+            if log:
+                try:
+                    turn = int(cs.RoundNumber)
+                except Exception:  # noqa
+                    turn = None
+                explain.publish(explain.from_steps(steps, explain_view(best, cs), turn=turn, threshold=0.03, potion_threshold=0.9))
+            return best
 
     def _make_ctx(self, cs, player):
         pc = player.Creature
@@ -379,15 +491,28 @@ class HeuristicAgent(Agent):
         return opts[:n]
 
     def card_reward(self, cards, alternatives):
-        deck = list(self.player.Deck.Cards) if self.player else []
-        best, bv = None, -99.0
-        for r in cards:
-            c = r.Card if hasattr(r, "Card") else r
-            v = self.card_value(c, deck)
-            if v > bv:
-                best, bv = c, v
-        thresh = self.skip_threshold + max(0, len(deck) - 22) * 0.25
-        return best if bv >= thresh - 3.0 else None
+        with explain.scope():
+            deck = list(self.player.Deck.Cards) if self.player else []
+            best, bv = None, -99.0
+            log = explain.enabled()
+            cands = [] if log else None
+            for r in cards:
+                c = r.Card if hasattr(r, "Card") else r
+                v = self.card_value(c, deck)
+                if log:
+                    cands.append({"id": _cid_up(c), "score": round(float(v), 4)})
+                if v > bv:
+                    best, bv = c, v
+            thresh = self.skip_threshold + max(0, len(deck) - 22) * 0.25
+            cut = thresh - 3.0
+            result = best if bv >= cut else None
+            if log:
+                cands.append({"id": "skip", "score": round(float(cut), 4)})
+                chosen = {"id": "skip", "score": round(float(cut), 4)} if result is None else {"id": _cid_up(result), "score": round(float(bv), 4)}
+                rec = {"kind": "reward", "chosen": chosen, "candidates": cands, "threshold": round(float(cut), 4)}
+                rec.update(explain_place(self))
+                explain.publish([rec])
+            return result
 
     # ---------- 地图 ----------
     # 粗略 HP 模型（占最大 HP 比例）：普通怪/精英的期望损失，休息恢复 30%
@@ -454,17 +579,33 @@ class HeuristicAgent(Agent):
     # ---------- 商店 ----------
     def shop(self, inventory, run):
         """返回本次要买的条目（按顺序尝试）。"""
-        buys = []
-        rem = inventory.CardRemovalEntry
-        if rem is not None and rem.IsStocked:
-            buys.append(rem)
-        for e in inventory.RelicEntries:
-            if e.IsStocked:
-                buys.append(e)
-        for e in inventory.CardEntries:
-            if e.IsStocked and e.CreationResult is not None and self.card_value(e.CreationResult.Card) >= 6.0:
-                buys.append(e)
-        return buys
+        with explain.scope():
+            buys = []
+            log = explain.enabled()
+            cands = [] if log else None
+            rem = inventory.CardRemovalEntry
+            if rem is not None and rem.IsStocked:
+                buys.append(rem)
+                if log:
+                    cands.append({"id": "CARD_REMOVAL", "score": 1.0, "cost": int(rem.Cost)})
+            for e in inventory.RelicEntries:
+                if e.IsStocked:
+                    buys.append(e)
+                    if log:
+                        cands.append({"id": _entry_id(e), "score": 1.0, "cost": int(e.Cost)})
+            for e in inventory.CardEntries:
+                if e.IsStocked and e.CreationResult is not None:
+                    v = self.card_value(e.CreationResult.Card)
+                    if log:
+                        cands.append({"id": _cid_up(e.CreationResult.Card), "score": round(float(v), 4), "cost": int(e.Cost)})
+                    if v >= 6.0:
+                        buys.append(e)
+            if log:
+                chosen = [{"id": _entry_id(e)} for e in buys]
+                rec = {"kind": "shop", "chosen": chosen, "candidates": cands, "threshold": 6.0}
+                rec.update(explain_place(self))
+                explain.publish([rec])
+            return buys
 
     def event_option(self, event, options, run):
         p = self.player

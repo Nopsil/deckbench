@@ -76,10 +76,15 @@ def cmd_batch(a):
     akw = {"width": a.width, "depth": a.depth} if a.agent == "search" else {}
     if a.agent.startswith(("strong", "learned", "modai")):
         akw.update(boss_aware=True, boss_search=False)
+    from sts2sim import explain as EX
+    explain_on = EX.requested(getattr(a, "explain", False))
+    if explain_on:
+        os.environ["DECKBENCH_EXPLAIN"] = "1"
     cfg = {"name": a.agent, "kw": akw, "variant": a.variant or None,
            "force": [x for x in a.force.split(",") if x], "replace": [x for x in a.replace.split(",") if x],
            "timeout": a.timeout or (60 if a.agent == "heuristic" else 900), "log_dir": a.log_dir or None,
-           "mods": [os.path.abspath(m) for m in a.mod], "style": batch.check_style(a.style, a.agent)}
+           "mods": [os.path.abspath(m) for m in a.mod], "style": batch.check_style(a.style, a.agent),
+           "explain": explain_on}
     if cfg["mods"]:
         batch._check_mods(cfg["mods"], a.char, cfg["variant"])   # 格式有错：大白话报错并退出（不开子进程）
     T = i18n.t
@@ -115,6 +120,11 @@ def cmd_batch(a):
     order = {s: i for i, (_, _, s) in enumerate(jobs)}
     res.sort(key=lambda r: order.get(r["seed"], 0))
     dt = time.time() - t
+    explain_rows = EX.peel(res, "_explain")
+    if explain_on:
+        path = EX.sibling_path(a.out)
+        EX.write_jsonl(path, explain_rows)
+        print(f"explain: {path}", flush=True)
     with open(a.out, "w", encoding="utf-8") as f:
         for r in res:
             f.write(json.dumps(r, default=str, ensure_ascii=False) + "\n")
@@ -156,6 +166,10 @@ def cmd_combat(a):
         exp["fights"] = a.fights
     for k, v in (exp.get("env") or {}).items():
         os.environ[str(k)] = str(v)
+    from sts2sim import explain as EX
+    explain_on = EX.requested(getattr(a, "explain", False)) or bool(exp.get("explain"))
+    if explain_on:
+        os.environ["DECKBENCH_EXPLAIN"] = "1"
     M = R.get_modset(exp["mods"])
     tasks = R.plan(exp, M, a.fights)
     jobs = a.jobs or os.cpu_count() or 1
@@ -181,11 +195,19 @@ def cmd_combat(a):
     wall = time.time() - t0
     os.makedirs(a.out, exist_ok=True)
     meta = {"exp": exp, "n_tasks": len(tasks), "wall_secs": wall, "jobs": jobs, "approx": allapprox}
+    if explain_on:
+        meta["explain"] = True
+    explain_rows = []
     with open(os.path.join(a.out, "raw.jsonl"), "w", encoding="utf-8") as f:
         for r in results:
             r = dict(r)
             r.pop("log", None)
+            explain_rows.extend(r.pop("explain", []) or [])
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
+    if explain_on:
+        path = os.path.join(a.out, "explain.jsonl")
+        EX.write_jsonl(path, explain_rows)
+        print(f"explain: {path}", flush=True)
     json.dump(meta, open(os.path.join(a.out, "meta.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     print(T("log.makingReport"), flush=True)
     make_report(a.out, M)
@@ -314,6 +336,7 @@ def main(argv=None):
     b.add_argument("--log-dir", default="", help="逐步决策日志目录（每局一个 JSONL）")
     b.add_argument("--mod", action="append", default=[], help="YAML 数据 mod 文件夹（整局），可多次")
     b.add_argument("--style", default="standard", help="打法风格（sts2sim/engine/style.py 的 STYLES）：standard / juggler")
+    b.add_argument("--explain", action="store_true", help="决策说明日志，写在 --out 旁边的 *.explain.jsonl。也认 DECKBENCH_EXPLAIN=1")
     c = sub.add_parser("combat")
     c.add_argument("experiment")
     c.add_argument("--fights", type=int)
@@ -321,6 +344,7 @@ def main(argv=None):
     c.add_argument("--seed", type=int)
     c.add_argument("--agent")
     c.add_argument("--out", required=True)
+    c.add_argument("--explain", action="store_true", help="决策说明日志 explain.jsonl，写在输出目录里。也认 DECKBENCH_EXPLAIN=1 或实验 YAML 的 explain: true")
     sub.add_parser("cards")
     v = sub.add_parser("validate-mod")
     v.add_argument("name")

@@ -43,26 +43,34 @@ class ForcePickAgent:
         setattr(self._inner, k, v)
 
     def card_reward(self, cards, alternatives):
+        from .. import explain
         for want in self._picks:
             for r in cards:
                 if _cid(r) == want:
                     object.__setattr__(self, "forced", self.forced + 1)
                     self._inner.last_reason = f"风格规则：见到 {want} 就拿"
+                    if explain.enabled():
+                        explain.publish([{"kind": "reward", "chosen": {"id": want},
+                                          "candidates": [{"id": _cid(c) or "?"} for c in cards], "note": "force-pick"}])
                     return getattr(r, "Card", r)
         return self._inner.card_reward(cards, alternatives)
 
     def shop(self, inventory, run):
-        buys = list(self._inner.shop(inventory, run) or [])
-        if self._shop:
-            for e in inventory.CardEntries:
-                try:
-                    if e.IsStocked and e.EnoughGold and e.CreationResult is not None and _cid(e.CreationResult) in self._picks:
-                        object.__setattr__(self, "forced", self.forced + 1)
-                        buys = [e] + [b for b in buys if b is not e]
-                        break
-                except Exception:  # noqa
-                    pass
-        return buys
+        from .. import explain
+        with explain.scope():
+            buys = list(self._inner.shop(inventory, run) or [])
+            if self._shop:
+                for e in inventory.CardEntries:
+                    try:
+                        if e.IsStocked and e.EnoughGold and e.CreationResult is not None and _cid(e.CreationResult) in self._picks:
+                            object.__setattr__(self, "forced", self.forced + 1)
+                            buys = [e] + [b for b in buys if b is not e]
+                            break
+                    except Exception:  # noqa
+                        pass
+            if explain.enabled():
+                explain.align_simple("shop", [{"id": _cid(e) or type(e).__name__} for e in buys], note="force-pick")
+            return buys
 
     def _raw_pick(self, c):
         return _cid(c) in self._picks and not getattr(c, "IsUpgraded", False)
@@ -90,8 +98,13 @@ class ForcePickAgent:
         return self._inner.rest_option(options, run)
 
     def combat_action(self, cs, player, acts):
+        from .. import explain
         if self._play_first:
             for a in acts:
                 if a[0] == "play" and _cid(a[1]) in self._picks:
+                    if explain.enabled():
+                        from .agents import explain_view
+                        view = explain_view(a, cs)
+                        explain.publish(explain.from_steps([view], view, note="force-pick"))
                     return a
         return self._inner.combat_action(cs, player, acts)

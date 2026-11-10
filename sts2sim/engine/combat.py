@@ -6,6 +6,7 @@
   ("end",)                  结束回合，走 EndPlayerTurnAction → PlayerCmd.EndTurn → 敌方回合 → 下一回合开始
 """
 from ..rt.boot import game as G
+from .. import explain
 
 MAX_ACTIONS_PER_TURN = 150
 MAX_ROUNDS = 80
@@ -101,6 +102,20 @@ def execute(action, cs, player):
 
 def run_combat(room, player, agent, stats=None):
     """驱动一场已开始（room.Enter 已调用）的战斗直到结束。返回 CombatStats。"""
+    if not explain.enabled():
+        return _run_combat(room, player, agent, stats)
+    ctx = {}
+    try:
+        st = G.RunManager.Instance.State
+        ctx["floor"] = int(st.TotalFloor)
+        ctx["act"] = int(st.CurrentActIndex) + 1
+    except Exception:  # noqa
+        pass
+    with explain.fight(**ctx):
+        return _run_combat(room, player, agent, stats)
+
+
+def _run_combat(room, player, agent, stats=None):
     st = stats or CombatStats()
     cs = room.CombatState
     st.hp_before = player.Creature.CurrentHp

@@ -110,6 +110,14 @@ Linux/macOS는 [docs/DEVELOPER.md](docs/DEVELOPER.md)를 참고하세요.
 「새 테스트 → 풀런 일괄」에서 **「게임 시드 지정」** 칸에 게임에 표시되는 시드(예: `7F3K9Q2ZB8MA`)를 넣으면, AI가 그 한 판만 플레이하면서 매 단계 무엇을 골랐는지 기록합니다. 기록은 결과 페이지에서 볼 수 있습니다.
 소문자, 알파벳 O와 I는 게임 규칙대로 자동으로 대문자, 숫자 0과 1로 바뀝니다. 명령줄: `python tools/batch.py --char Silent --seed 7F3K9Q2ZB8MA --log-dir steps`.
 
+## AI가 왜 그 수를 뒀는지
+
+기본은 꺼져 있습니다. 켜면 카드를 낼 때, 대상을 고를 때, 물약을 쓸 때, 보상과 상점에서 고를 때마다 이미 계산된 상위 후보(점수와 고른 것)를 그 실행 출력 옆의 JSONL에 한 줄씩 적습니다. 꺼져 있으면 예전 경로 그대로입니다. 난수를 새로 뽑지 않아서, 같은 시드는 플래그를 켜도 꺼도 결과가 같습니다.
+
+- 풀런: `python tools/batch.py --explain --out runs.jsonl` (또는 환경 변수 `DECKBENCH_EXPLAIN=1`) → `runs.explain.jsonl`
+- 옛 전투 실험: `python -m sts2sim experiments/quick.yaml --explain`, 또는 실험 YAML의 `explain: true` → 보고서 디렉터리의 `explain.jsonl`
+- 전투 하나 읽기: `python tools/explain_fight.py runs.explain.jsonl --fight 0`
+
 ## 0.1.5 기능 써 보기 / Try 0.1.5 features
 
 저장소 루트에서 실행합니다. 릴리스 노트는 [docs/RELEASE_0.1.5.md](docs/RELEASE_0.1.5.md)입니다 (중국어·영어. GitHub Release 본문으로 그대로 쓸 수 있습니다).

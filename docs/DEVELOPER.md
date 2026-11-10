@@ -89,6 +89,7 @@ PYTHONPATH=. .venv/bin/python tools/batch.py --char Claude --asc 10 --n 100 --ag
 | `--boss-sims` / `--elite-sims` | 同 `--sims`（`mentor-full-ev` 为 4000） | `mentor-*` 首领 / 精英战每步的模拟次数 |
 | `--seed` | 空 | 真游戏种子（逗号分隔可多个；按游戏规则转大写、O→0、I→1）；给了就忽略 `--n/--start` |
 | `--log-dir` | 空 | 每局一个逐步决策日志 JSONL（`<角色>_A<进阶>_<种子>.jsonl`） |
+| `--explain` | 关 | 出牌、目标、药水、奖励、商店的候选分数。写到 `--out` 旁边的 `*.explain.jsonl`（没给 `--out` 就写当前目录的 `explain.jsonl`）。环境变量 `DECKBENCH_EXPLAIN=1` 同样打开。不抽随机数，同一颗种子开关结果相同。一场战斗的可读文本：`python tools/explain_fight.py <日志> --fight 0` |
 | `--style` | `standard` | 打法风格：`standard`（标准，不加规则）、`juggler`（杂耍流：优先拿杂耍 JUGGLING，偏好多段攻击和反直觉的组合；要 `strong` / `learned` / `planner` / `imitation` / `modai` / `mentor` 系 AI）。`tools/ab_card.py` 也有 `--style` |
 | `--force-pick` / `--force-pick-first` | 空 | 见到这些牌就拿；战斗里先打 |
 | `--width` / `--depth` | `6` / `1` | `search` AI 的搜索宽度/深度 |
@@ -245,8 +246,9 @@ spire-mentor 已经实现了这些牌，但 `state_from_dict` 查牌 id 时只�
 .venv\Scripts\python -m sts2sim experiments\quick.yaml
 ```
 
-参数：`--fights`（每格场数）、`--jobs`（并行进程）、`--seed`、`--agent`（`heuristic` / `beam`）、`--out`（输出目录，默认 `reports/<实验名>/`）。
-输出：`report.md`（中文报告）、`cells.csv`、`cards.csv`、`encounters.csv`、`coverage_*.csv`、`raw.jsonl`、`meta.json`。
+参数：`--fights`（每格场数）、`--jobs`（并行进程）、`--seed`、`--agent`（`heuristic` / `beam`）、`--out`（输出目录，默认 `reports/<实验名>/`）、`--explain`（出牌 / 目标 / 药水的候选分数，写到该目录的 `explain.jsonl`；实验 YAML 也可以写 `explain: true`，或设 `DECKBENCH_EXPLAIN=1`。关闭时不组装候选。同一颗种子，开和关的战斗结果相同）。
+输出：`report.md`（中文报告）、`cells.csv`、`cards.csv`、`encounters.csv`、`coverage_*.csv`、`raw.jsonl`、`meta.json`，打开说明日志时还有 `explain.jsonl`。一场战斗的 Markdown：`python tools/explain_fight.py <目录>/explain.jsonl --fight 0`。
+*`--explain` (or `explain: true`, or `DECKBENCH_EXPLAIN=1`) writes `explain.jsonl` next to `raw.jsonl`. It stays off unless you ask, and a fixed seed matches with the flag on or off. `python tools/explain_fight.py <dir>/explain.jsonl --fight 0` renders one fight.*
 同一个种子、同样的参数 → 完全相同的结果（与并行数无关）。
 
 ### 敌人数据从哪来 / Where enemy behaviour comes from

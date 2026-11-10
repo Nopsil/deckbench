@@ -80,11 +80,18 @@ class JugglerMixin:
         return super().marginal(card, deck, act)
 
     def card_reward(self, cards, alternatives):
+        from .. import explain
+        with explain.scope():
+            return self._juggler_card_reward(cards, alternatives, explain)
+
+    def _juggler_card_reward(self, cards, alternatives, explain):
         cs = [getattr(x, "Card", x) for x in cards]
         for c in cs:
             if c.Id.Entry == STAR:              # 覆盖 PPO：见JUGGLING就拿
                 self.forced = getattr(self, "forced", 0) + 1
                 self.last_reason = "JUGGLING永远不嫌多"
+                if explain.enabled():
+                    explain.publish([{"kind": "reward", "chosen": {"id": STAR}, "candidates": [{"id": _id(x) or STAR} for x in cs], "note": "style"}])
                 return c
         r = super().card_reward(cards, alternatives)
         if hasattr(self, "_ppo"):
@@ -95,6 +102,9 @@ class JugglerMixin:
                 if boost:
                     r = max(boost, key=lambda c: BOOST[c.Id.Entry])
                     self.last_reason = "攻击优先：JUGGLING 组件"
+        if explain.enabled():
+            cid = "skip" if r is None else (_id(r) or "?")
+            explain.align_simple("reward", {"id": cid}, note="style" if r is not None and getattr(r, "Id", None) is not None and r.Id.Entry in BOOST else None)
         return r
 
     def select_cards(self, options, min_sel, max_sel):
@@ -122,23 +132,28 @@ class JugglerMixin:
 
     # ---- 商店 / 遗物 ----
     def shop(self, inventory, run):
-        buys = list(super().shop(inventory, run) or [])
-        front = []
-        for e in inventory.CardEntries:
-            try:
-                if e.IsStocked and getattr(e, "EnoughGold", True) and e.CreationResult is not None and _id(e.CreationResult) == STAR:
-                    front.append(e)
-                    self.forced = getattr(self, "forced", 0) + 1
-                    break
-            except Exception:  # noqa
-                pass
-        for e in inventory.RelicEntries:
-            try:
-                if e.IsStocked and getattr(e, "EnoughGold", True) and _id(e) in RELICS:
-                    front.append(e)
-            except Exception:  # noqa
-                pass
-        return front + [b for b in buys if all(b is not f for f in front)]
+        from .. import explain
+        with explain.scope():
+            buys = list(super().shop(inventory, run) or [])
+            front = []
+            for e in inventory.CardEntries:
+                try:
+                    if e.IsStocked and getattr(e, "EnoughGold", True) and e.CreationResult is not None and _id(e.CreationResult) == STAR:
+                        front.append(e)
+                        self.forced = getattr(self, "forced", 0) + 1
+                        break
+                except Exception:  # noqa
+                    pass
+            for e in inventory.RelicEntries:
+                try:
+                    if e.IsStocked and getattr(e, "EnoughGold", True) and _id(e) in RELICS:
+                        front.append(e)
+                except Exception:  # noqa
+                    pass
+            out = front + [b for b in buys if all(b is not f for f in front)]
+            if explain.enabled():
+                explain.align_simple("shop", [{"id": _id(e) or type(e).__name__} for e in out], note="style" if front else None)
+            return out
 
     def treasure_relic(self, relics, run):
         for i, r in enumerate(relics or []):
@@ -172,6 +187,15 @@ class JugglerMixin:
         return 0
 
     def combat_action(self, cs, player, acts):
+        from .. import explain
+        from .agents import explain_view
+        with explain.scope():
+            a = self._juggler_combat(cs, player, acts)
+            if explain.enabled() and a is not None:
+                explain.align_action(explain_view(a, cs), note="style")
+            return a
+
+    def _juggler_combat(self, cs, player, acts):
         rnd = getattr(cs, "RoundNumber", None)
         key, n_atk = getattr(self, "_jt", (None, 0))
         if key != rnd:
