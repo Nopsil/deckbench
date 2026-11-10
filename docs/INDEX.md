@@ -16,9 +16,9 @@
 | [SAVE_FORMAT.md](SAVE_FORMAT.md) | 中文 + English | 对局记录的两种 JSON、批量摘要、种子预览 |
 | [CALIBRATION.md](CALIBRATION.md) | 中文 + English | 真对局对照同一条选牌路径上的模拟掉血：匹配规则、百分位、界面和 HTTP、MCP，以及缺口分诊（`tools/gap_triage.py`、`POST /api/gap_triage`、校准页） |
 | [COMPARE.md](COMPARE.md) | 中文 + English | 两次已完成的战斗实验：格子胜率、超时、回合、掉血、每回合输出，以及单卡使用和效率。`GET /api/runs/compare`、MCP `compare_runs`、界面 `#/compare` |
-| [DECKS.md](DECKS.md) | 中文 + English | 组牌页：搜索模拟器牌池，勾选遭遇或一场连战（例如第 1 幕全部精英），保存成和 `experiments/*.yaml` 一样的用户预设。没选遭遇时仍是一场训练木桩。两份预设可以对打（同一份遭遇、同一颗种子），打完打开 `#/compare`。`GET /api/cards`、`GET /api/encounters`、`POST /api/decks`、`POST /api/decks/head_to_head`、MCP `list_cards` / `list_encounters` / `save_deck` / `head_to_head`、界面 `#/decks` |
+| [DECKS.md](DECKS.md) | 中文 + English | 组牌页：搜索模拟器牌池，勾选遭遇或一场连战（例如第 1 幕全部精英），保存成和 `experiments/*.yaml` 一样的用户预设。没选遭遇时仍是一场训练木桩。两份预设可以对打（同一份遭遇、同一颗种子）。长测试有进度和取消，部分结果可以对比和导出。`GET /api/cards`、`GET /api/encounters`、`POST /api/decks`、`POST /api/decks/head_to_head`、`GET /api/runs/<id>/progress`、MCP `list_cards` / `list_encounters` / `save_deck` / `head_to_head` / `run_progress` / `cancel_run`、界面 `#/decks` |
 | [EXPORT.md](EXPORT.md) | 中文 + English | 把已完成的测试、可选的战斗对比、可选的校准 / 缺口分诊写成一份离线 HTML。`GET /api/runs/<id>/export.html`、`GET /api/runs/compare/export.html`、MCP `export_report`、`python -m tools.export_report` |
-| [MCP.md](MCP.md) | 中文 + English | MCP 对战，以及 `import_save`、`import_history_batch`、`batch_run_summary`、`card_ab`、`compare_runs`、`explain_fight`、`calibrate`、`gap_triage`、`export_report`、`list_cards`、`list_encounters`、`save_deck`、`head_to_head` |
+| [MCP.md](MCP.md) | 中文 + English | MCP 对战，以及 `import_save`、`import_history_batch`、`batch_run_summary`、`card_ab`、`compare_runs`、`explain_fight`、`calibrate`、`gap_triage`、`export_report`、`list_cards`、`list_encounters`、`save_deck`、`head_to_head`、`run_progress`、`cancel_run` |
 | [PERFORMANCE.md](PERFORMANCE.md) | 中文 + English | `python tools/bench.py` 的样本、场/秒和内部战斗引擎改了什么 |
 | [COVERAGE.md](COVERAGE.md) | 中文 + English | 补测试那一次的语句覆盖率快照，以及当时修的五处边界 |
 | [CI.md](CI.md) | 中文 + English | GitHub Actions：Ubuntu / Windows、Python 3.11 与 3.12、pytest-cov 作业摘要、ruff 0.17.4；Ubuntu 上单独的 Playwright 界面冒烟；Windows 安装包工作流、接口冒烟，以及响应的 `charset=utf-8` |

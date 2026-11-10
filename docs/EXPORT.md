@@ -40,11 +40,11 @@
 
 响应是 `Content-Type: text/html; charset=utf-8`，并带 `Content-Disposition` 文件名（`deckbench-run-….html` 或 `deckbench-compare-….html`）。
 
-未知 id 是 404。还没跑完是 409。对比的未知 id、同一个 id、重复或类型不对的参数是 400。校准路径在允许目录外、符号链接跳出去、超过 32MB、坏 JSON、不是校准也不是分诊，都是 400。正文是一句说明，没有堆栈。
+未知 id 是 404。还在跑是 409。已经取消、并且结果文件还在的测试可以导出，页面上写明是部分结果（`partial`）。没有结果文件是 404。对比的未知 id、同一个 id、重复或类型不对的参数是 400。校准路径在允许目录外、符号链接跳出去、超过 32MB、坏 JSON、不是校准也不是分诊，都是 400。正文是一句说明，没有堆栈。
 
 *The response is `Content-Type: text/html; charset=utf-8`, with a `Content-Disposition` filename (`deckbench-run-….html` or `deckbench-compare-….html`).*
 
-*An unknown id is 404. A test that is not finished is 409. For a comparison, an unknown id, the same id twice, or a repeated or wrong-typed parameter is 400. A calibration path outside an allowed folder, a symlink that escapes, a file over 32MB, broken JSON, or a file that is neither a calibration nor a triage is 400. The body is one sentence and has no stack trace.*
+*An unknown id is 404. A test that is still running is 409. A cancelled test whose result files are still there can be exported, and the page says the result is partial. No result file is 404. For a comparison, an unknown id, the same id twice, or a repeated or wrong-typed parameter is 400. A calibration path outside an allowed folder, a symlink that escapes, a file over 32MB, broken JSON, or a file that is neither a calibration nor a triage is 400. The body is one sentence and has no stack trace.*
 
 ## 命令行 / Command line
 

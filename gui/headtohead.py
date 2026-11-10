@@ -5,11 +5,9 @@
 """
 from sts2sim.deckpresets import DeckPresetError, head_to_head_plan
 
-WAIT_SECS = 900
-
 
 def run_pair(payload):
-    """校验后开两场战斗测试，两场都结束后返回它们的 id。"""
+    """校验后开两场战斗测试，马上返回它们的 id。页面再轮询进度。"""
     plan = head_to_head_plan(payload)
     from gui import i18n
     from gui.server import jobs
@@ -34,18 +32,15 @@ def run_pair(payload):
     except ValueError as exc:
         jobs.cancel(meta_a["id"])
         raise DeckPresetError("preset") from exc
-    done_a = jobs.wait(meta_a["id"], WAIT_SECS)
-    done_b = jobs.wait(meta_b["id"], WAIT_SECS)
-    if not done_a or done_a.get("status") != "done" or not done_b or done_b.get("status") != "done":
-        raise DeckPresetError("head_to_head")
     return {
         "ok": True,
-        "a": done_a["id"],
-        "b": done_b["id"],
+        "a": meta_a["id"],
+        "b": meta_b["id"],
+        "status": "running",
         "seed": plan["seed"],
         "max_turns": plan["max_turns"],
         "agent": plan["agent"],
         "encounters": [row["id"] for row in plan["encounters"]],
         "fights": plan["fights"],
-        "compare": "/#/compare?a=" + done_a["id"] + "&b=" + done_b["id"],
+        "compare": "/#/compare?a=" + meta_a["id"] + "&b=" + meta_b["id"],
     }

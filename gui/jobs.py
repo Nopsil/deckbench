@@ -39,6 +39,60 @@ def _now():
     return _dt.datetime.now().astimezone().isoformat(timespec="seconds")
 
 
+CANCEL_NAME = "cancel.request"
+
+
+def cancel_path(run_dir):
+    return os.path.join(run_dir, CANCEL_NAME)
+
+
+def cancel_requested(run_dir):
+    return bool(run_dir) and os.path.isfile(cancel_path(run_dir))
+
+
+def _elapsed(meta, now):
+    status = meta.get("status")
+    if status in ("running", "queued"):
+        started = meta.get("started_ts")
+        if isinstance(started, (int, float)) and not isinstance(started, bool):
+            return round(max(0.0, now - float(started)), 3)
+        return None
+    secs = meta.get("secs")
+    if isinstance(secs, (int, float)) and not isinstance(secs, bool):
+        return round(max(0.0, float(secs)), 3)
+    return None
+
+
+def progress_view(meta, *, cancel_requested=False, now=None):
+    """一次测试的进度。elapsed 用开始时间现算，不靠工人进程每秒回写。"""
+    if not isinstance(meta, dict):
+        return None
+    prog = meta.get("progress") if isinstance(meta.get("progress"), dict) else {}
+    try:
+        done = int(prog.get("done") or 0)
+    except (TypeError, ValueError):
+        done = 0
+    try:
+        total = int(prog.get("total") or 0)
+    except (TypeError, ValueError):
+        total = 0
+    status = meta.get("status") or ""
+    partial = bool(meta.get("partial")) or status == "cancelled"
+    moment = time.time() if now is None else now
+    return {
+        "id": meta.get("id"),
+        "kind": meta.get("kind"),
+        "status": status,
+        "done": done,
+        "total": total,
+        "encounter": str(prog.get("encounter") or ""),
+        "encounter_name": str(prog.get("encounter_name") or ""),
+        "elapsed": _elapsed(meta, moment),
+        "partial": partial,
+        "cancel_requested": bool(cancel_requested) and status in ("running", "queued"),
+    }
+
+
 class Job:
     def __init__(self, meta, run_dir):
         self.meta = meta
@@ -156,6 +210,7 @@ class JobManager:
         lang = lang if lang in i18n.LANGS else i18n.current()
         env = dict(env)
         env["DECKBENCH_LANG"] = lang      # 工作进程的日志用开始运行时的界面语言
+        env["DECKBENCH_CANCEL_FILE"] = cancel_path(d)
         meta["lang"] = lang
         meta["argv"] = argv
         j.save()
@@ -192,9 +247,20 @@ class JobManager:
                 if m:
                     try:
                         p = json.loads(m.group(1))
-                        j.meta["progress"] = {"done": p["done"], "total": p["total"]}
-                    except Exception:
-                        pass
+                        prog = {
+                            "done": int(p["done"]),
+                            "total": int(p["total"]),
+                            "encounter": str(p.get("encounter") or ""),
+                            "encounter_name": str(p.get("encounter_name") or ""),
+                        }
+                    except (TypeError, ValueError, KeyError, json.JSONDecodeError):
+                        prog = None
+                    if prog is not None:
+                        with j.lock:
+                            if j.cancelled or cancel_requested(j.dir):
+                                prog["cancel_requested"] = True
+                            j.meta["progress"] = prog
+                            j.save()
                     continue
                 if DONE.match(line):
                     continue
@@ -209,33 +275,92 @@ class JobManager:
                 j.lines.append(i18n.t("jobs.startFailed", j.meta.get("lang"), err=e))
             logf.write(i18n.t("jobs.startFailed", j.meta.get("lang"), err=e) + "\n")
         logf.close()
-        j.meta["finished"] = _now()
-        j.meta["secs"] = time.time() - j.meta["started_ts"]
-        if j.cancelled:
-            j.meta["status"] = "cancelled"
-            msg = i18n.t("jobs.cancelled", j.meta.get("lang"), done=j.meta.get("progress", {}).get("done", 0),
-                         total=j.meta.get("progress", {}).get("total", "?"))
-            with j.lock:
-                j.lines.append(msg)
-            with open(os.path.join(j.dir, "run.log"), "a", encoding="utf-8") as f:
-                f.write(msg + "\n")
-        elif rc == 0:
-            j.meta["status"] = "done"
+        stopped = cancel_requested(j.dir)
+        summary = None
+        summary_error = None
+        with j.lock:
+            stopped = bool(j.cancelled or stopped)
+            kind = j.meta.get("kind")
+            run_dir = j.dir
+        if stopped or rc == 0:
             try:
-                s = self.backend.summarize(j.meta["kind"], j.dir)
-                j.meta["headline"] = _headline(j.meta["kind"], s)
-            except Exception as e:  # noqa
-                j.meta["headline"] = {"error": str(e)}
-        else:
-            j.meta["status"] = "failed"
-            j.meta["error"] = "\n".join(j.lines[-15:])
-        j.save()
+                summary = self.backend.summarize(kind, run_dir)
+            except Exception as exc:  # noqa: BLE001
+                summary_error = str(exc)
+        with j.lock:
+            j.meta["finished"] = _now()
+            j.meta["secs"] = time.time() - j.meta["started_ts"]
+            if stopped:
+                j.meta["status"] = "cancelled"
+                j.meta["partial"] = True
+                if summary_error:
+                    j.meta["headline"] = {"error": summary_error, "partial": True}
+                else:
+                    j.meta["headline"] = _headline(j.meta["kind"], summary)
+                    j.meta["headline"]["partial"] = True
+                msg = i18n.t("jobs.cancelled", j.meta.get("lang"), done=j.meta.get("progress", {}).get("done", 0),
+                             total=j.meta.get("progress", {}).get("total", "?"))
+                j.lines.append(msg)
+                with open(os.path.join(j.dir, "run.log"), "a", encoding="utf-8") as handle:
+                    handle.write(msg + "\n")
+            elif rc == 0:
+                j.meta["status"] = "done"
+                j.meta["partial"] = False
+                if summary_error:
+                    j.meta["headline"] = {"error": summary_error}
+                else:
+                    j.meta["headline"] = _headline(j.meta["kind"], summary)
+            else:
+                j.meta["status"] = "failed"
+                j.meta["error"] = "\n".join(j.lines[-15:])
+            j.save()
+
+    def progress(self, rid):
+        if not isinstance(rid, str) or not rid:
+            return None
+        j = self.jobs.get(rid)
+        if j is not None:
+            with j.lock:
+                requested = bool(j.cancelled) or cancel_requested(j.dir)
+                return progress_view(j.meta, cancel_requested=requested)
+        meta = self.get(rid)
+        if not isinstance(meta, dict):
+            return None
+        child = self.run_dir(rid)
+        requested = cancel_requested(child) if child else False
+        prog = meta.get("progress") if isinstance(meta.get("progress"), dict) else {}
+        return progress_view(meta, cancel_requested=requested or bool(prog.get("cancel_requested")))
 
     def cancel(self, rid):
-        j = self.jobs.get(rid)
-        if not j or not j.proc or j.proc.poll() is not None:
+        """让工人在两场之间停下。不杀进程，已经打完的场次会写下来。"""
+        if not isinstance(rid, str) or not rid:
             return False
-        j.cancelled = True
+        j = self.jobs.get(rid)
+        meta = None
+        if j is not None:
+            with j.lock:
+                meta = j.meta
+        else:
+            meta = self.get(rid)
+        if not isinstance(meta, dict) or meta.get("status") not in ("running", "queued"):
+            return False
+        folder = j.dir if j is not None else self.run_dir(rid)
+        if not folder:
+            return False
+        with open(cancel_path(folder), "w", encoding="utf-8") as handle:
+            handle.write("1\n")
+        if j is not None:
+            with j.lock:
+                j.cancelled = True
+                prog = dict(j.meta.get("progress") or {})
+                prog["cancel_requested"] = True
+                j.meta["progress"] = prog
+                j.save()
+        return True
+
+    def _kill(self, j):
+        if not j.proc or j.proc.poll() is not None:
+            return
         try:
             if os.name == "nt":
                 subprocess.run(["taskkill", "/T", "/F", "/PID", str(j.proc.pid)], capture_output=True,
@@ -244,12 +369,12 @@ class JobManager:
                 os.killpg(j.proc.pid, signal.SIGTERM)
         except Exception:
             j.proc.kill()
-        return True
 
     def shutdown(self):
-        for rid, j in list(self.jobs.items()):
+        for _rid, j in list(self.jobs.items()):
             if j.proc and j.proc.poll() is None:
-                self.cancel(rid)
+                self.cancel(j.meta.get("id"))
+                self._kill(j)
 
 
 def _headline(kind, s):

@@ -199,6 +199,7 @@
             <template #icon><n-icon :component="PlayerPlay" /></template>{{ t('nt.start') }}
           </n-button>
           <div class="hint" style="text-align:center">{{ t('nt.startHint') }}</div>
+          <run-progress v-if="liveId" :run-id="liveId" @settle="onLive" />
         </div>
       </div>
     </div>
@@ -212,6 +213,7 @@ import { NButton, NCheckbox, NCheckboxGroup, NIcon, NInput, NInputNumber, NPopco
 import { Route, Bolt as Swords, PlayerPlay, Package } from '@vicons/tabler'
 import CardPicker from '../components/CardPicker.vue'
 import EncounterPicker from '../components/EncounterPicker.vue'
+import RunProgress from '../components/RunProgress.vue'
 import { api, store, runTitle } from '../api'
 import { t, tr, joinList } from '../i18n'
 
@@ -222,6 +224,8 @@ const cat = computed(() => store.catalog)
 const kind = ref(localStorage.getItem('nt.kind') || 'batch')
 const title = ref('')
 const starting = ref(false)
+const liveId = ref('')
+const liveStatus = ref('')
 const uploading = ref(false)
 const saved = JSON.parse(localStorage.getItem('nt.form') || '{}')
 const b = reactive({ char: 'Ironclad', asc: 0, n: 100, start: 0, procs: 4, agent: 'heuristic', style: 'standard', variants: [], force: [], replace: [], gameSeed: '', ...(saved.b || {}) })
@@ -292,7 +296,10 @@ const styleBad = computed(() => {
   const st = ((cat.value && cat.value.styles) || []).find((x) => x.id === b.style)
   return st && !styleOk(st, b.agent) ? joinList(st.agents) : ''
 })
-const canStart = computed(() => kind.value === 'batch' ? b.n > 0 && !styleBad.value : (c.source === 'preset' ? !!c.preset : c.decks.length > 0 && (c.encounters.length > 0 || c.rooms.length > 0)))
+const canStart = computed(() => {
+  if (liveStatus.value === 'running' || liveStatus.value === 'queued') return false
+  return kind.value === 'batch' ? b.n > 0 && !styleBad.value : (c.source === 'preset' ? !!c.preset : c.decks.length > 0 && (c.encounters.length > 0 || c.rooms.length > 0))
+})
 
 async function start() {
   starting.value = true
@@ -305,9 +312,14 @@ async function start() {
       if (c.encounters.length) params.encounters = c.encounters.map((row) => ({ id: row.id, fights: Number(row.fights) || 1 }))
     }
     const m = await api.post('/api/runs', { kind: kind.value, params, title: title.value || autoTitle.value })
+    liveStatus.value = 'running'
+    liveId.value = m.id
     store.loadRuns()
-    router.push('/run/' + m.id)
   } catch (e) { msg.error(e.message) } finally { starting.value = false }
+}
+function onLive(view) {
+  liveStatus.value = view.status || ''
+  if (view.status === 'done' && view.id) router.push('/run/' + view.id)
 }
 async function upload({ file, onFinish, onError }) {
   uploading.value = true

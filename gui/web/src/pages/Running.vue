@@ -31,15 +31,23 @@
             </n-popconfirm>
             <template v-else>
               <n-button secondary @click="rerun"><template #icon><n-icon :component="Refresh" /></template>{{ t('common.rerun') }}</n-button>
-              <n-button v-if="status === 'done'" secondary tag="a" download data-action="export" :href="exportHref"><template #icon><n-icon :component="FileExport" /></template>{{ t('export.button') }}</n-button>
-              <n-button v-if="status === 'done'" type="primary" @click="$router.push('/report/' + id)"><template #icon><n-icon :component="ChartBar" /></template>{{ t('run.viewReport') }}</n-button>
+              <n-button v-if="settled" secondary tag="a" download data-action="export" :href="exportHref"><template #icon><n-icon :component="FileExport" /></template>{{ t('export.button') }}</n-button>
+              <n-button v-if="settled" type="primary" @click="$router.push('/report/' + id)"><template #icon><n-icon :component="ChartBar" /></template>{{ t('run.viewReport') }}</n-button>
             </template>
           </div>
         </div>
-        <div class="prog">
+        <div class="prog" data-progress :data-status="status" :data-partial="partial ? '1' : '0'">
           <div class="track"><div class="fill" :class="status" :style="{ width: pct * 100 + '%' }"><div v-if="status === 'running'" class="shine"></div></div></div>
           <div class="pv">{{ Math.floor(pct * 100) }}%</div>
         </div>
+        <div class="enc">
+          <span class="faint">{{ t('run.encounter') }}</span>
+          <b data-progress-encounter :data-encounter="prog.encounter || ''">{{ prog.encounter_name || prog.encounter || '—' }}</b>
+          <span class="sr-only" data-progress-done>{{ prog.done }}</span>
+          <span class="sr-only" data-progress-total>{{ prog.total }}</span>
+        </div>
+        <div v-if="partial" class="hint" data-partial>{{ t('run.partialHint') }}</div>
+        <div v-else-if="prog.cancel_requested && status === 'running'" class="hint">{{ t('run.stopping') }}</div>
         <div class="grid g4" style="margin-top:18px">
           <stat :label="meta.kind === 'batch' ? t('run.doneRuns') : t('run.doneFights')" :value="`${prog.done} / ${prog.total || '—'}`" />
           <stat :label="t('common.elapsed')" :value="fmt.secs(elapsed)" />
@@ -85,7 +93,9 @@ let es = null
 let tick = null
 let firstProg = null
 
-const pct = computed(() => (prog.value.total ? prog.value.done / prog.value.total : status.value === 'done' ? 1 : 0))
+const pct = computed(() => (prog.value.total ? prog.value.done / prog.value.total : (status.value === 'done' || status.value === 'cancelled') ? 1 : 0))
+const settled = computed(() => status.value === 'done' || status.value === 'cancelled')
+const partial = computed(() => status.value === 'cancelled' || !!(meta.value && meta.value.partial) || !!prog.value.partial)
 const elapsed = computed(() => {
   if (!meta.value) return null
   if (meta.value.secs && status.value !== 'running') return meta.value.secs
@@ -97,7 +107,7 @@ const eta = computed(() => {
   return (prog.value.total - prog.value.done) / speed.value
 })
 const exportHref = computed(() => {
-  if (!id.value || status.value !== 'done') return undefined
+  if (!id.value || !settled.value) return undefined
   const q = new URLSearchParams({ lang: lang.value })
   return `/api/runs/${encodeURIComponent(id.value)}/export.html?` + q.toString()
 })
@@ -161,6 +171,9 @@ onUnmounted(() => { close(); clearInterval(tick) })
 
 <style scoped>
 .head .ht { font-size: 20px; font-weight: 700; margin: 10px 0 10px; }
+.enc { display: flex; justify-content: space-between; gap: 12px; margin-top: 12px; font-size: 13px; }
+.enc b { font-weight: 550; text-align: right; word-break: break-all; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0; }
 .prog { display: flex; align-items: center; gap: 16px; margin-top: 22px; }
 .track { flex: 1; height: 12px; border-radius: 99px; background: #26262B; overflow: hidden; }
 .fill { position: relative; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #C4664A, #E8946F); transition: width .5s ease; overflow: hidden; }

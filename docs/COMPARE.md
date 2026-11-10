@@ -24,9 +24,9 @@
 
 `GET /api/runs/compare?a=<id>&b=<id>`
 
-`a` 和 `b` 是界面里一次测试的 id。未知 id、同一个 id、缺了参数、同一个参数写了两次，都是 400，正文是一句说明，没有堆栈。两次都要已完成，而且都是战斗实验。
+`a` 和 `b` 是界面里一次测试的 id。未知 id、同一个 id、缺了参数、同一个参数写了两次，都是 400，正文是一句说明，没有堆栈。两次都要是战斗实验，而且已经结束：`done`，或者 `cancelled` 并留下了部分结果。还在跑是 400，不是 500。取消的那一侧 `partial` 为 true，正文里也有 `partial`。数字只包括打完的场次。
 
-*`a` and `b` are GUI test ids. An unknown id, the same id twice, a missing parameter, or the same parameter twice is a 400 with one sentence and no stack trace. Both tests must be finished combat tests.*
+*`a` and `b` are GUI test ids. An unknown id, the same id twice, a missing parameter, or the same parameter twice is a 400 with one sentence and no stack trace. Both tests must be combat tests that have finished: `done`, or `cancelled` with the partial result kept. A test that is still running is a 400, not a 500. A cancelled side has `partial: true`, and the body has `partial` too. The numbers include only the fights that finished.*
 
 返回的 `cells[].metrics` 里，每一项有 `a`、`b`、`delta`（B − A）、`method`、`p_value`、`significant`。胜率和超时的 `method` 是 `two_proportion_z`，比例在 0 到 1 之间，并带 Wilson 区间和 `wilson_overlap`（两个区间重叠则为 true）。`significant` 为 true 表示双侧 p < 0.05。平均回合、`hp_loss`、`dpt` 在有逐场记录时 `method` 是 `welch`；只有 `cells.csv` 的平均数时 `method` 是 `means_only`，`significant` 为 null。
 
@@ -46,6 +46,6 @@
 
 ## MCP
 
-`compare_runs(a, b)` 返回同一份 `cells` 和 `cards`。`a`、`b` 可以是界面测试 id，或结果目录，或其中的 `raw.jsonl` / `cells.csv`。路径规则和 `batch_run_summary` 相同。`--import-only` 也提供这个工具。失败是 JSON：`{"ok": false, "read_only": true, "error": "..."}`，例如 `same_run`、`bad_type`、`not_found`、`not_done`、`not_combat`、`no_data`、`not_json`。
+`compare_runs(a, b)` 返回同一份 `cells` 和 `cards`。`a`、`b` 可以是界面测试 id，或结果目录，或其中的 `raw.jsonl` / `cells.csv`。已经取消、目录里还留着结果的也可以比，`partial` 为 true。路径规则和 `batch_run_summary` 相同。`--import-only` 也提供这个工具。失败是 JSON：`{"ok": false, "read_only": true, "error": "..."}`，例如 `same_run`、`bad_type`、`not_found`、`not_done`、`not_combat`、`no_data`、`not_json`。还在跑是 `not_done`，不抛异常。
 
-*`compare_runs(a, b)` returns the same `cells` and `cards`. `a` and `b` may be a GUI test id, a result directory, or a `raw.jsonl` / `cells.csv` inside one. Paths follow `batch_run_summary`. `--import-only` exposes this tool too. A failure is JSON: `{"ok": false, "read_only": true, "error": "..."}`, for example `same_run`, `bad_type`, `not_found`, `not_done`, `not_combat`, `no_data` or `not_json`.*
+*`compare_runs(a, b)` returns the same `cells` and `cards`. `a` and `b` may be a GUI test id, a result directory, or a `raw.jsonl` / `cells.csv` inside one. A cancelled run whose results are still in the folder can be compared, and `partial` is true. Paths follow `batch_run_summary`. `--import-only` exposes this tool too. A failure is JSON: `{"ok": false, "read_only": true, "error": "..."}`, for example `same_run`, `bad_type`, `not_found`, `not_done`, `not_combat`, `no_data` or `not_json`. A test that is still running is `not_done`. It does not raise.*

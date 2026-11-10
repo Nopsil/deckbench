@@ -302,9 +302,15 @@ def _read_meta(run_dir):
     return meta if isinstance(meta, dict) else {}
 
 
+def _marked_partial(value):
+    if not isinstance(value, dict):
+        return False
+    return bool(value.get("partial") or value.get("status") == "cancelled")
+
+
 def _ensure_done(meta):
     status = meta.get("status") if isinstance(meta, dict) else None
-    if isinstance(status, str) and status != "done":
+    if isinstance(status, str) and status not in ("done", "cancelled"):
         raise AnalysisError("not_done", field="run")
 
 
@@ -689,6 +695,8 @@ def _run_section(run, lang):
     summary = run.get("summary") if isinstance(run.get("summary"), dict) else {}
     kind = meta.get("kind")
     inner = ["<h3>" + _esc(_run_title(meta) or _t(lang, "export.sectionRun")) + "</h3>"]
+    if _marked_partial(meta):
+        inner.append(_note(_t(lang, "export.partial")))
     inner.append(_chips(_run_chips(meta, lang)))
     if kind == "combat":
         inner.append(_combat_block(summary, lang))
@@ -850,6 +858,8 @@ def _compare_section(body, lang):
     left = _side_name(body.get("a"), "A")
     right = _side_name(body.get("b"), "B")
     inner = [_note(_t(lang, "cmp.hint"))]
+    if body.get("partial") or _marked_partial(body.get("a")) or _marked_partial(body.get("b")):
+        inner.append(_note(_t(lang, "export.partial")))
     inner.append(
         "<div class=\"sides\"><div class=\"side\"><span class=\"tag\">A</span>"
         + _esc(left) + "</div><div class=\"side b\"><span class=\"tag b\">B</span>"

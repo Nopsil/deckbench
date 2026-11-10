@@ -643,6 +643,20 @@ def _runs_dir(allowed, monkeypatch):
     return runs
 
 
+def _wait_run(client, rid, timeout=180):
+    import time
+    deadline = time.time() + timeout
+    last = None
+    while time.time() < deadline:
+        res = client.get(f"/api/runs/{rid}/progress", headers=EN)
+        assert res.status_code == 200, res.text
+        last = res.json()
+        if last.get("status") not in ("running", "queued"):
+            return last
+        time.sleep(0.05)
+    raise AssertionError(last)
+
+
 def _experiment(runs, rid):
     import yaml
     text = (runs / rid / "experiment.yaml").read_text(encoding="utf-8")
@@ -736,6 +750,7 @@ def test_head_to_head_runs_both_decks_and_compares(client, allowed, monkeypatch)
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["ok"] is True
+    assert body["status"] == "running"
     assert body["seed"] == 11 and body["max_turns"] == 4
     assert body["encounters"] == ["DUMMY"] and body["fights"] == 1
     assert body["compare"] == f"/#/compare?a={body['a']}&b={body['b']}"
@@ -748,6 +763,8 @@ def test_head_to_head_runs_both_decks_and_compares(client, allowed, monkeypatch)
     assert [row["encounter"] for row in exp_a["extra"]] == ["DUMMY"]
     assert [row["encounter"] for row in exp_b["extra"]] == ["DUMMY"]
     assert exp_a["extra"][0]["max_turns"] == exp_b["extra"][0]["max_turns"] == 4
+    assert _wait_run(client, body["a"])["status"] == "done"
+    assert _wait_run(client, body["b"])["status"] == "done"
     raw_a = json.loads((runs / body["a"] / "out" / "raw.jsonl").read_text(encoding="utf-8").splitlines()[0])
     raw_b = json.loads((runs / body["b"] / "out" / "raw.jsonl").read_text(encoding="utf-8").splitlines()[0])
     assert raw_a["encounter"] == raw_b["encounter"] == "DUMMY"
