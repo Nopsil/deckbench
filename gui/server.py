@@ -138,8 +138,9 @@ def summary(rid: str):
 @app.get("/api/runs/{rid}/report")
 def report(rid: str):
     _need(rid)
-    f = os.path.join(jobs.run_dir(rid), "out", "report.md")
-    if not os.path.exists(f):
+    d = jobs.run_dir(rid)
+    f = os.path.join(d, "out", "report.md") if d else ""
+    if not d or not os.path.exists(f):
         raise HTTPException(404, T("err.noReport"))
     return {"markdown": open(f, encoding="utf-8").read()}
 
@@ -153,6 +154,8 @@ def runfile(rid: str, name: str):
     if name not in FILES:
         raise HTTPException(404)
     d = jobs.run_dir(rid)
+    if not d:
+        raise HTTPException(404)
     for f in (os.path.join(d, name), os.path.join(d, "out", name)):
         if os.path.exists(f):
             return FileResponse(f, filename=name)
