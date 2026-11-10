@@ -165,7 +165,7 @@ Claude や Cursor など MCP に対応した AI アシスタントを使って�
 - **カード単体の A/B**：2 つのグループは同じ乱数シードを使い、違いはそのカード 1 枚だけなので、差がそのままそのカードの影響になります。勝率差には **二群の比率の z 検定の p 値**（両側）も付きます。ペア差と 95% 区間はそのままです。
 - **ラン数が少ないとき**：どちらかの有効ランが **30 未満** だと、「サンプル不足のため結論できない」と出ます。数字は出ますが、そのカードの強さの判断には使わないでください。
 
-コマンドラインでは `python tools/batch.py`、`python tools/ab_card.py ... --format text|markdown|json`、`python tools/ab_table.py <ディレクトリ> --format markdown|text|json`、`python tools/ai_summary.py a.jsonl b.jsonl`（`--json` で JSON。2 つ目以降は最初のファイルに対する p 値）に出ます。レポートと A/B の HTTP（`/api/runs/{id}/summary`、`/api/ab`）は同じ JSON にフィールドを足すだけで、古いフィールドは残します。
+コマンドラインでは `python tools/batch.py`、`python tools/ab_card.py ... --format text|markdown|json`、`python tools/ab_table.py <ディレクトリ> --format markdown|text|json`、`python tools/ai_summary.py a.jsonl b.jsonl`（`--json` で JSON。2 つ目以降は最初のファイルに対する p 値）に出ます。レポート画面と A/B 画面には Wilson 区間、p 値、サンプル不足の警告が出ます。HTTP（`/api/runs/{id}/summary`、`/api/ab`）は同じ JSON にフィールドを足すだけで、古いフィールドは残します。
 
 **大切なこと**：AI は人間の上級者ではないので、これらの数字は**実際のプレイヤーの勝率ではありません**。**同じ設定の中で比べる**（新カード vs 旧カード、数値調整の前 vs 後、自作キャラ vs ベースゲームのキャラ）のには向いていますが、絶対的な強さの指標としては使えません。
 

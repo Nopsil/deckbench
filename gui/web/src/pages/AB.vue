@@ -21,12 +21,13 @@
 
     <template v-else-if="R.kind === 'batch'">
       <div class="grid g2">
-        <div class="side A"><span class="tagA">A</span><div><div class="st">{{ runTitle(R.a) }}</div><div class="sp">{{ t('ab.validRuns', { n: R.result.a.n }) }} · {{ fmt.time(R.a.created) }}</div></div></div>
-        <div class="side B"><span class="tagB">B</span><div><div class="st">{{ runTitle(R.b) }}</div><div class="sp">{{ t('ab.validRuns', { n: R.result.b.n }) }} · {{ fmt.time(R.b.created) }}</div></div></div>
+        <div class="side A"><span class="tagA">A</span><div><div class="st">{{ runTitle(R.a) }}</div><div class="sp">{{ t('ab.validRuns', { n: R.result.a.n }) }} · {{ fmt.time(R.a.created) }}</div><div v-if="hasWinCi(R.result.a)" class="sp">{{ t('ab.sideWin', { win: fmt.pct(R.result.a.win), lo: fmt.pct(R.result.a.win_ci_low), hi: fmt.pct(R.result.a.win_ci_high) }) }}</div></div></div>
+        <div class="side B"><span class="tagB">B</span><div><div class="st">{{ runTitle(R.b) }}</div><div class="sp">{{ t('ab.validRuns', { n: R.result.b.n }) }} · {{ fmt.time(R.b.created) }}</div><div v-if="hasWinCi(R.result.b)" class="sp">{{ t('ab.sideWin', { win: fmt.pct(R.result.b.win), lo: fmt.pct(R.result.b.win_ci_low), hi: fmt.pct(R.result.b.win_ci_high) }) }}</div></div></div>
       </div>
+      <div v-if="sampleNote" class="hint warn">{{ sampleNote }}</div>
       <div v-if="floorRow" class="grid g4" style="margin-top:16px">
-        <stat :label="t('ab.floorDiff')" :value="signed(floorRow.diff, 2)" :sub="t('ab.ci95', { v: floorRow.ci95?.toFixed(2) }) + ' · ' + sig(floorRow)" :hl="floorRow.significant" />
-        <stat v-for="r in rateRows.slice(0, 3)" :key="r.key" :label="t('ab.diffOf', { name: mname(r) })" :value="signed(r.diff * 100, 1) + ' pp'" :sub="`± ${(r.ci95 * 100).toFixed(1)} pp · ${sig(r)}`" :hl="r.significant" />
+        <stat :label="t('ab.floorDiff')" :value="signed(floorRow.diff, 2)" :sub="floorSub" :hl="floorRow.significant" />
+        <stat v-for="r in highlightRates" :key="r.key" :label="t('ab.diffOf', { name: mname(r) })" :value="signed(r.diff * 100, 1) + ' pp'" :sub="rateSub(r)" :hl="r.significant" />
       </div>
       <div class="grid" style="grid-template-columns: 1fr 1fr; margin-top:16px">
         <div class="panel"><h3>{{ t('ab.rateDiffTitle') }}</h3><chart :option="diffOpt" :height="300" />
@@ -37,10 +38,10 @@
             <tbody>
               <tr v-for="r in R.result.rows" :key="r.key">
                 <td>{{ mname(r) }}</td>
-                <td>{{ r.pct ? fmt.pct(r.a) : fmt.num(r.a) }}</td>
-                <td>{{ r.pct ? fmt.pct(r.b) : fmt.num(r.b) }}</td>
+                <td>{{ cellRate(r, 'a') }}</td>
+                <td>{{ cellRate(r, 'b') }}</td>
                 <td class="mono">{{ r.diff === undefined ? '—' : (r.pct ? signed(r.diff * 100, 1) + ' ± ' + (r.ci95 * 100).toFixed(1) + ' pp' : signed(r.diff, 2) + ' ± ' + r.ci95.toFixed(2)) }}</td>
-                <td><n-tag v-if="r.diff !== undefined" size="small" :bordered="false" :type="r.significant ? (r.diff > 0 ? 'success' : 'error') : 'default'">{{ sig(r) }}</n-tag></td>
+                <td><n-tag v-if="r.diff !== undefined" size="small" :bordered="false" :type="r.significant ? (r.diff > 0 ? 'success' : 'error') : 'default'">{{ sig(r) }}</n-tag><div v-if="'p_value' in r" class="hint">{{ t('ab.pValue', { p: fmtP(r.p_value) }) }}</div><div v-if="r.sample_warning" class="hint warn">{{ t('ab.tooSmallTag') }}</div></td>
               </tr>
               <tr><td>{{ t('ab.monLossA1') }}</td><td>{{ fmt.num(R.result.a.mon_loss_a1, 1) }}</td><td>{{ fmt.num(R.result.b.mon_loss_a1, 1) }}</td><td class="mono">{{ R.result.a.mon_loss_a1 != null && R.result.b.mon_loss_a1 != null ? signed(R.result.b.mon_loss_a1 - R.result.a.mon_loss_a1, 1) : '—' }}</td><td></td></tr>
             </tbody>
@@ -55,6 +56,7 @@
         <div class="side A"><span class="tagA">A</span><div><div class="st">{{ runTitle(R.a) }}</div></div></div>
         <div class="side B"><span class="tagB">B</span><div><div class="st">{{ runTitle(R.b) }}</div></div></div>
       </div>
+      <div v-if="sampleNote" class="hint warn">{{ sampleNote }}</div>
       <div v-if="!R.result.rows.length" class="panel empty" style="margin-top:16px"><div class="big">{{ t('ab.noCommonCells') }}</div></div>
       <template v-else>
         <div class="panel" style="margin-top:16px"><h3>{{ t('ab.cellDiffTitle') }}</h3>
@@ -93,6 +95,48 @@ const optsB = computed(() => {
 const sig = (r) => (r.significant ? t('ab.sig') : t('ab.notSig'))
 const mname = (r) => tr('metric.', r.key)
 const signed = (x, d) => (x === undefined || x === null ? '—' : (x > 0 ? '+' : x < 0 ? '−' : '±') + Math.abs(x).toFixed(d))
+function fmtP(p) {
+  if (p === null || p === undefined) return '—'
+  if (p < 0.0001) return p.toExponential(2)
+  return Number(p).toFixed(4)
+}
+function hasWinCi(s) {
+  return !!(s && s.win != null && s.win_ci_low != null && s.win_ci_high != null)
+}
+function wilsonOf(r, side) {
+  const lo = r[side + '_ci_low']
+  const hi = r[side + '_ci_high']
+  if (lo == null || hi == null) return ''
+  return t('ab.wilson', { lo: fmt.pct(lo), hi: fmt.pct(hi) })
+}
+function cellRate(r, side) {
+  const base = r.pct ? fmt.pct(r[side]) : fmt.num(r[side])
+  const extra = r.pct ? wilsonOf(r, side) : ''
+  return extra ? `${base} · ${extra}` : base
+}
+function rateSub(r) {
+  const bits = [`± ${(r.ci95 * 100).toFixed(1)} pp`, sig(r)]
+  if ('p_value' in r) bits.push(t('ab.pValue', { p: fmtP(r.p_value) }))
+  if (r.sample_warning) bits.push(t('ab.tooSmallTag'))
+  return bits.join(' · ')
+}
+const sampleNote = computed(() => {
+  const res = R.value?.result
+  if (!res || !R.value) return ''
+  if (R.value.kind === 'batch') {
+    const win = (res.rows || []).find((row) => row.key === 'win')
+    const warn = (win && win.sample_warning) || (res.a && res.a.sample_warning) || (res.b && res.b.sample_warning)
+    if (!warn) return ''
+    return t('ab.sampleSmall', {
+      na: (res.a && res.a.n) || 0,
+      nb: (res.b && res.b.n) || 0,
+      min: (win && win.min_n) || (res.a && res.a.min_n) || 30,
+    })
+  }
+  const small = (res.rows || []).find((row) => row.sample_warning)
+  if (!small) return ''
+  return t('ab.sampleSmallAny', { min: small.min_n || 30 })
+})
 
 watch([a, b], async () => {
   router.replace({ query: { ...(a.value ? { a: a.value } : {}), ...(b.value ? { b: b.value } : {}) } })
@@ -103,7 +147,20 @@ watch([a, b], async () => {
 }, { immediate: true })
 
 const floorRow = computed(() => R.value?.result.rows.find((r) => r.key === 'floor' && r.diff !== undefined))
+const floorSub = computed(() => {
+  const r = floorRow.value
+  if (!r) return ''
+  const bits = [t('ab.ci95', { v: r.ci95?.toFixed(2) }), sig(r)]
+  if (r.sample_warning) bits.push(t('ab.tooSmallTag'))
+  return bits.join(' · ')
+})
 const rateRows = computed(() => (R.value?.result.rows || []).filter((r) => r.pct && r.diff !== undefined))
+const highlightRates = computed(() => {
+  const rows = rateRows.value
+  const win = rows.find((r) => r.key === 'win')
+  const rest = rows.filter((r) => r.key !== 'win')
+  return (win ? [win, ...rest] : rest).slice(0, 3)
+})
 const pairNote = computed(() => {
   const r = R.value?.result.rows.find((x) => x.diff !== undefined)
   if (!r) return t('ab.tooFew')
@@ -120,7 +177,7 @@ function diffChart(items, nameFn) {
   const pad = Math.max(2, (hi - lo) * 0.06)
   return { ...baseChart(), grid: { left: 10, right: 40, top: 16, bottom: 20, containLabel: true },
     tooltip: { ...baseChart().tooltip, trigger: 'axis', axisPointer: { type: 'shadow' },
-      formatter: (p) => { const r = rows[p[0].dataIndex]; return `${cats[p[0].dataIndex]}<br/>${t('ab.diff')} <b>${signed(r.diff * 100, 1)} pp</b> (± ${(r.ci95 * 100).toFixed(1)})<br/>${sig(r)}` } },
+      formatter: (p) => { const r = rows[p[0].dataIndex]; const pv = ('p_value' in r) ? `<br/>${t('ab.pValue', { p: fmtP(r.p_value) })}` : ''; return `${cats[p[0].dataIndex]}<br/>${t('ab.diff')} <b>${signed(r.diff * 100, 1)} pp</b> (± ${(r.ci95 * 100).toFixed(1)})${pv}<br/>${sig(r)}` } },
     xAxis: axis({ type: 'value', min: Math.floor(lo - pad), max: Math.ceil(hi + pad), axisLabel: { color: C.muted, hideOverlap: true, formatter: (v) => (v > 0 ? '+' : '') + v } , name: 'pp', nameTextStyle: { color: C.faint } }),
     yAxis: axis({ type: 'category', data: cats, axisLabel: { color: C.text, width: 200, overflow: 'truncate' } }),
     series: [
@@ -141,11 +198,17 @@ function diffChart(items, nameFn) {
 const diffOpt = computed(() => diffChart(rateRows.value, mname))
 const cellDiffOpt = computed(() => diffChart(R.value.result.rows, (r) => `${r.deck} · ${t('rep.actN', { n: r.act })} · ${tr('room.', r.room)}`))
 const p1 = (x) => (x === null || x === undefined ? '—' : (x * 100).toFixed(1) + '%')
+function cellWin(r, side, nkey) {
+  const extra = wilsonOf(r, side)
+  const base = `${p1(r[side])} (${r[nkey]})`
+  return extra ? `${base} · ${extra}` : base
+}
 const cellCols = [
   { title: () => t('col.deck'), key: 'deck', ellipsis: { tooltip: true } }, { title: () => t('col.act'), key: 'act', width: 56 },
   { title: () => t('col.room'), key: 'room', width: 76, render: (r) => tr('room.', r.room) },
-  { title: () => t('ab.winA'), key: 'a', render: (r) => `${p1(r.a)} (${r.na})` }, { title: () => t('ab.winB'), key: 'b', render: (r) => `${p1(r.b)} (${r.nb})` },
+  { title: () => t('ab.winA'), key: 'a', render: (r) => cellWin(r, 'a', 'na') }, { title: () => t('ab.winB'), key: 'b', render: (r) => cellWin(r, 'b', 'nb') },
   { title: () => t('ab.diff'), key: 'diff', sorter: (x, y) => x.diff - y.diff, render: (r) => h('span', { class: 'mono' }, `${signed(r.diff * 100, 1)} ± ${(r.ci95 * 100).toFixed(1)} pp`) },
+  { title: () => t('ab.pValueLabel'), key: 'p_value', width: 130, render: (r) => ('p_value' in r ? fmtP(r.p_value) : '—') + (r.sample_warning ? ' · ' + t('ab.tooSmallTag') : '') },
   { title: '', key: 's', width: 80, render: (r) => h(NTag, { size: 'small', bordered: false, type: r.significant ? (r.diff > 0 ? 'success' : 'error') : 'default' }, { default: () => sig(r) }) },
 ]
 </script>
@@ -167,4 +230,5 @@ const cellCols = [
 .cmp tr:last-child td { border-bottom: none; }
 .legend { display: flex; gap: 18px; justify-content: center; font-size: 12px; color: #8A857E; margin-top: 4px; }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.hint.warn { color: #E0A86C; }
 </style>

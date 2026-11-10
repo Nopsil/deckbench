@@ -165,7 +165,7 @@ Claude나 Cursor처럼 MCP를 지원하는 AI 비서를 쓰고 있다면, 시뮬
 - **카드 한 장 A/B**: 두 그룹은 같은 랜덤 시드를 쓰고 차이는 그 카드 한 장뿐이라, 결과 차이가 곧 그 카드의 영향입니다. 승률 차이에는 **두 비율 z 검정의 p 값**(양측)도 붙습니다. 기존 짝비교 차이와 95% 구간은 그대로입니다.
 - **판 수가 너무 적을 때**: 어느 한쪽의 유효 판이 **30판 미만**이면 「표본이 부족해 결론낼 수 없음」이라고 나옵니다. 숫자는 그대로 찍히지만, 그 카드가 강한지 판단하는 데는 쓰지 마세요.
 
-명령줄에서는 `python tools/batch.py`, `python tools/ab_card.py ... --format text|markdown|json`, `python tools/ab_table.py <디렉터리> --format markdown|text|json`, `python tools/ai_summary.py a.jsonl b.jsonl`(`--json`이면 JSON. 두 번째 파일부터 첫 파일 대비 p 값)에 나옵니다. 보고서와 A/B HTTP(`/api/runs/{id}/summary`, `/api/ab`)는 같은 JSON에 필드만 더하고, 예전 필드는 그대로 둡니다.
+명령줄에서는 `python tools/batch.py`, `python tools/ab_card.py ... --format text|markdown|json`, `python tools/ab_table.py <디렉터리> --format markdown|text|json`, `python tools/ai_summary.py a.jsonl b.jsonl`(`--json`이면 JSON. 두 번째 파일부터 첫 파일 대비 p 값)에 나옵니다. 보고서 화면과 A/B 화면에는 Wilson 구간, p 값, 표본 부족 경고가 나옵니다. HTTP(`/api/runs/{id}/summary`, `/api/ab`)는 같은 JSON에 필드만 더하고, 예전 필드는 그대로 둡니다.
 
 **중요**: AI는 실력 좋은 사람 플레이어가 아니므로 이 숫자들은 **실제 플레이어의 승률이 아닙니다**. **같은 설정 안에서 서로 비교할 때**(새 카드 vs 옛 카드, 수치 조정 전 vs 후, 내 캐릭터 vs 기본 캐릭터) 쓰기 좋고, 절대적인 실력 지표로 보기에는 맞지 않습니다.
 
