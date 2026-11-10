@@ -23,6 +23,16 @@ _MSG = {}
 _REQ_LANG = contextvars.ContextVar("deckbench_lang", default=None)
 
 
+# 请求里认的标记。x-lang 和导出的 ?lang= 共用，不要另写一份。
+_REQUEST_TAGS = frozenset({
+    "zhs", "en", "ja", "ko",
+    "zh", "zh-cn", "zh-hans", "zh-sg", "chinese", "chs",
+    "en-us", "en-gb", "en-au", "english",
+    "ja-jp", "jpn", "japanese",
+    "ko-kr", "kor", "korean",
+})
+
+
 def normalize(s):
     """任意语言标记（zh-CN / zh_Hans / ja_JP / ko-KR / en-US / jpn …）→ 界面语言；认不出 → en。"""
     s = str(s or "").strip().lower().replace("_", "-")
@@ -37,6 +47,24 @@ def normalize(s):
     if s.startswith("ko") or s in ("kor", "korean"):
         return "ko"
     return "en"
+
+
+def request_lang(raw):
+    """x-lang 和 ?lang= 共用的归一。空、非字符串、认不出 → None。
+
+    大小写不敏感，下划线当连字符。zh-CN / zh-Hans / zh → zhs，en-US → en，
+    ja-JP → ja，ko-KR → ko。认不出不回落成 en（那是系统语言的事）。
+    """
+    if not isinstance(raw, str) or "\x00" in raw:
+        return None
+    text = raw.strip()
+    if not text:
+        return None
+    folded = text.lower().replace("_", "-")
+    if folded not in _REQUEST_TAGS and not folded.startswith(("zh-", "en-", "ja-", "ko-")):
+        return None
+    mapped = normalize(text)
+    return mapped if mapped in LANGS else None
 
 
 def messages(lang):
@@ -102,8 +130,11 @@ def os_lang():
 
 
 def set_request_lang(lang):
-    """服务器每个请求开头调用（前端在请求头 x-lang 里带当前语言）。"""
-    return _REQ_LANG.set(lang if lang in LANGS else None)
+    """服务器每个请求开头调用（前端在请求头 x-lang 里带当前语言）。
+
+    BCP-47 别名和 ?lang= 走 request_lang。认不出就不当成这次请求的语言。
+    """
+    return _REQ_LANG.set(request_lang(lang))
 
 
 def current():

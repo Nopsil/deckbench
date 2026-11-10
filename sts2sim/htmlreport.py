@@ -26,13 +26,6 @@ from sts2sim.analysis import AnalysisError, _gui_data_root, _is_run_id, resolve_
 
 _SAVE_PARTS = ("saves", "history", "slaythespire2")
 _COMBAT_FILES = ("raw.jsonl", "cells.csv", "cards.csv")
-_LANG_EXACT = {
-    "zhs", "en", "ja", "ko",
-    "zh", "zh-cn", "zh-hans", "zh-sg", "chinese", "chs",
-    "en-us", "en-gb", "en-au", "english",
-    "ja-jp", "jpn", "japanese",
-    "ko-kr", "kor", "korean",
-}
 _HTML_LANG = {"zhs": "zh-CN", "en": "en", "ja": "ja", "ko": "ko"}
 _METRIC_KEY = {
     "win": "cmp.win",
@@ -58,17 +51,17 @@ class ExportError(Exception):
 
 
 def parse_lang(raw):
-    """空字符串表示用当前界面语言。认不出的标记是 bad_lang，不回显原文。"""
+    """空字符串表示用当前界面语言。认不出的标记是 bad_lang，不回显原文。
+
+    和请求头 x-lang 共用 gui.i18n.request_lang。
+    """
     if not isinstance(raw, str) or "\x00" in raw:
         raise ExportError("bad_type", field="lang")
-    text = raw.strip()
-    if not text:
-        return None
-    folded = text.lower().replace("_", "-")
-    if folded not in _LANG_EXACT and not folded.startswith(("zh-", "en-", "ja-", "ko-")):
-        raise ExportError("bad_lang", field="lang")
     from gui import i18n
-    return i18n.normalize(text)
+    chosen = i18n.request_lang(raw)
+    if raw.strip() and not chosen:
+        raise ExportError("bad_lang", field="lang")
+    return chosen
 
 
 def export_filename(run_id="", a="", b="", calibration=False):
