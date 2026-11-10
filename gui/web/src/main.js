@@ -10,6 +10,7 @@ import AB from './pages/AB.vue'
 import History from './pages/History.vue'
 import ImportRun from './pages/ImportRun.vue'
 import SeedPreview from './pages/SeedPreview.vue'
+import ExplainLog from './pages/ExplainLog.vue'
 import ModEditor from './pages/ModEditor.vue'
 
 const router = createRouter({
@@ -23,6 +24,7 @@ const router = createRouter({
     { path: '/history', component: History, meta: { key: 'history' } },
     { path: '/import', component: ImportRun, meta: { key: 'import' } },
     { path: '/preview', component: SeedPreview, meta: { key: 'preview' } },
+    { path: '/explain', component: ExplainLog, meta: { key: 'explain' } },
     { path: '/mods', component: ModEditor, meta: { key: 'mods' } },
   ],
 })

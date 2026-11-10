@@ -328,6 +328,18 @@ class PreviewReq(BaseModel):
     neow: str = "first"
 
 
+class ExplainPathReq(BaseModel):
+    path: str
+
+
+class ExplainFightReq(BaseModel):
+    path: str
+    seed: str = ""
+    fight: int = 0
+    offset: int = 0
+    limit: int = 20
+
+
 def _import_detail(err):
     """解析器附带的一行原因。不进成功响应，只接在已经翻译的错误后面。"""
     raw = (getattr(err, "params", None) or {}).get("detail")
@@ -382,6 +394,39 @@ def _preview_http(err):
     return T("prev.err.failed", err=err.code)
 
 
+def _explain_http(err):
+    p = getattr(err, "params", None) or {}
+    path = p.get("path", "")
+    code = err.code
+    if code == "need_path":
+        return T("exp.err.need_path")
+    if code == "path_not_allowed":
+        return T("exp.err.path_not_allowed", path=path)
+    if code == "not_found":
+        return T("exp.err.not_found", path=path)
+    if code == "refuse_write":
+        return T("exp.err.refuse_write", path=path)
+    if code == "not_explain":
+        return T("exp.err.not_explain", path=path)
+    if code == "ambiguous_explain":
+        return T("exp.err.ambiguous_explain", n=p.get("n", 0), path=path)
+    if code == "not_json":
+        return T("exp.err.not_json", line=p.get("line", "?"))
+    if code == "unreadable":
+        return T("exp.err.unreadable", path=path)
+    if code == "bad_fight":
+        return T("exp.err.bad_fight")
+    if code == "bad_offset":
+        return T("exp.err.bad_offset")
+    if code == "bad_limit":
+        return T("exp.err.bad_limit")
+    if code == "bad_seed":
+        return T("exp.err.bad_seed")
+    if code == "fight_out_of_range":
+        return T("exp.err.fight_out_of_range", fight=p.get("fight", 0), fight_count=p.get("fight_count", 0))
+    return T("exp.err.failed", err=code)
+
+
 @app.post("/api/import")
 def import_save(req: ImportPathReq):
     """只读解析玩家指出的 .run / current_run.save / 存档目录。"""
@@ -431,6 +476,33 @@ def saves_discover():
     """常见位置里的存档目录。只列路径，不读内容。"""
     from sts2sim.saveimport import discover
     return {"roots": discover()}
+
+
+@app.get("/api/explain/logs")
+def explain_logs():
+    """允许目录里的 --explain 日志。只列路径，不读内容，不写文件。"""
+    from sts2sim.analysis import explain_logs as _logs
+    return _logs()
+
+
+@app.post("/api/explain")
+def explain_open(req: ExplainPathReq):
+    """一份日志里的种子和战斗。只读，路径规则和 MCP explain_fight 相同。"""
+    from sts2sim.analysis import AnalysisError, explain_catalog
+    try:
+        return explain_catalog(req.path)
+    except AnalysisError as e:
+        raise HTTPException(400, _explain_http(e))
+
+
+@app.post("/api/explain/fight")
+def explain_fight_page(req: ExplainFightReq):
+    """一场战斗的一页决策。阅读和分页走 analysis.explain_fight，这里只补分差。不写文件。"""
+    from sts2sim.analysis import AnalysisError, explain_page
+    try:
+        return explain_page(req.path, req.fight, req.seed, req.offset, req.limit)
+    except AnalysisError as e:
+        raise HTTPException(400, _explain_http(e))
 
 
 @app.post("/api/seed-preview")

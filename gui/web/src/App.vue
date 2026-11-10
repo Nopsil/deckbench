@@ -61,7 +61,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { NConfigProvider, NMessageProvider, NDialogProvider, NIcon, NSelect, NSpin, darkTheme, zhCN, dateZhCN, enUS, dateEnUS, jaJP, dateJaJP, koKR, dateKoKR } from 'naive-ui'
-import { CirclePlus, PlayerPlay, ChartBar, Scale, History, World, Puzzle, Folder, Map } from '@vicons/tabler'
+import { CirclePlus, PlayerPlay, ChartBar, Scale, History, World, Puzzle, Folder, Map, ListSearch } from '@vicons/tabler'
 import { themeFor } from './theme'
 import { store } from './api'
 import { t, lang, LANGS, setLang } from './i18n'
@@ -75,6 +75,7 @@ const nav = [
   { to: '/history', text: 'nav.history', icon: History },
   { to: '/import', text: 'nav.import', icon: Folder },
   { to: '/preview', text: 'nav.preview', icon: Map },
+  { to: '/explain', text: 'nav.explain', icon: ListSearch },
   { to: '/mods', text: 'nav.mods', icon: Puzzle },
 ]
 const NAIVE = { zhs: { ui: zhCN, date: dateZhCN }, en: { ui: enUS, date: dateEnUS }, ja: { ui: jaJP, date: dateJaJP }, ko: { ui: koKR, date: dateKoKR } }
