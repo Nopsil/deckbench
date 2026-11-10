@@ -12,7 +12,10 @@
           <n-select v-model:value="b" :options="optsB" filterable :disabled="!a" :placeholder="t('cmp.empty')" />
         </div>
       </div>
-      <div class="hint">{{ t('cmp.hint') }}</div>
+      <div class="row between" style="margin-top:12px">
+        <div class="hint" style="margin:0">{{ t('cmp.hint') }}</div>
+        <n-button v-if="exportHref" secondary tag="a" download data-action="export" :href="exportHref"><template #icon><n-icon :component="FileExport" /></template>{{ t('export.button') }}</n-button>
+      </div>
     </div>
 
     <div v-if="err" class="panel empty"><div class="big">{{ err }}</div></div>
@@ -116,9 +119,9 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NButton, NIcon, NSelect, NSpin } from 'naive-ui'
-import { ArrowsLeftRight } from '@vicons/tabler'
+import { ArrowsLeftRight, FileExport } from '@vicons/tabler'
 import { api, store, fmt, runTitle } from '../api'
-import { t, tr } from '../i18n'
+import { t, tr, lang } from '../i18n'
 
 const route = useRoute()
 const router = useRouter()
@@ -131,6 +134,11 @@ const done = computed(() => store.runs.filter((r) => r.status === 'done' && r.ki
 const label = (r) => `${runTitle(r)}  ·  ${fmt.time(r.created)}`
 const optsA = computed(() => done.value.map((r) => ({ label: label(r), value: r.id })))
 const optsB = computed(() => done.value.filter((r) => r.id !== a.value).map((r) => ({ label: label(r), value: r.id })))
+const exportHref = computed(() => {
+  if (!a.value || !b.value) return undefined
+  const q = new URLSearchParams({ a: a.value, b: b.value, lang: lang.value })
+  return '/api/runs/compare/export.html?' + q.toString()
+})
 const METRIC_KEY = { win: 'cmp.win', timeout: 'cmp.timeout', turns: 'cmp.turns', hp_loss: 'cmp.hpLoss', dpt: 'cmp.dpt' }
 const HIGHER = new Set(['win', 'dpt', 'efficiency', 'usage'])
 const LOWER = new Set(['timeout', 'turns', 'hp_loss'])

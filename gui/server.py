@@ -13,7 +13,12 @@ import zipfile
 import yaml
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    StreamingResponse,
+)
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict
 
@@ -251,6 +256,87 @@ def runs_compare(request: Request):
     return body
 
 
+def _export_http(err):
+    params = getattr(err, "params", None) or {}
+    code = getattr(err, "code", "")
+    if code == "bad_type":
+        return T("api.err.bad_type", field=params.get("field") or "request", expected=T("api.type.string"))
+    if code == "missing":
+        return T("api.err.missing", field=params.get("field") or "request")
+    if code == "bad_lang":
+        return T("export.err.badLang")
+    if code == "need_input":
+        return T("export.err.need")
+    if code == "no_result":
+        return T("export.err.noResult")
+    if code == "not_calibration":
+        return T("gap.err.not_calibration")
+    if code == "refuse_write":
+        return T("exp.err.refuse_write", path=params.get("path") or "")
+    return T("export.err.need")
+
+
+def _export_lang(request):
+    """?lang= 盖过请求头。重复的 lang、认不出的标记是 400，不回显原文。"""
+    from sts2sim.htmlreport import ExportError, parse_lang
+    values = request.query_params.getlist("lang")
+    if len(values) > 1:
+        raise HTTPException(400, T("api.err.bad_type", field="lang", expected=T("api.type.string")))
+    try:
+        chosen = parse_lang(values[0] if values else "")
+    except ExportError as exc:
+        raise HTTPException(400, _export_http(exc))
+    if chosen:
+        i18n.set_request_lang(chosen)
+        return chosen
+    return i18n.current()
+
+
+def _optional_calibration(request):
+    """可选的校准或分诊 JSON。路径规则和只读分析相同。"""
+    from sts2sim.analysis import AnalysisError
+    from sts2sim.htmlreport import ExportError, load_side_report
+    values = request.query_params.getlist("calibration")
+    if not values:
+        return None, None
+    if len(values) != 1:
+        raise HTTPException(400, T("api.err.bad_type", field="calibration", expected=T("api.type.string")))
+    text = values[0].strip()
+    if not text:
+        raise HTTPException(400, T("api.err.missing", field="calibration"))
+    try:
+        return load_side_report(text)
+    except ExportError as exc:
+        raise HTTPException(400, _export_http(exc))
+    except AnalysisError as exc:
+        raise HTTPException(400, _gap_analysis_http(exc))
+
+
+def _html_file(document, filename):
+    from sts2sim.htmlreport import content_disposition
+    return HTMLResponse(
+        content=document,
+        media_type="text/html; charset=utf-8",
+        headers={"content-disposition": content_disposition(filename)},
+    )
+
+
+@app.get("/api/runs/compare/export.html")
+def runs_compare_export(request: Request):
+    """两次已完成的战斗实验，写成一份离线 HTML。不新开模拟。
+
+    可选 calibration 是一份校准 JSON 或已经分诊好的 JSON，写进同一份文件。
+    """
+    from sts2sim.htmlreport import export_filename, render_html
+    lang = _export_lang(request)
+    body = runs_compare(request)
+    calibration, gap = _optional_calibration(request)
+    document = render_html(lang=lang, comparison=body, calibration=calibration, gap=gap)
+    left = (body.get("a") or {}).get("id") or "a"
+    right = (body.get("b") or {}).get("id") or "b"
+    return _html_file(document, export_filename(a=str(left), b=str(right)))
+
+
 @app.post("/api/runs")
 def start(req: StartReq):
     if req.kind not in ("batch", "combat"):
@@ -304,6 +390,27 @@ def summary(rid: str):
     if m.get("status") != "done":
         raise HTTPException(409, T("err.notDone"))
     return {"meta": m, "summary": backend.summarize(m["kind"], jobs.run_dir(rid))}
+
+
+@app.get("/api/runs/{rid}/export.html")
+def run_export(rid: str, request: Request):
+    """一次已完成的测试，写成一份离线 HTML。不新开模拟。
+
+    可选 calibration 把校准或缺口分诊写进同一份文件。
+    """
+    from sts2sim.htmlreport import export_filename, render_html
+    lang = _export_lang(request)
+    meta = _need(rid)
+    if meta.get("status") != "done":
+        raise HTTPException(409, T("err.notDone"))
+    summary = backend.summarize(meta.get("kind"), jobs.run_dir(rid))
+    if not summary:
+        raise HTTPException(404, T("export.err.noResult"))
+    calibration, gap = _optional_calibration(request)
+    document = render_html(
+        lang=lang, run={"meta": meta, "summary": summary}, calibration=calibration, gap=gap,
+    )
+    return _html_file(document, export_filename(run_id=rid))
 
 
 @app.get("/api/runs/{rid}/report")

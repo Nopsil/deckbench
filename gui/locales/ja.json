@@ -1096,5 +1096,20 @@
  "err.compareCombat": "マスの比較には、完了した戦闘テストが2つ必要です。",
  "err.compareNoData": "比べられる戦闘マスがありません。",
  "err.compareBad": "戦闘結果が正しい JSON ではありません（{line} 行目）。",
- "hist.compareCells": "マスの差"
+ "hist.compareCells": "マスの差",
+ "export.button": "レポートを書き出す",
+ "export.pageTitle": "DeckBench レポート",
+ "export.offline": "このファイルは単体で完結しています。グラフはページ内に描かれます。開いてもネットワークは使わず、シミュレーションを始めず、シードと AI も変えません。",
+ "export.generated": "数字は、すでに終わった結果から写しています。シミュレーションはやり直していません。",
+ "export.sectionRun": "完了したテスト",
+ "export.sectionCompare": "2 つのテストの比較",
+ "export.sectionCal": "較正",
+ "export.sectionGap": "ギャップの仕分け",
+ "export.footer": "DeckBench オフラインレポート",
+ "export.deltaChart": "マスごとの勝率差（B − A）",
+ "export.winBars": "マスごとの勝率",
+ "export.truncated": "先頭 {n} 件だけ表示しています。",
+ "export.err.noResult": "完了したこのテストに読める結果ファイルがありません。",
+ "export.err.need": "完了したテスト、比べる戦闘テスト 2 つ、または較正レポートを指定してください。",
+ "export.err.badLang": "lang は zh-CN、en、ja、ko のいずれかです。"
 }

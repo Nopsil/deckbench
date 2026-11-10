@@ -1096,5 +1096,20 @@
  "err.compareCombat": "格子对比需要两次已完成的战斗实验。",
  "err.compareNoData": "这两次测试没有可对比的战斗格子。",
  "err.compareBad": "战斗结果不是有效的 JSON（第 {line} 行）。",
- "hist.compareCells": "格子差值"
+ "hist.compareCells": "格子差值",
+ "export.button": "导出报告",
+ "export.pageTitle": "DeckBench 报告",
+ "export.offline": "这份文件是自包含的。图表画在页面里。打开它不会访问网络，也不会新开模拟，不改种子和 AI。",
+ "export.generated": "数字来自已经跑完的结果，没有重新计算模拟。",
+ "export.sectionRun": "已完成的测试",
+ "export.sectionCompare": "两次测试的对比",
+ "export.sectionCal": "校准",
+ "export.sectionGap": "缺口分诊",
+ "export.footer": "DeckBench 离线报告",
+ "export.deltaChart": "各格子胜率差（B − A）",
+ "export.winBars": "各格子胜率",
+ "export.truncated": "只显示前 {n} 条。",
+ "export.err.noResult": "这次已完成的测试没有可读的结果文件。",
+ "export.err.need": "请指定一次已完成的测试、两次要对比的战斗实验，或一份校准报告。",
+ "export.err.badLang": "lang 只能是 zh-CN、en、ja 或 ko。"
 }

@@ -1096,5 +1096,20 @@
  "err.compareCombat": "Cell comparison needs two finished combat tests.",
  "err.compareNoData": "These tests have no combat cells to compare.",
  "err.compareBad": "The combat results are not valid JSON (line {line}).",
- "hist.compareCells": "Cell deltas"
+ "hist.compareCells": "Cell deltas",
+ "export.button": "Export report",
+ "export.pageTitle": "DeckBench report",
+ "export.offline": "This file is self-contained. Charts are drawn in the page. Opening it does not use the network, and it does not start a simulation or change seeds or AI.",
+ "export.generated": "Numbers are copied from results that already finished.",
+ "export.sectionRun": "Finished run",
+ "export.sectionCompare": "Run comparison",
+ "export.sectionCal": "Calibration",
+ "export.sectionGap": "Gap triage",
+ "export.footer": "DeckBench offline report",
+ "export.deltaChart": "Win-rate delta by cell (B − A)",
+ "export.winBars": "Win rate by cell",
+ "export.truncated": "Showing the first {n}.",
+ "export.err.noResult": "This finished test has no readable result file.",
+ "export.err.need": "Choose a finished run, two combat tests to compare, or a calibration report.",
+ "export.err.badLang": "lang must be zh-CN, en, ja, or ko."
 }
