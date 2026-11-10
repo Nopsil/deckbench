@@ -27,7 +27,7 @@
   before_block_clear(creature, keep)   玩家回合开始清空格挡前，可改 ev.keep
 """
 import random
-from types import FunctionType, SimpleNamespace
+from types import FunctionType, ModuleType, SimpleNamespace
 
 ACTION_CAP_DEFAULT = 200
 
@@ -58,6 +58,8 @@ class Power:
         self.amount = amount
         self.src = src            # 归因名（通常是来源卡名）
         self.data = dict(params)
+        on = type(self).__dict__.get("_onmap")
+        self._on = on if on is not None else _build_onmap(type(self))
 
     def clone(self, owner):
         # 浅拷贝实例字段，再换掉 owner 和 data。和 copy.copy 一样，data 里的嵌套容器仍共享。
@@ -243,14 +245,41 @@ def _build_modmap(mod):
     return m
 
 
-def _fire(obj, meth, combat, ev):
-    cls = type(obj)
+def _onmap_of(cls):
     mp = cls.__dict__.get("_onmap")
     if mp is None:
         mp = _build_onmap(cls)
-    fn = mp.get(meth)
+    return mp
+
+
+def _fire(obj, meth, combat, ev):
+    """实例上的 ``_on`` 是类的 on_* 表。没有这个事件就不调用。"""
+    try:
+        fn = obj._on.get(meth)
+    except AttributeError:
+        on = _onmap_of(type(obj))
+        try:
+            obj._on = on
+        except Exception:
+            fn = on.get(meth)
+        else:
+            fn = on.get(meth)
     if fn is not None:
         fn(obj, combat, ev)
+
+
+_METH = {}
+
+
+def _copy_value(v):
+    """战斗 data 的浅拷贝。dict / list / set 走自己的 copy，其余有 copy 方法的同样调用。"""
+    t = type(v)
+    if t is dict or t is list or t is set:
+        return v.copy()
+    copy = getattr(v, "copy", None)
+    if copy is None:
+        return v
+    return copy()
 
 
 # ---------------------------------------------------------------- 战斗
@@ -287,7 +316,7 @@ class Combat:
         new.player = self.player.clone()
         new.enemies = [e.clone() for e in self.enemies]
         new.relics = [r.clone() for r in self.relics]
-        new.data = {k: (v.copy() if hasattr(v, "copy") else v) for k, v in self.data.items()}
+        new.data = {k: _copy_value(v) for k, v in self.data.items()}
         self._clone_n += 1
         new.rng = random.Random(self._clone_n * 7919 + self.turn)
         new.stats = None
@@ -331,7 +360,9 @@ class Combat:
 
     def emit(self, name, **kw):
         ev = SimpleNamespace(**kw)
-        meth = "on_" + name
+        meth = _METH.get(name)
+        if meth is None:
+            meth = _METH[name] = "on_" + name
         fire = _fire
         for r in self.relics:
             fire(r, meth, self, ev)
@@ -344,7 +375,7 @@ class Combat:
                 for p in list(e.powers.values()):
                     fire(p, meth, self, ev)
         for m in self.mod.listeners:
-            if type(m).__name__ == "module":
+            if isinstance(m, ModuleType):
                 mp = m.__dict__.get("_onmap")
                 if mp is None:
                     mp = _build_modmap(m)
@@ -369,20 +400,28 @@ class Combat:
     def calc_damage(self, src, target, base, kind="attack", card=None, ctx=None):
         amount = base
         if kind == "attack" and src is not None:
-            amount += src.amt("STRENGTH")
+            # 和 amt / has 同一判断，少一次方法调用。层数为 0 的能力不算。
+            sp = src.powers.get("STRENGTH")
+            if sp is not None:
+                amount += sp.amount
             if src.is_player and card is not None:
-                amount += src.amt("VIGOR")
+                vg = src.powers.get("VIGOR")
+                if vg is not None:
+                    amount += vg.amount
             ev = self.emit("damage_add", src=src, target=target, amount=amount, kind=kind, card=card, ctx=ctx)
             amount = ev.amount
             amount = float(amount)
-            if src.has("WEAK"):
+            wk = src.powers.get("WEAK")
+            if wk is not None and wk.amount != 0:
                 amount *= 0.75
-            if target.has("VULNERABLE"):
+            vu = target.powers.get("VULNERABLE")
+            if vu is not None and vu.amount != 0:
                 amount *= 1.5
             ev = self.emit("damage_mul", src=src, target=target, amount=amount, kind=kind, card=card, ctx=ctx)
             amount = ev.amount
         amount = int(amount)
-        if target.has("INTANGIBLE"):
+        it = target.powers.get("INTANGIBLE")
+        if it is not None and it.amount != 0:
             amount = min(amount, 1)
         return max(0, amount)
 

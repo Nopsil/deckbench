@@ -13,6 +13,18 @@ def _read(path):
         return f.read()
 
 
+def test_fixed_seeds_match_the_pre_speedup_record_and_a_repeat_run():
+    """加速前后逐字段相同：和记下的记录一致，同一批种子再打一遍也一致。"""
+    first = fightcheck.workload(4, 2, ("heuristic",))
+    second = fightcheck.workload(4, 2, ("heuristic",))
+    assert first == second
+    assert fightcheck.canonical(first) == _read(HEUR)
+    beam_first = fightcheck.workload(2, 1, ("beam",))
+    beam_second = fightcheck.workload(2, 1, ("beam",))
+    assert beam_first == beam_second
+    assert fightcheck.canonical(beam_first) == _read(BEAM)
+
+
 def test_heuristic_seeds_match_recorded_output():
     rows = fightcheck.workload(4, 2, ("heuristic",))
     assert fightcheck.canonical(rows) == _read(HEUR)
