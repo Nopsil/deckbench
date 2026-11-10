@@ -2,6 +2,8 @@
 
 # DeckBench · 牌组测试台
 
+[![CI](https://github.com/Nopsil/deckbench/actions/workflows/ci.yml/badge.svg)](https://github.com/Nopsil/deckbench/actions/workflows/ci.yml)
+
 **牌组测试台：不进游戏，让 AI 自动打几百上千局，告诉你胜率、能打到第几层、死在哪、某张卡强不强。**
 给《杀戮尖塔 2》mod 作者和玩家用的非官方平衡测试工具。
 
