@@ -1,4 +1,4 @@
-"""只读分析已经跑完的结果，给 MCP 用。不新开模拟，不写文件。
+"""只读分析已经跑完的结果，给 MCP 和决策说明页用。不新开模拟，不写文件。
 
 路径必须落在允许的目录里（realpath，符号链接按目标算）：
 
@@ -12,12 +12,17 @@
 import json
 import os
 
-from sts2sim.explain import combat_groups, top
+from sts2sim.explain import combat_groups, num, top
 from sts2sim.saveimport import SaveImportError, refuse_save_write
 
 _KINDS = ("play", "target", "potion", "reward", "shop")
 _DECISION_KEYS = ("seq", "kind", "turn", "floor", "act", "room", "encounter", "fight", "card", "threshold", "note")
 _MAX_LIMIT = 100
+# 选中项和次高分的差不超过这个值，界面标成「分差很小」。绝对分差，四种 AI 的分数都能用。
+CLOSE_GAP = 0.5
+_LOG_SKIP = {"saves", "history", "SlayTheSpire2", "node_modules", ".git", "__pycache__"}
+_LOG_LIMIT = 200
+_LOG_DEPTH = 6
 
 
 class AnalysisError(Exception):
@@ -310,28 +315,25 @@ def _where(row):
     return out
 
 
-def explain_fight(path, fight=0, seed="", offset=0, limit=20):
-    if not isinstance(seed, str):
-        raise AnalysisError("bad_seed")
-    fight = _index("fight", fight, 0)
-    offset = _index("offset", offset, 0)
-    limit = min(_index("limit", limit, 1), _MAX_LIMIT)
+def _prepare_explain(path):
     found = _explain_file(path)
     rows = _load_jsonl(found)
     if not any(r.get("kind") in _KINDS for r in rows):
         raise AnalysisError("not_explain", path=found)
-    filtered = rows
+    return found, rows
+
+
+def _filtered_rows(rows, seed):
     if seed:
-        filtered = [r for r in rows if str(r.get("seed")) == seed]
+        return [r for r in rows if str(r.get("seed")) == seed]
+    return rows
+
+
+def _fight_bundle(filtered, fight):
+    """一场战斗的行，加上同一层的奖励和商店。和 explain_fight 用的是同一段。"""
     groups = combat_groups(filtered)
     if fight >= len(groups):
-        if not groups and fight == 0:
-            return {
-                "ok": True, "read_only": True, "path": found, "fight": 0, "fight_count": 0,
-                "seed": seed or None, "where": {}, "offset": offset, "limit": limit, "total": 0,
-                "next_offset": None, "decisions": [],
-            }
-        raise AnalysisError("fight_out_of_range", fight=fight, fight_count=len(groups))
+        return groups, None, []
     _key, fight_rows = groups[fight]
     floor = fight_rows[0].get("floor")
     seed_v = fight_rows[0].get("seed")
@@ -339,7 +341,26 @@ def explain_fight(path, fight=0, seed="", offset=0, limit=20):
     if floor is not None:
         extra = [r for r in filtered if r.get("kind") in ("reward", "shop")
                  and r.get("floor") == floor and r.get("seed") == seed_v]
-    decisions = fight_rows + extra
+    return groups, fight_rows, fight_rows + extra
+
+
+def explain_fight(path, fight=0, seed="", offset=0, limit=20):
+    if not isinstance(seed, str):
+        raise AnalysisError("bad_seed")
+    fight = _index("fight", fight, 0)
+    offset = _index("offset", offset, 0)
+    limit = min(_index("limit", limit, 1), _MAX_LIMIT)
+    found, rows = _prepare_explain(path)
+    filtered = _filtered_rows(rows, seed)
+    groups, fight_rows, decisions = _fight_bundle(filtered, fight)
+    if fight_rows is None:
+        if not groups and fight == 0:
+            return {
+                "ok": True, "read_only": True, "path": found, "fight": 0, "fight_count": 0,
+                "seed": seed or None, "where": {}, "offset": offset, "limit": limit, "total": 0,
+                "next_offset": None, "decisions": [],
+            }
+        raise AnalysisError("fight_out_of_range", fight=fight, fight_count=len(groups))
     page = decisions[offset:offset + limit]
     nxt = offset + len(page)
     return {
@@ -356,6 +377,173 @@ def explain_fight(path, fight=0, seed="", offset=0, limit=20):
         "next_offset": nxt if nxt < len(decisions) else None,
         "decisions": [_decision(r) for r in page],
     }
+
+
+def _seed_label(row):
+    seed = row.get("seed")
+    if seed is None:
+        return None
+    return str(seed)
+
+
+def _run_entry(seed, char, filtered):
+    groups = combat_groups(filtered)
+    fights = []
+    for i, (_key, fight_rows) in enumerate(groups):
+        _groups, _rows, decisions = _fight_bundle(filtered, i)
+        turns = []
+        for row in fight_rows:
+            turn = row.get("turn")
+            if turn is not None and turn not in turns:
+                turns.append(turn)
+        fights.append({
+            "fight": i,
+            "where": _where(fight_rows[0]),
+            "decisions": len(decisions),
+            "turns": turns,
+        })
+    return {"seed": seed, "char": char, "fights": fights}
+
+
+def explain_catalog(path):
+    """一份日志里有哪些种子、每个种子有哪些战斗。场次序号和 explain_fight 的 fight 相同。"""
+    found, rows = _prepare_explain(path)
+    labels = []
+    chars = {}
+    for row in rows:
+        if row.get("kind") not in _KINDS:
+            continue
+        label = _seed_label(row)
+        if label not in labels:
+            labels.append(label)
+            chars[label] = row.get("char") if isinstance(row.get("char"), str) else None
+        elif chars.get(label) is None and isinstance(row.get("char"), str):
+            chars[label] = row.get("char")
+    concrete = [label for label in labels if label]
+    if concrete:
+        runs = [_run_entry(label, chars.get(label), _filtered_rows(rows, label)) for label in concrete]
+    else:
+        runs = [_run_entry(None, chars.get(None), rows)]
+    return {"ok": True, "read_only": True, "path": found, "runs": runs}
+
+
+def _option_key(item):
+    return (item.get("id"), item.get("target"), item.get("hand"))
+
+
+def _score_of(item):
+    if not isinstance(item, dict) or "score" not in item:
+        return None
+    return num(item.get("score"))
+
+
+def decision_margin(decision):
+    """选中分数减去其余候选里的最高分。没有第二名或缺分数时 margin 为 None。
+
+    close 为真表示绝对分差不超过 CLOSE_GAP（含打平，以及略低于次高的改写）。
+    """
+    chosen = decision.get("chosen")
+    cands = [c for c in (decision.get("candidates") or []) if isinstance(c, dict)]
+    if isinstance(chosen, list):
+        chosen_list = [c for c in chosen if isinstance(c, dict)]
+    elif isinstance(chosen, dict):
+        chosen_list = [chosen]
+    else:
+        chosen_list = []
+    chosen_keys = set()
+    for item in chosen_list:
+        if item.get("id") is None and item.get("kind") == "end":
+            continue
+        chosen_keys.add(_option_key(item))
+    scores = []
+    for item in chosen_list:
+        score = _score_of(item)
+        if score is None:
+            key = _option_key(item)
+            for cand in cands:
+                if _option_key(cand) == key:
+                    score = _score_of(cand)
+                    if score is not None:
+                        break
+        if score is not None:
+            scores.append(score)
+    chosen_score = min(scores) if scores else None
+    runner = None
+    runner_score = None
+    for cand in cands:
+        if cand.get("picked") or _option_key(cand) in chosen_keys:
+            continue
+        score = _score_of(cand)
+        if score is None:
+            continue
+        if runner_score is None or score > runner_score:
+            runner = cand
+            runner_score = score
+    runner_up = None
+    if runner is not None:
+        runner_up = {}
+        for key in ("id", "name", "target", "hand"):
+            if runner.get(key) is not None:
+                runner_up[key] = runner[key]
+        runner_up["score"] = runner_score
+    if chosen_score is None or runner_up is None:
+        return {"margin": None, "close": False, "runner_up": runner_up, "chosen_score": chosen_score}
+    margin = num(chosen_score - runner_score)
+    return {
+        "margin": margin,
+        "close": margin is not None and abs(margin) <= CLOSE_GAP,
+        "runner_up": runner_up,
+        "chosen_score": chosen_score,
+    }
+
+
+def explain_page(path, fight=0, seed="", offset=0, limit=20):
+    """explain_fight 的一页，每条决策加上和次高分的差距。不重新读文件格式，不写。"""
+    doc = explain_fight(path, fight, seed, offset, limit)
+    out = dict(doc)
+    out["close_gap"] = CLOSE_GAP
+    annotated = []
+    for decision in doc["decisions"]:
+        item = dict(decision)
+        item.update(decision_margin(decision))
+        annotated.append(item)
+    out["decisions"] = annotated
+    return out
+
+
+def explain_logs():
+    """允许的目录里已有的说明日志。只列路径，不读内容，不创建目录。"""
+    logs = []
+    seen = set()
+    truncated = False
+    for root in allowed_roots():
+        if truncated:
+            break
+        for dirpath, dirnames, names in os.walk(root, followlinks=False):
+            rel = os.path.relpath(dirpath, root)
+            depth = 0 if rel == "." else rel.count(os.sep) + 1
+            if depth >= _LOG_DEPTH:
+                dirnames[:] = []
+            else:
+                dirnames[:] = [d for d in dirnames if d not in _LOG_SKIP and not d.startswith(".")]
+            for name in sorted(names):
+                if name != "explain.jsonl" and not name.endswith(".explain.jsonl"):
+                    continue
+                try:
+                    real = resolve_read(os.path.join(dirpath, name))
+                except AnalysisError:
+                    continue
+                if not os.path.isfile(real) or real in seen:
+                    continue
+                seen.add(real)
+                logs.append({"path": real, "name": os.path.basename(real)})
+                if len(logs) >= _LOG_LIMIT:
+                    truncated = True
+                    break
+            if truncated:
+                break
+    logs.sort(key=lambda item: item["path"])
+    return {"ok": True, "read_only": True, "logs": logs, "truncated": truncated}
 
 
 def batch_run_summary_json(path):
