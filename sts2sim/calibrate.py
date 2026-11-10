@@ -19,7 +19,7 @@ import math
 import os
 import re
 
-from sts2sim.analysis import AnalysisError, _batch_file, _load_jsonl
+from sts2sim.analysis import AnalysisError, _batch_file, _load_jsonl, allowed_roots, resolve_read
 from sts2sim.engine.seed import canonicalize
 from sts2sim.saveimport import SaveImportError, _sim_character, load_path
 
@@ -51,6 +51,10 @@ _ROOM_NAMES = {
     "unassigned": "Unknown",
     "event": "Event",
 }
+_LIST_LIMIT = 200
+_LIST_DEPTH = 6
+_LIST_SKIP = {"saves", "history", "SlayTheSpire2", "node_modules", ".git", "__pycache__"}
+_CURRENT_SAVES = ("current_run.save", "current_run_mp.save")
 _BLANK_SIM = {
     "sim_n": None,
     "mean": None,
@@ -649,6 +653,150 @@ def calibrate_json(real, sim):
         return _dump(calibrate_paths(real, sim, restricted=True))
     except (CalibrateError, SaveImportError, AnalysisError) as err:
         return _error_json(err)
+
+
+def parse_sim_bytes(data):
+    """上传的模拟 jsonl。空行跳过，一行一个对象。不写盘。"""
+    if not isinstance(data, (bytes, bytearray)):
+        raise AnalysisError("not_json", line=1)
+    try:
+        text = bytes(data).decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise AnalysisError("not_json", line=1)
+    rows = []
+    for i, line in enumerate(text.splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            raise AnalysisError("not_json", line=i)
+        if not isinstance(row, dict):
+            raise AnalysisError("not_json", line=i)
+        rows.append(row)
+    return rows
+
+
+def calibrate_rows(real, rows):
+    """一份对局路径对已经读入的模拟行。不读模拟文件，不写盘。"""
+    if not isinstance(real, str) or not real.strip():
+        raise CalibrateError("need_real")
+    if not isinstance(rows, list):
+        raise CalibrateError("need_sim")
+    doc = load_path(real.strip())
+    if doc.get("kind") != "run":
+        raise CalibrateError("one_run")
+    body = report(doc["run"], rows)
+    real_path = doc["run"].get("path") or real.strip()
+    try:
+        shown = os.path.realpath(real_path)
+    except OSError:
+        shown = str(real_path)
+    out = {}
+    for key, value in body.items():
+        out[key] = value
+        if key == "v":
+            out["real_path"] = shown
+    return out
+
+
+def _history_runs(saves_dir):
+    hist = os.path.join(saves_dir, "history")
+    if not os.path.isdir(hist):
+        return []
+    try:
+        names = sorted(os.listdir(hist))
+    except OSError:
+        return []
+    out = []
+    for name in names:
+        if not name.lower().endswith(".run"):
+            continue
+        path = os.path.join(hist, name)
+        if os.path.isfile(path):
+            out.append(path)
+    return out
+
+
+def _files_named(dirpath, wanted):
+    try:
+        names = sorted(os.listdir(dirpath))
+    except OSError:
+        return []
+    folded = {name.lower(): name for name in names}
+    out = []
+    for want in wanted:
+        hit = folded.get(want)
+        if not hit:
+            continue
+        path = os.path.join(dirpath, hit)
+        if os.path.isfile(path):
+            out.append(path)
+    return out
+
+
+def list_imported_runs():
+    """discover() 找到的 history/*.run 和 current_run.save。只列路径，不读内容。"""
+    from sts2sim.saveimport import discover
+
+    runs = []
+    seen = set()
+    truncated = False
+    for root in discover():
+        if truncated:
+            break
+        base = root.get("path") if isinstance(root, dict) else None
+        if not isinstance(base, str) or not os.path.isdir(base):
+            continue
+        for path in _history_runs(base) + _files_named(base, _CURRENT_SAVES):
+            try:
+                real = os.path.realpath(path)
+            except OSError:
+                continue
+            if real in seen or not os.path.isfile(real):
+                continue
+            seen.add(real)
+            runs.append({"path": real, "name": os.path.basename(real)})
+            if len(runs) >= _LIST_LIMIT:
+                truncated = True
+                break
+    runs.sort(key=lambda item: item["path"])
+    return {"ok": True, "read_only": True, "runs": runs, "truncated": truncated}
+
+
+def list_sim_files():
+    """允许目录里的 runs.jsonl。只列路径，不读内容，不创建目录。"""
+    found = []
+    seen = set()
+    truncated = False
+    for root in allowed_roots():
+        if truncated:
+            break
+        for dirpath, dirnames, names in os.walk(root, followlinks=False):
+            rel = os.path.relpath(dirpath, root)
+            depth = 0 if rel == "." else rel.count(os.sep) + 1
+            if depth >= _LIST_DEPTH:
+                dirnames[:] = []
+            else:
+                dirnames[:] = [d for d in dirnames if d not in _LIST_SKIP and not d.startswith(".")]
+            for name in sorted(names):
+                if name != "runs.jsonl":
+                    continue
+                try:
+                    real = resolve_read(os.path.join(dirpath, name))
+                except AnalysisError:
+                    continue
+                if not os.path.isfile(real) or real in seen:
+                    continue
+                seen.add(real)
+                found.append({"path": real, "name": os.path.basename(real)})
+                if len(found) >= _LIST_LIMIT:
+                    truncated = True
+                    break
+            if truncated:
+                break
+    found.sort(key=lambda item: item["path"])
+    return {"ok": True, "read_only": True, "sims": found, "truncated": truncated}
 
 
 def _fmt(value):

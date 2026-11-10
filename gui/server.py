@@ -11,7 +11,7 @@ import tempfile
 import zipfile
 
 import yaml
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -502,6 +502,48 @@ def calibrate_report(req: CalibrateReq):
         raise HTTPException(400, _explain_http(e))
     except CalibrateError as e:
         raise HTTPException(400, _calibrate_http(e))
+
+
+@app.get("/api/calibrate/reals")
+def calibrate_reals():
+    """常见位置里已导入的 history/*.run 和 current_run.save。只列路径，不读内容。"""
+    from sts2sim.calibrate import list_imported_runs
+    return list_imported_runs()
+
+
+@app.get("/api/calibrate/sims")
+def calibrate_sims():
+    """允许目录里的 runs.jsonl。只列路径，不读内容，不写文件。"""
+    from sts2sim.calibrate import list_sim_files
+    return list_sim_files()
+
+
+@app.post("/api/calibrate/upload")
+async def calibrate_upload(real: str = Form(""), file: UploadFile = File(...)):
+    """浏览器选中的 runs.jsonl 只在内存里和一份真对局对照。不写盘，不新开模拟。
+
+    real 和 /api/calibrate 一样，是一份 .run / .save。file 是 jsonl 正文，
+    不要求落在允许目录里。返回的 sim_path 只是上传时的文件名。
+    """
+    from sts2sim.analysis import AnalysisError
+    from sts2sim.calibrate import CalibrateError, calibrate_rows, parse_sim_bytes
+    from sts2sim.saveimport import MAX_BYTES, SaveImportError
+    data = await file.read()
+    if len(data) > MAX_BYTES:
+        raise HTTPException(400, T("imp.err.too_big"))
+    try:
+        body = calibrate_rows(real, parse_sim_bytes(data))
+    except SaveImportError as e:
+        raise HTTPException(400, _import_http(e))
+    except AnalysisError as e:
+        raise HTTPException(400, _explain_http(e))
+    except CalibrateError as e:
+        raise HTTPException(400, _calibrate_http(e))
+    name = os.path.basename(str(file.filename or "upload.jsonl").replace("\\", "/"))
+    if not name or name in (".", ".."):
+        name = "upload.jsonl"
+    body["sim_path"] = name
+    return body
 
 
 @app.post("/api/import/upload")
