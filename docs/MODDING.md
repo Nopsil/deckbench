@@ -1,6 +1,6 @@
 # 写自己的 mod / Writing your own mod
 
-[← 返回 README](../README.md) · [开发者文档](DEVELOPER.md)
+[← 返回 README](../README.md) · [文档索引](INDEX.md) · [开发者文档](DEVELOPER.md)
 
 这份指南讲怎么用 YAML 写卡牌、能力、遗物和角色。前半部分是**整局用的 YAML mod**（新，不用写代码，图形界面里也能填表做）；
 后半部分是旧版 **YAML 战斗模拟器** 的写法（YAML + 少量 Python 钩子，卡组和实验）。

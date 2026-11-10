@@ -1,6 +1,6 @@
 # Mod authors: getting started
 
-[← README](../README.md) · [中文](MOD_AUTHORS.zh-CN.md) · [Format reference](MODDING.md)
+[← README](../README.md) · [Index](INDEX.md) · [中文](MOD_AUTHORS.zh-CN.md) · [Format reference](MODDING.md)
 
 This page is the short path from a fresh checkout to a number you can read. The example mod is `examples/spark/`. It is original YAML in the sts2sim mod format (`sts2sim/modfmt`). It adds two cards, **Arc** and **Lantern**, plus the small pool the full-run checker asks for (two Attacks, two Skills and one Power outside Basic, and at least one Common, Uncommon and Rare). Card text in that folder was written for this example.
 

@@ -1,5 +1,7 @@
 # MCP 对战模式 / MCP play mode
 
+[← 返回 README](../README.md) · [文档索引](INDEX.md) · [存档格式](SAVE_FORMAT.md)
+
 让支持 MCP 的 AI 助手（Claude、Cursor、Grok 等）通过 `tools/mcp_server.py` 在模拟器里**一步一步**打一局：看局面、选选项、写理由、撤销重来，最后导出一份操作清单，可以照着在真游戏里用同一个种子复刻。
 
 *Lets any MCP client play a seeded run step by step: read the state, pick options with a reason, undo, and export a replay list you can follow in the real game with the same seed.*
