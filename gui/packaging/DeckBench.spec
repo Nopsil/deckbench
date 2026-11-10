@@ -52,6 +52,13 @@ a = Analysis(
     noarchive=False,
 )
 pyz = PYZ(a.pure)
+# file_version_info.txt is written by build.ps1 from sts2sim.__version__ (write_version_info.py).
+_version_file = os.path.join(HERE, "file_version_info.txt")
+_exe_kwargs = {}
+if sys.platform == "win32":
+    if not os.path.isfile(_version_file):
+        raise SystemExit("file_version_info.txt is missing; build.ps1 writes it from sts2sim.__version__")
+    _exe_kwargs["version"] = _version_file
 exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name="DeckBench", console=False,
-          icon=os.path.join(HERE, "icon.ico"), upx=False)
+          icon=os.path.join(HERE, "icon.ico"), upx=False, **_exe_kwargs)
 coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="DeckBench")

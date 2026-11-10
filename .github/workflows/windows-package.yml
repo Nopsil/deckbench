@@ -28,7 +28,6 @@ jobs:
     env:
       PYTHONUTF8: "1"
       PYTHONIOENCODING: utf-8
-      PACKAGE_VERSION: "0.1.5"
 
     steps:
       - uses: actions/checkout@v7
@@ -40,6 +39,19 @@ jobs:
           cache-dependency-path: |
             requirements.txt
             requirements-gui.txt
+
+      - name: Read the project version
+        id: version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          $ver = (& python (Join-Path $env:GITHUB_WORKSPACE "gui\packaging\read_version.py")).Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $ver) { throw "could not read sts2sim.__version__" }
+          if ($ver -notmatch '^[0-9A-Za-z][0-9A-Za-z.+-]*$') { throw "refusing version '$ver'" }
+          "version=$ver" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8NoBOM
+          "PACKAGE_VERSION=$ver" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8NoBOM
+          Write-Host "PACKAGE_VERSION=$ver"
 
       - uses: actions/setup-node@v7
         with:
@@ -84,7 +96,17 @@ jobs:
           # The csproj Exclude globs use '/'. A backslash here can miss those two framework DLLs.
           $toolDir = $dll.DirectoryName -replace '\\', '/'
           Write-Host "IlspyToolDir=$toolDir"
-          dotnet publish $csproj -c Release -r win-x64 --self-contained -o $decompiler "-p:IlspyToolDir=$toolDir"
+          $ver = $env:PACKAGE_VERSION
+          if (-not $ver) { throw "PACKAGE_VERSION is empty" }
+          $core = $ver
+          if ($core.StartsWith("v") -or $core.StartsWith("V")) { $core = $core.Substring(1) }
+          $cut = $core.IndexOfAny(@([char]"+", [char]"-"))
+          if ($cut -ge 0) { $core = $core.Substring(0, $cut) }
+          $parts = @($core.Split("."))
+          while ($parts.Count -lt 4) { $parts += "0" }
+          $fileVer = "{0}.{1}.{2}.{3}" -f $parts[0], $parts[1], $parts[2], $parts[3]
+          Write-Host "FileVersion=$fileVer InformationalVersion=$ver"
+          dotnet publish $csproj -c Release -r win-x64 --self-contained -o $decompiler "-p:IlspyToolDir=$toolDir" "-p:Version=$ver" "-p:FileVersion=$fileVer" "-p:AssemblyVersion=$fileVer" "-p:InformationalVersion=$ver" "-p:IncludeSourceRevisionInInformationalVersion=false"
           if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed ($LASTEXITCODE)" }
           if (-not (Test-Path (Join-Path $decompiler "ilspycmd-host.exe"))) {
             throw "published decompiler is missing ilspycmd-host.exe"
@@ -194,8 +216,8 @@ jobs:
       - name: Upload the Windows zip
         uses: actions/upload-artifact@v7
         with:
-          name: DeckBench-0.1.5-win64
-          path: ${{ runner.temp }}/deckbench-build/DeckBench-0.1.5-win64.zip
+          name: DeckBench-${{ steps.version.outputs.version }}-win64
+          path: ${{ runner.temp }}/deckbench-build/DeckBench-${{ steps.version.outputs.version }}-win64.zip
           if-no-files-found: error
           retention-days: 30
 
@@ -203,7 +225,7 @@ jobs:
         if: always() && (steps.api-smoke.outcome == 'success' || steps.api-smoke.outcome == 'failure')
         uses: actions/upload-artifact@v7
         with:
-          name: DeckBench-0.1.5-api-smoke-log
+          name: DeckBench-${{ steps.version.outputs.version }}-api-smoke-log
           path: ${{ runner.temp }}/deckbench-api-smoke.log
           if-no-files-found: error
           retention-days: 30

@@ -11,6 +11,8 @@ DeckBench（牌组测试台）Windows 版
 3. 双击 DeckBench.exe。
    第一次启动会弹出「请稍候」提示，从你电脑上的游戏生成需要的数据，大约 1–2 分钟，完成后界面自动打开。
    不需要另外安装 Python 或 .NET。
+   左下角的版本和旁边的 VERSION.txt、关于 里的版本是同一个数。
+   「检查更新」只有你点了才查询 GitHub 上的发布页，平时不联网，也不会上传对局。
 4. 找不到游戏时会弹窗提示。游戏装在非默认位置的话，在 DeckBench 文件夹里打开 PowerShell 运行一次：
    .\DeckBench.exe --game-dir "D:\SteamLibrary\steamapps\common\Slay the Spire 2"
    （换成你自己的游戏路径；之后直接双击即可，游戏更新后再次启动会自动重新生成。）
@@ -42,6 +44,8 @@ what kills you, and whether a card is strong. Fan-made; not affiliated with Mega
 2. Extract the whole zip to a folder (e.g. D:\DeckBench).
 3. Double-click DeckBench.exe. The first launch shows a "please wait" box while it generates data from your own
    install (about 1-2 minutes); the app opens when done. No Python or .NET installation needed.
+   The version in the footer, VERSION.txt, and About are the same number.
+   Check for updates asks GitHub Releases only after you click it. Nothing is uploaded, and it does not run in the background.
 4. If the game isn't found, run once in PowerShell inside the folder (then just double-click from then on):
    .\DeckBench.exe --game-dir "D:\SteamLibrary\steamapps\common\Slay the Spire 2"
 

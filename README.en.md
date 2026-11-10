@@ -36,7 +36,7 @@ An unofficial balance-testing tool for Slay the Spire 2 mod authors and players.
 - **Death causes**: see which enemies and which fights kill you most often, so you can quickly spot your deck's weak points.
 - **Single-card A/B**: same seeds, one group with a card added and one without — see directly how much that one card changes the win rate and floors reached.
 - **Test your own mod**: a sample mod is built in (Claude娘, original content), and you can upload your own YAML mod for combat tests.
-- **A desktop app, all on your PC**: pick settings with a few clicks, run with one button, live progress, chart reports and history. Nothing goes online and nothing is uploaded.
+- **A desktop app, all on your PC**: pick settings with a few clicks, run with one button, live progress, chart reports and history. Runs stay on your PC and nothing is uploaded. The footer shows the version. **Check for updates** in About stays off until you click it, and then it only asks GitHub Releases.
 - **Four languages**: English, 简体中文, 日本語 and 한국어, switchable in the app; game names (cards, characters, enemies) come from your own install in the same language.
 - **Import a real run**: read a finished run or the in-progress save (seed, route, card picks, relics) without modifying it.
 - **Calibrate a real run against simulations**: for the same seed, character and card-pick path, compare real HP lost in each fight with the simulated distribution. A floor that does not line up is unmatched; a neighbouring fight is not used in its place.

@@ -34,7 +34,7 @@
               </div>
               <div v-else-if="store.catalogError" class="eng err">{{ t('app.backendError', { err: store.catalogError }) }}</div>
               <div v-else class="eng"><n-spin size="small" /> <span class="es">{{ t('app.loadingSim') }}</span></div>
-              <div v-if="appVersion" class="ver">DeckBench v{{ appVersion }}</div>
+              <button v-if="appVersion" type="button" class="ver" data-testid="about-version" @click="aboutOpen = true">DeckBench v{{ appVersion }}</button>
             </div>
           </aside>
           <main class="main">
@@ -51,6 +51,22 @@
               </transition>
             </router-view>
           </main>
+          <n-modal v-model:show="aboutOpen" preset="card" :title="t('about.title')" style="width: min(440px, calc(100vw - 32px))" :bordered="false">
+            <div data-testid="about-dialog">
+              <p class="about-ver">{{ t('about.versionLine', { version: appVersion }) }}</p>
+              <p class="about-note">{{ t('about.manual') }}</p>
+              <n-button data-testid="check-updates" :loading="updateBusy" :disabled="updateBusy" @click="checkUpdates">{{ t('about.check') }}</n-button>
+              <p v-if="updateStatus === 'up_to_date'" class="about-result" data-testid="update-result">{{ t('about.upToDate') }}</p>
+              <p v-else-if="updateStatus === 'update_available'" class="about-result" data-testid="update-result">
+                {{ t('about.updateAvailable', { version: updateLatest }) }}
+                <a :href="updateUrl" target="_blank" rel="noopener noreferrer">{{ t('about.releaseLink') }}</a>
+              </p>
+              <p v-else-if="updateStatus === 'offline'" class="about-result" data-testid="update-result">{{ t('about.offline') }}</p>
+              <p v-else-if="updateStatus === 'rate_limited'" class="about-result" data-testid="update-result">{{ t('about.rateLimit') }}</p>
+              <p v-else-if="updateStatus === 'not_published'" class="about-result" data-testid="update-result">{{ t('about.notPublished') }}</p>
+              <p v-else-if="updateStatus" class="about-result" data-testid="update-result">{{ t('about.error') }}</p>
+            </div>
+          </n-modal>
         </div>
       </n-dialog-provider>
     </n-message-provider>
@@ -60,7 +76,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { NConfigProvider, NMessageProvider, NDialogProvider, NIcon, NSelect, NSpin, darkTheme, zhCN, dateZhCN, enUS, dateEnUS, jaJP, dateJaJP, koKR, dateKoKR } from 'naive-ui'
+import { NConfigProvider, NMessageProvider, NDialogProvider, NIcon, NSelect, NSpin, NModal, NButton, darkTheme, zhCN, dateZhCN, enUS, dateEnUS, jaJP, dateJaJP, koKR, dateKoKR } from 'naive-ui'
 import { CirclePlus, PlayerPlay, ChartBar, Scale, ArrowsLeftRight, History, World, Puzzle, Folder, Map, ListSearch, ChartDots, Stack2 } from '@vicons/tabler'
 import { themeFor } from './theme'
 import { store } from './api'
@@ -94,6 +110,41 @@ const isOn = (it) => route.path === it.to || route.path.startsWith(it.to + '/')
 const runningCount = computed(() => store.runs.filter((r) => r.status === 'running').length)
 let timer
 const appVersion = ref('')
+const aboutOpen = ref(false)
+const updateBusy = ref(false)
+const updateStatus = ref('')
+const updateLatest = ref('')
+const updateUrl = ref('')
+function releaseHref(url) {
+  return typeof url === 'string' && url.startsWith('https://github.com/Nopsil/deckbench/')
+    ? url
+    : 'https://github.com/Nopsil/deckbench/releases'
+}
+async function checkUpdates() {
+  updateBusy.value = true
+  updateStatus.value = ''
+  updateLatest.value = ''
+  updateUrl.value = ''
+  const ctrl = new AbortController()
+  const abortTimer = setTimeout(() => ctrl.abort(), 15000)
+  try {
+    const r = await fetch('/api/updates/check', { method: 'POST', headers: { 'x-lang': lang.value }, signal: ctrl.signal })
+    let data = null
+    try { data = await r.json() } catch (e) { data = null }
+    if (!data || !data.status) {
+      updateStatus.value = 'error'
+      return
+    }
+    updateStatus.value = data.status
+    updateLatest.value = data.latest || ''
+    updateUrl.value = releaseHref(data.html_url)
+  } catch (e) {
+    updateStatus.value = 'offline'
+  } finally {
+    clearTimeout(abortTimer)
+    updateBusy.value = false
+  }
+}
 onMounted(() => {
   fetch('/api/version').then((r) => r.json()).then((d) => { appVersion.value = d.version || '' }).catch(() => {})
   store.loadCatalog()
@@ -123,7 +174,12 @@ nav { display: flex; flex-direction: column; gap: 3px; flex: 1; min-height: 0; o
 .lang { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding: 0 2px; }
 .lang-ic { color: #77736C; flex: none; }
 .eng { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: 12px; background: #1E1E22; border: 1px solid #2A2A2F; }
-.ver { margin-top: 10px; padding: 0 4px; font-size: 11px; color: #77736C; letter-spacing: .02em; }
+.ver { margin-top: 10px; padding: 0 4px; font-size: 11px; color: #77736C; letter-spacing: .02em; background: none; border: 0; cursor: pointer; text-align: left; font-family: inherit; }
+.ver:hover { color: #E4DFD8; }
+.about-ver { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
+.about-note { color: #8A857E; font-size: 12.5px; line-height: 1.5; margin: 0 0 14px; }
+.about-result { margin: 14px 0 0; font-size: 13.5px; line-height: 1.5; }
+.about-result a { color: #F2A385; }
 .eng.err { color: #E06C6C; font-size: 12px; max-height: 72px; overflow: hidden; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: #8FBF8F; margin-top: 6px; box-shadow: 0 0 0 3px rgba(143,191,143,.15); flex: none; }
 .et { font-size: 12.5px; font-weight: 600; }

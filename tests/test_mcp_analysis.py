@@ -328,10 +328,10 @@ def test_server_registers_analysis_tools_on_play_and_import_only():
     mcp = _load_mcp()
     play = mcp.build()
     names = [t.name for t in play._tool_manager.list_tools()]
-    assert names[-14:] == [
+    assert names[-15:] == [
         "batch_run_summary", "card_ab", "compare_runs", "explain_fight", "calibrate", "gap_triage",
         "export_report", "list_cards", "list_encounters", "save_deck", "head_to_head",
-        "card_impact", "run_progress", "cancel_run",
+        "card_impact", "run_progress", "cancel_run", "check_update",
     ]
     tools = {t.name: t for t in play._tool_manager.list_tools()}
     assert tools["batch_run_summary"].parameters["required"] == ["path"]
@@ -366,7 +366,7 @@ def test_server_registers_analysis_tools_on_play_and_import_only():
         "import_save", "import_history_batch", "batch_run_summary", "card_ab", "compare_runs",
         "explain_fight", "calibrate", "gap_triage", "export_report",
         "list_cards", "list_encounters", "save_deck", "head_to_head", "card_impact",
-        "run_progress", "cancel_run",
+        "run_progress", "cancel_run", "check_update",
     ]
     impact = tools["card_impact"]
     assert "Wilson" in impact.description and "400" in impact.description

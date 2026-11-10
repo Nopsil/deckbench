@@ -13,6 +13,11 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <ServerGarbageCollection>true</ServerGarbageCollection>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- File version is stamped at publish from sts2sim.__version__ (gui/packaging/read_version.py). Do not write a second version number here. -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <Company>DeckBench</Company>
+    <Product>DeckBench</Product>
+    <Description>DeckBench decompiler host</Description>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="$(IlspyToolDir)/*.dll" Exclude="$(IlspyToolDir)/System.Collections.Immutable.dll;$(IlspyToolDir)/System.Reflection.Metadata.dll"><Private>true</Private></Reference>
