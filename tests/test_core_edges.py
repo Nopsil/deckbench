@@ -1,8 +1,13 @@
-"""战斗核心的边界：过量伤害不能把生命打成负数，中毒统计按实际失去的生命算。"""
+"""战斗核心的边界：过量伤害不能把生命打成负数，中毒统计按实际失去的生命算。
+
+监听缓存必须和「先快照再调用」同一顺序：前面一组新加上的能力，这次事件看得到；
+同一组里新加上的，这次看不到。
+"""
 import random
 
-from sts2sim.core import Combat, Creature, Player
+from sts2sim.core import Combat, Creature, Player, Power, register_power
 from sts2sim.powers import Poison
+from sts2sim.relics import Relic, register_relic
 
 
 class _Mod:
@@ -56,6 +61,66 @@ def test_lethal_poison_does_not_leave_negative_hp():
     assert foe.hp == 0
     assert foe.alive is False
     assert combat.stats.card["毒雾"][1] == 5
+
+
+class _PingLog:
+    order = []
+
+
+@register_power
+class _BenchLate(Power):
+    id = "_BENCH_LATE"
+
+    def on_ping(self, C, ev):
+        _PingLog.order.append(("late", self.owner.name))
+
+
+@register_power
+class _BenchEarly(Power):
+    id = "_BENCH_EARLY"
+
+    def on_ping(self, C, ev):
+        _PingLog.order.append(("early", self.owner.name))
+        if "_BENCH_LATE" not in self.owner.powers:
+            C.apply_power(self.owner, "_BENCH_LATE", 1)
+        foe = C.enemies[0]
+        if "_BENCH_LATE" not in foe.powers:
+            C.apply_power(foe, "_BENCH_LATE", 1)
+
+
+@register_relic
+class _BenchRelic(Relic):
+    id = "_BENCH_RELIC"
+
+    def on_ping(self, C, ev):
+        _PingLog.order.append(("relic",))
+        if "_BENCH_EARLY" not in C.player.powers:
+            C.apply_power(C.player, "_BENCH_EARLY", 1)
+
+
+def test_emit_snapshot_shows_powers_added_for_later_groups_only():
+    foe = _Foe("木桩", 20)
+    combat = _combat(foe)
+    combat.relics = [_BenchRelic()]
+    _PingLog.order = []
+    ev = combat.emit("ping")
+    assert ev is not None
+    # 遗物先跑，给玩家加上 Early。玩家这组的快照在遗物之后，所以 Early 这次看得到。
+    # Early 再给自己加 Late：同一张表已经快照过，这次看不到。
+    # Early 给敌人加 Late：敌人那组还没快照，这次看得到。
+    assert _PingLog.order == [("relic",), ("early", "铁甲"), ("late", "木桩")]
+    _PingLog.order = []
+    combat.emit("ping")
+    assert _PingLog.order == [
+        ("relic",),
+        ("early", "铁甲"),
+        ("late", "铁甲"),
+        ("late", "木桩"),
+    ]
+    foe.alive = False
+    _PingLog.order = []
+    combat.emit("ping")
+    assert _PingLog.order == [("relic",), ("early", "铁甲"), ("late", "铁甲")]
 
 
 def test_nonlethal_poison_still_ticks_for_the_stack():

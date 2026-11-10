@@ -10,9 +10,53 @@
     翻倍/三倍是否被拦截设计未定，由 MULT_BLOCKED_BY_ARTIFACT 开关决定（默认不拦截）。
   * RLHF 只修正主施加数量（modify_apply），不递归；连坐次级施加 secondary=True，什么都不触发。
 """
+import os
+
 from sts2sim.core import Power, register_power
 from sts2sim.relics import Relic, register_relic
 from sts2sim import expr
+
+
+def _make_env_get():
+    """读环境变量。和 os.environ.get 的值相同，缺省也相同。
+
+    os.environ.get 每次都走编码。这里对着 environ 自己的表查，值变了会重新解码。
+    """
+    data = getattr(os.environ, "_data", None)
+    if not isinstance(data, dict):
+        return os.environ.get
+    sample = next(iter(data), None)
+    if sample is None:
+        return os.environ.get
+    if isinstance(sample, bytes):
+        enc, dec = os.fsencode, os.fsdecode
+        keys = {}
+        prev = {}
+
+        def get(key, default=None, _d=data, _e=enc, _c=dec, _k=keys, _p=prev):
+            b = _k.get(key)
+            if b is None:
+                b = _k[key] = _e(key)
+            raw = _d.get(b)
+            if raw is None:
+                return default
+            old = _p.get(b)
+            if old is not None and old[0] == raw:
+                return old[1]
+            s = _c(raw)
+            _p[b] = (raw, s)
+            return s
+
+        return get
+
+    def get(key, default=None, _d=data):
+        raw = _d.get(key)
+        return default if raw is None else raw
+
+    return get
+
+
+_env = _make_env_get()
 
 FK = "FK"
 MULT_BLOCKED_BY_ARTIFACT = False
@@ -201,9 +245,14 @@ FENLEIQI_VARIANTS = {
 }
 
 
-def fenleiqi_variant():
-    import os
-    return FENLEIQI_VARIANTS[os.environ.get("STS2SIM_FENLEIQI", "v34")]
+def fenleiqi_variant(_box=[None]):
+    v = _env("STS2SIM_FENLEIQI", "v34")
+    hit = _box[0]
+    if hit is not None and hit[0] == v:
+        return hit[1]
+    out = FENLEIQI_VARIANTS[v]
+    _box[0] = (v, out)
+    return out
 
 
 def _extra(C):
@@ -303,33 +352,44 @@ GRANT_CARDS = {"MIANZE", "HONGDUI", "FANGYU_HUIFU", "BUNENGBANG"}
 GRANT_CARDS_6 = GRANT_CARDS | {"SHAODENG", "WANQUAN_ZHENGQUE"}
 
 
-def fanji_cfg():
-    import os
-    v = os.environ.get("STS2SIM_FANJI", "off")
+def fanji_cfg(_box=[None]):
+    v = _env("STS2SIM_FANJI", "off")
+    hit = _box[0]
+    if hit is not None and hit[0] == v:
+        return hit[1]
     if v == "off":
-        return None
-    mode, cap, f = v.split("-")
-    return mode, int(cap), f
+        out = None
+    else:
+        mode, cap, f = v.split("-")
+        out = (mode, int(cap), f)
+    _box[0] = (v, out)
+    return out
 
 
-def flq_opt():
-    import os
-    return os.environ.get("STS2SIM_FLQ", "flat")
+def flq_opt(_box=[None]):
+    v = _env("STS2SIM_FLQ", "flat")
+    hit = _box[0]
+    if hit is not None and hit[0] == v:
+        return hit[1]
+    _box[0] = (v, v)
+    return v
 
 
 def fanji_base(f, L):
     return {"L": L, "2L": 2 + L, "H": L // 2, "1H": 1 + L // 2}[f]
 
 
-def fanji_grants(card):
-    import os
-    g = GRANT_CARDS_6 if os.environ.get("STS2SIM_GRANT", "4") == "6" else GRANT_CARDS
-    return card.d.id in g
+def fanji_grants(card, _box=[None]):
+    v = _env("STS2SIM_GRANT", "4")
+    hit = _box[0]
+    if hit is None or hit[0] != v:
+        hit = (v, GRANT_CARDS_6 if v == "6" else GRANT_CARDS)
+        _box[0] = hit
+    return card.d.id in hit[1]
 
 
 def fanji_ai_mode():
-    import os
-    return os.environ.get("STS2SIM_FANJI_AI", "flat")
+    return _env("STS2SIM_FANJI_AI", "flat")
 
 
 def fanji_hit_dmg(C, L, n=1):

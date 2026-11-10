@@ -28,12 +28,19 @@ def register_helper(name, fn):
     return fn
 
 
-def _blank_ns():
+def _ensure_base():
     global _BASE_NS
     if _BASE_NS is None:
         _BASE_NS = dict(BASE)
         _BASE_NS.update(HELPERS)
-    return _BASE_NS.copy()
+    return _BASE_NS
+
+
+def _blank_ns():
+    return _ensure_base().copy()
+
+
+_MISS = object()
 
 
 def _stacks(c, pid):
@@ -75,6 +82,32 @@ def ev(x, ctx, extra=None):
         return x
     if not isinstance(x, str):
         return x
+    # 纯名字（卡牌 vars 里的 dmg、block…）不编译、不复制命名空间。
+    # 查找顺序和下面的 eval 一样：extra 盖过 T/P/C/card/ctx，再盖过 locals、vars、内置名。
+    if x.isidentifier():
+        if extra:
+            v = extra.get(x, _MISS)
+            if v is not _MISS:
+                return v
+        if x == "T":
+            return ctx.target
+        if x == "P":
+            return ctx.combat.player
+        if x == "C":
+            return ctx.combat
+        if x == "card":
+            return ctx.card
+        if x == "ctx":
+            return ctx
+        v = ctx.locals.get(x, _MISS)
+        if v is not _MISS:
+            return v
+        v = ctx.vars.get(x, _MISS)
+        if v is not _MISS:
+            return v
+        v = _ensure_base().get(x, _MISS)
+        if v is not _MISS:
+            return v
     code = _CACHE.get(x)
     if code is None:
         code = compile(x, "<expr>", "eval")
