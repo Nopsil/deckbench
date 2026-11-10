@@ -164,7 +164,7 @@ python tools/import_dll_mod.py "/path/to/Slay the Spire 2/mods/MyMod" --out mods
 
 左侧 **「模组编辑器」**：填表做一个角色（生命、能量、起始牌组、初始遗物）、卡牌（效果从菜单里选：造成伤害、施加能力、抽牌……或常用模板）、能力和遗物（「什么时候 → 做什么」），按 **「检查」** 会用大白话指出问题。
 然后在 **「试跑」** 里一键跑整局批量，或者做单卡 A/B（同一批种子，起始牌组 vs 起始牌组 + 这张牌）。可以导入 / 导出 zip 和别人交换。
-同样的 YAML 文件也能直接放进 `mods/` 用命令行跑：`python tools/batch.py --mod mods/my_mod --char MyHero --agent modai`。格式说明见 [docs/MODDING.md](docs/MODDING.md)。
+同样的 YAML 文件也能直接放进 `mods/` 用命令行跑：`python tools/batch.py --mod mods/my_mod --char MyHero --agent modai`。从安装到第一条命令（示例 mod、小样本胜率、单卡 A/B、出牌说明）见 [docs/MOD_AUTHORS.md](docs/MOD_AUTHORS.md)（[中文](docs/MOD_AUTHORS.zh-CN.md)）。格式说明见 [docs/MODDING.md](docs/MODDING.md)。
 
 已经装在游戏里的 mod 不用先手写 YAML：**模组编辑器**里按 **「导入游戏 mod」**，选那个 mod 的 zip（清单 JSON + DLL），或从下拉框选游戏 `mods/` 里的一份。认得出的牌会变成表，DLL 不会被执行。限制见 [docs/DLL_MODS.md](docs/DLL_MODS.md)。
 
@@ -223,6 +223,7 @@ python tools/import_dll_mod.py "/path/to/Slay the Spire 2/mods/MyMod" --out mods
 - [docs/DEVELOPER.md](docs/DEVELOPER.md)：命令行批量运行（全部参数）、首次生成的内部原理、可选的 spire-mentor AI、旧版战斗模拟器、目录结构、测试（含 Linux/macOS 命令）。
 - 可选的更强 AI：自己构建第三方 [spire-mentor](https://github.com/tfriedel/spire-mentor) 后，官方安装包里就可以选 `mentor-full` / `mentor-full-ev`（MCTS 打战斗，PPO 做局外决策，只支持 5 个原版角色），不用重编 DeckBench。spire-mentor 不随本项目分发；Windows 打包版要把 `mentor.local.json` 的 `python` 指到构建 `sts2_rs` 的解释器。它在 v0.111 的 19 张新牌（SIDESTEP 等）上有一个已知的读取问题，我们提供了一个很小的本地补丁。冒烟和打包注意见 [docs/DEVELOPER.md](docs/DEVELOPER.md#可选spire-mentor更强的-ai--optional-spire-mentor)。
   *Optional stronger AI: after you build spire-mentor yourself, the official package can run `mentor-full` / `mentor-full-ev` (vanilla characters only) without rebuilding DeckBench. It is not shipped here; the Windows package needs `mentor.local.json` `python` set to the interpreter that built `sts2_rs`. A known upstream loader bug for 19 v0.111 cards (SIDESTEP etc.) has a small local patch. Smoke steps and packaging rules: docs/DEVELOPER.md.*
+- [docs/MOD_AUTHORS.md](docs/MOD_AUTHORS.md)（[中文](docs/MOD_AUTHORS.zh-CN.md)）：mod 作者入门。示例在 `examples/spark/`，用内部 Python 引擎跑小样本，不需要游戏安装。
 - [docs/MODDING.md](docs/MODDING.md)：用 YAML + Python 写自己的 mod（卡牌、能力、遗物、卡组、实验）。
 - [gui/README.md](gui/README.md)：图形界面的结构和打包。
 - [CONTRIBUTING.md](CONTRIBUTING.md)：贡献须知（不接受任何游戏内容）。

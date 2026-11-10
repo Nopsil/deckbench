@@ -4,9 +4,10 @@
 
 这份指南讲怎么用 YAML 写卡牌、能力、遗物和角色。前半部分是**整局用的 YAML mod**（新，不用写代码，图形界面里也能填表做）；
 后半部分是旧版 **YAML 战斗模拟器** 的写法（YAML + 少量 Python 钩子，卡组和实验）。
+从安装到第一条能跑的命令，见 [MOD_AUTHORS.md](MOD_AUTHORS.md)（[中文](MOD_AUTHORS.zh-CN.md)），示例 mod 在 `examples/spark/`。
 示例：`gui/examples/demo_mod/`（最小示例）、`mods/claude_v34/`（完整角色）。
 
-*How to write cards, powers, relics and characters in YAML. The first part covers YAML mods for full runs (new; no code, also doable with forms in the GUI); the second part is the legacy YAML combat simulator (YAML plus small Python hooks, decks and experiments). Examples: `mods/claude_yaml/` (full runs), `gui/examples/demo_mod/`, `mods/claude_v34/` (combat simulator).*
+*How to write cards, powers, relics and characters in YAML. The first part covers YAML mods for full runs (new; no code, also doable with forms in the GUI); the second part is the legacy YAML combat simulator (YAML plus small Python hooks, decks and experiments). Getting started, from install to the first commands: [MOD_AUTHORS.md](MOD_AUTHORS.md) ([中文](MOD_AUTHORS.zh-CN.md)), example mod in `examples/spark/`. Examples: `mods/claude_yaml/` (full runs), `gui/examples/demo_mod/`, `mods/claude_v34/` (combat simulator).*
 
 > 注意：只写你自己原创的内容。不要把游戏原版卡牌的文字、数值表或美术放进 mod 再提交到本仓库（见 [CONTRIBUTING.md](../CONTRIBUTING.md)）。
 > 要和原版角色对比，需要本机的原版对照组 `mods/vanilla/`，见 [DEVELOPER.md · 旧版 YAML 战斗模拟器](DEVELOPER.md#旧版-yaml-战斗模拟器--legacy-yaml-combat-simulator)。

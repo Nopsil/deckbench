@@ -1,0 +1,72 @@
+# Two cards this walkthrough compares: ARC and LANTERN.
+# The others fill the pool the full-run checker asks for
+# (2 Attacks, 2 Skills, 1 Power outside Basic, and one Common / Uncommon / Rare).
+# Types are the Chinese words the internal fight engine matches; the checker also accepts Attack/Skill/Power.
+- id: FLICK
+  name: Flick
+  type: 攻击
+  rarity: 基础
+  cost: 1
+  target: enemy
+  vars: {dmg: 6}
+  upgrade: {vars: {dmg: 9}}
+  text: A small burst of heat. Deal 6 damage.
+  effects: [{op: damage, amount: dmg}]
+- id: WARD
+  name: Ward
+  type: 技能
+  rarity: 基础
+  cost: 1
+  target: self
+  vars: {blk: 5}
+  upgrade: {vars: {blk: 8}}
+  text: Draw the flame in. Gain 5 Block.
+  effects: [{op: block, amount: blk}]
+- id: ARC
+  name: Arc
+  type: 攻击
+  rarity: 普通
+  cost: 1
+  target: enemy
+  vars: {dmg: 4}
+  upgrade: {vars: {dmg: 5}}
+  text: The spark jumps. Deal 4 damage twice.
+  effects: [{op: damage, amount: dmg, hits: 2}]
+- id: KINDLE
+  name: Kindle
+  type: 技能
+  rarity: 普通
+  cost: 1
+  target: self
+  vars: {blk: 4, n: 1}
+  upgrade: {vars: {blk: 6}}
+  text: Feed the wick. Gain 4 Block. Draw 1 card.
+  effects: [{op: block, amount: blk}, {op: draw, n: n}]
+- id: LANTERN
+  name: Lantern
+  type: 攻击
+  rarity: 罕见
+  cost: 1
+  target: enemy
+  vars: {dmg: 9}
+  upgrade: {vars: {dmg: 12}}
+  text: Swing the lantern. Deal 9 damage.
+  effects: [{op: damage, amount: dmg}]
+- id: GLOAM
+  name: Gloam
+  type: 技能
+  rarity: 罕见
+  cost: 1
+  target: self
+  vars: {blk: 8}
+  upgrade: {vars: {blk: 11}}
+  text: Step into the dim. Gain 8 Block.
+  effects: [{op: block, amount: blk}]
+- id: HEARTH
+  name: Hearth
+  type: 能力
+  rarity: 稀有
+  cost: 1
+  target: self
+  text: Keep a coal. Gain 1 Warmth.
+  effects: [{template: gain_power, power: WARMTH, amount: 1}]

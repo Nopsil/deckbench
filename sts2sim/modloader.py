@@ -9,6 +9,9 @@ mod.yaml 例：
   characters:
     claude: {name: Claude娘, hp: 75, energy: 3, hand: 5, relics: [CONSTITUTION]}
   ai_values: {FK: 0.8}        # 可选：给启发式 AI 的能力估值覆盖
+
+内置目录没有这份 mod 时，再按环境变量 STS2SIM_USER_MODS 找（os.pathsep 分隔的目录，
+每个目录下面是 mod 文件夹）。示例：STS2SIM_USER_MODS=examples 能加载 examples/spark。
 """
 import importlib.util
 import os
@@ -22,6 +25,22 @@ from . import enemies as _enemies  # noqa
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODS_DIR = os.path.join(ROOT, "mods")
 BUILTIN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "builtin_cards.yaml")
+
+
+def mod_dir(name):
+    """mods/<name>，没有 mod.yaml 时再找 STS2SIM_USER_MODS 里的同名文件夹。"""
+    base = os.path.join(MODS_DIR, name)
+    if os.path.isfile(os.path.join(base, "mod.yaml")):
+        return base
+    extra = os.environ.get("STS2SIM_USER_MODS", "")
+    for root in extra.split(os.pathsep):
+        root = root.strip()
+        if not root:
+            continue
+        alt = os.path.join(root, name)
+        if os.path.isfile(os.path.join(alt, "mod.yaml")):
+            return alt
+    return base
 
 
 def _yaml(path):
@@ -51,10 +70,14 @@ class ModSet:
             self.by_name.setdefault(d.name, d)
 
     def _load_mod(self, name):
-        base = os.path.join(MODS_DIR, name)
+        base = mod_dir(name)
         if not os.path.exists(os.path.join(base, "mod.yaml")):
-            hint = ("\n原版对照组 mods/vanilla 不随仓库分发（属于游戏数据），需要你自己在本机整理，见 README「可选外部依赖」。"
-                    "\nmods/vanilla is not shipped (game data); see README 'Optional external dependencies'.") if name == "vanilla" else ""
+            if name == "vanilla":
+                hint = ("\n原版对照组 mods/vanilla 不随仓库分发（属于游戏数据），需要你自己在本机整理，见 README「可选外部依赖」。"
+                        "\nmods/vanilla is not shipped (game data); see README 'Optional external dependencies'.")
+            else:
+                hint = ("\n内置 mods/ 里没有这份文件夹。可以把其所在目录放进 STS2SIM_USER_MODS（例如 examples）。"
+                        "\nNo such folder under mods/. Set STS2SIM_USER_MODS to the directory that contains it (for example examples).")
             raise SystemExit(f"找不到 mod / mod not found: {base}{hint}")
         meta = _yaml(os.path.join(base, "mod.yaml"))
         self.meta[name] = meta

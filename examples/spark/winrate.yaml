@@ -1,0 +1,13 @@
+# Tiny win-rate sample for the internal fight engine. No game install.
+# decks is empty so this file does not ask for real encounters.
+# The dummy row's fights: 2 is the sample. --fights sizes the decks list (empty here).
+name: spark_win
+title: Spark example — tiny win-rate sample
+mods: [spark]
+seed: 1
+fights: 2
+max_turns: 1
+agent: heuristic
+decks: []
+extra:
+  - {deck: spark_arc, encounter: DUMMY, fights: 2, max_turns: 1, room: 探针}
