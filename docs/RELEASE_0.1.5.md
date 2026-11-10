@@ -1,10 +1,10 @@
 # DeckBench 0.1.5
 
-这一版对应更新日志里的「未发布（0.1.5）」。功能已经在 `main`：PR #4（合并提交 `a204bb4`）收进导入、种子预览、DLL→YAML 和 mentor-full 打包；#6–#26 补上本文、只读摘要、种子预览 JSON、history 批量摘要和安装包清单；#27–#39 补上 Wilson 区间、决策说明、`--workers`、`--mechanic-aware`、校准、mod 作者入门和内部战斗加速。版本号仍是 `0.1.5`（`sts2sim.__version__`、`gui/web/package.json`、`gui/packaging/build.ps1` 的默认 `-Version`），本文不改版本。文档目录在 [INDEX.md](INDEX.md)。
+这一版对应更新日志里的「未发布（0.1.5）」。功能已经在 `main`：PR #4（合并提交 `a204bb4`）收进导入、种子预览、DLL→YAML 和 mentor-full 打包；#6–#26 补上本文、只读摘要、种子预览 JSON、history 批量摘要和安装包清单；#27–#39 补上 Wilson 区间、决策说明、`--workers`、`--mechanic-aware`、校准、mod 作者入门和内部战斗加速；#40 把更新日志对齐到 #39。其后按 `git log` 的合并顺序是 #41、#43、#42、#44、#45、#46、#47、#48、#49、#50、#51、#52：覆盖率、持续集成、坏输入、Windows 种子预览缓存、界面语言、Windows 安装包工作流、简体中文文档、打包脚本修复、缺口分诊、打包后的接口冒烟，以及 `charset=utf-8`。版本号仍是 `0.1.5`（`sts2sim.__version__`、`gui/web/package.json`、`gui/packaging/build.ps1` 的默认 `-Version`），本文不改版本。文档目录在 [INDEX.md](INDEX.md)。
 
 给两类人：已经把 mod 装进游戏、想先看数字的作者；想挑一条适合录像的种子、又不想先让 AI 把整局打完的玩家。
 
-*These notes are the GitHub Release body for what the changelog lists as Unreleased (0.1.5). The features are on `main`: PR #4 (merge `a204bb4`) brought in import, seed preview, DLL→YAML and mentor-full packaging; #6–#26 added these notes, the read-only summary, seed-preview JSON, the history batch summary and the package manifest; #27–#39 added the Wilson interval, decision explanations, `--workers`, `--mechanic-aware`, calibration, the mod-author guide and a faster internal fight engine. The version is still `0.1.5` (`sts2sim.__version__`, `gui/web/package.json`, the default `-Version` in `gui/packaging/build.ps1`). This file does not bump it. Documentation index: [INDEX.md](INDEX.md).*
+*These notes are the GitHub Release body for what the changelog lists as Unreleased (0.1.5). The features are on `main`: PR #4 (merge `a204bb4`) brought in import, seed preview, DLL→YAML and mentor-full packaging; #6–#26 added these notes, the read-only summary, seed-preview JSON, the history batch summary and the package manifest; #27–#39 added the Wilson interval, decision explanations, `--workers`, `--mechanic-aware`, calibration, the mod-author guide and a faster internal fight engine. #40 aligned the changelog through #39. After that, in `git log` merge order, #41, #43, #42, #44, #45, #46, #47, #48, #49, #50, #51 and #52 added coverage, CI, clear errors for bad input, the Windows seed-preview cache, the UI language, the Windows package workflow, 简体中文 docs, the packaging-script fixes, gap triage, the packaged API smoke, and `charset=utf-8`. The version is still `0.1.5` (`sts2sim.__version__`, `gui/web/package.json`, the default `-Version` in `gui/packaging/build.ps1`). This file does not bump it. Documentation index: [INDEX.md](INDEX.md).*
 
 *Written for mod authors who already have a mod in the game, and for players picking a seed to record without first letting an AI play the whole run.*
 
@@ -21,7 +21,7 @@
 - **DLL → YAML。** 读你已经写好的游戏 mod（清单 JSON + DLL），能反编译时把直线的伤害、格挡、抽牌、能量、治疗、施加能力翻成现有 YAML，再到模组编辑器里改、保存、整局试跑。DLL 不执行，游戏文件不复制进来。
 - **官方安装包可以接上 `mentor-full` / `mentor-full-ev`。** 仍然不附带 spire-mentor。整局批量的 AI 列表里就有这两项；没配好时是灰的。不用为了接上它重编 DeckBench。
 
-更细的字段、路径和缺口在 [SAVE_FORMAT.md](SAVE_FORMAT.md)、[DLL_MODS.md](DLL_MODS.md)、[MCP.md](MCP.md)、[MOD_AUTHORS.md](MOD_AUTHORS.md)（[简体中文](MOD_AUTHORS.zh-CN.md)）、[PERFORMANCE.md](PERFORMANCE.md)、[DEVELOPER.md](DEVELOPER.md)。全部文档的目录是 [INDEX.md](INDEX.md)。更新日志全文在仓库根目录的 [CHANGELOG.md](../CHANGELOG.md)。
+更细的字段、路径和缺口在 [SAVE_FORMAT.md](SAVE_FORMAT.md)、[DLL_MODS.md](DLL_MODS.md)、[MCP.md](MCP.md)、[MOD_AUTHORS.md](MOD_AUTHORS.md)（[简体中文](MOD_AUTHORS.zh-CN.md)）、[CALIBRATION.md](CALIBRATION.md)、[PERFORMANCE.md](PERFORMANCE.md)、[COVERAGE.md](COVERAGE.md)、[CI.md](CI.md)、[DEVELOPER.md](DEVELOPER.md)。Windows 安装包的说明在 [gui/packaging/README-win.txt](../gui/packaging/README-win.txt)（打进 zip 叫 `README.txt`）。全部文档的目录是 [INDEX.md](INDEX.md)。更新日志全文在仓库根目录的 [CHANGELOG.md](../CHANGELOG.md)。
 
 ### 试一下
 
@@ -102,6 +102,27 @@ python tools/bench.py
 
 `examples/spark` 的小样本命令写在 [MOD_AUTHORS.zh-CN.md](MOD_AUTHORS.zh-CN.md)，由 `tests/test_mod_authors.py` 在内部 Python 引擎上跑完。
 
+### #41–#52
+
+版本号仍是 0.1.5。`git log` 上的合并顺序是 #41、#43、#42、#44、#45、#46、#47、#48、#49、#50、#51、#52。
+
+- **覆盖率。** 补了卡牌结算、能力 / 遗物钩子、存档解析、校准匹配和 HTTP 错误路径的测试。快照和五处边界写在 [COVERAGE.md](COVERAGE.md)：X 费牌被重放时仍用这次付出的能量；对没有活着的目标施加能力并 `save` 时记下 0；`{category, entry}` 拼成 `CATEGORY.ENTRY`（只有 entry 时仍用 entry）；摘要遇到路线里的非对象不再抛错；缺了运行目录时报告接口返回 404，模组 zip 里列出的文件缺失时返回说明而不是 `TypeError`。普通打出、固定种子和 AI 的选择不变。
+- **持续集成。** GitHub Actions 在 Ubuntu 和 Windows 上用 Python 3.11 与 3.12 跑完整的 pytest（安装 fastapi、httpx 和 python-multipart，图形界面测试会执行），把 pytest-cov 写进作业摘要，并用 ruff 检查。需要本机游戏安装的测试仍然跳过。见 [CI.md](CI.md)。
+- **坏输入是说得清的错误。** `POST /api/import/batch`、`POST /api/calibrate`、`POST /api/calibrate/upload` 以及只读 MCP 工具：目录外的路径、符号链接跳出去、超过 32MB 的上传、坏掉的 JSONL 行、缺字段、类型不对，都是 4xx 或 `{"ok": false, "error": ...}`，正文里没有堆栈。不改模拟、种子和 AI。
+- **Windows 上的种子预览缓存。** 读和写都允许共享删除，`os.replace` 遇到拒绝访问会短暂停一下再试。读者仍只看到完整的旧文件或完整的新文件。mod 作者指南的 bash 示例在 Windows 上改用 Git Bash；没装就跳过。`python -m sts2sim --workers` 的工作进程不会再次进入入口。
+- **界面语言默认跟浏览器。** 侧栏的简体中文 / English（日本語、한국어仍在同一菜单）记在这个浏览器的 `localStorage`，优先于数据目录的 `settings.json`。没有记住的选择时用 `navigator.language`。决策说明和校准用同一套文案。卡牌和遭遇的 ID 原样显示。
+- **Windows 安装包可以在 Actions 里打出来并核对，不发布。** `.github/workflows/windows-package.yml` 在手动运行或推送 `v*` 标签时，于 `windows-latest` 走现有的 `build.ps1`（`-Version 0.1.5`）。打完对目录跑 `dry_check.py --app`，对 zip 跑 `audit.ps1`（运行器没有游戏，不做安装目录哈希对照）。再用 zip 里的 `sim/` 跑 `python -m sts2sim --help`，以及一场不需要游戏的木桩（`claude_v34` 的 `probe_noengine`，`encounter: DUMMY`）。zip 只作为 Actions artifact 上传，不创建 GitHub Release。步骤在 [DEVELOPER.md](DEVELOPER.md#windows-打包版--building-the-windows-package)，工作流说明在 [CI.md](CI.md)。打进包里的说明是 [gui/packaging/README-win.txt](../gui/packaging/README-win.txt)。
+- **简体中文文档。** 校准、持续集成、覆盖率快照、性能样本和合成 DLL 夹具是中英对照，并收进 [INDEX.md](INDEX.md)。mod 作者入门仍是英文 [MOD_AUTHORS.md](MOD_AUTHORS.md) 加简体中文 [MOD_AUTHORS.zh-CN.md](MOD_AUTHORS.zh-CN.md)。
+- **打包脚本能在 Windows PowerShell 5.1 里跑。** `gui/packaging` 里带中文的 `build.ps1`、`audit.ps1`、`win_api_test.ps1` 是带 BOM 的 UTF-8。没有 BOM 时，多字节字符会吞掉引号，`build.ps1` 报 “The string is missing the terminator”。纯 ASCII 的 `.ps1` 可以不带 BOM。反编译器工程 `ilspycmd-host.csproj` 的 XML 注释不再含有 `--`（原先的 `--version` / `--self-contained` 让 MSBuild 报 MSB4025）。`dry_check.py` 会拒绝这两种问题。
+- **缺口分诊。** `python tools/gap_triage.py` 读一份或多份 `tools/calibrate.py --json` 的结果，按遭遇和敌人能力 / 机制汇总 `likely_sim_gap`。真机掉血高于 p95 是模拟偏乐观，低于 p5 是偏悲观。Markdown 指向 `sts2sim/powers_enemy.py`、`sts2sim/powers.py`、`sts2sim/enemies.py`，荆棘再指向可选的 `mechanic_adjust`。`POST /api/gap_triage` 和只读 MCP `gap_triage`（`--import-only` 也有）返回同一份汇总。侧栏「校准」（`#/calibrate`）在对照表下面列出这两侧和建议查看的源文件。不改模拟、种子和 AI。见 [CALIBRATION.md](CALIBRATION.md)。
+- **打包后的 HTTP 冒烟，以及 UTF-8。** 命令行冒烟之后，`gui/packaging/smoke_api.ps1` 解压刚打好的 zip，启动包里的 `DeckBench.exe --serve`（不开窗口），等到 `GET /api/health`，再经 `POST /api/runs` 打一场木桩，然后关掉进程。冒烟日志作为 artifact 上传。`--serve` 不再因为还没有本机游戏数据而退出；要游戏的接口仍返回原来的说明。双击打开窗口仍会先检查游戏。JSON 以及 text/html 等文本响应带 `charset=utf-8`。冒烟自己按 UTF-8 读响应字节，并核对训练木桩的 `enc_name` 仍是「木桩」，summary 里的卡组名也是中文。见 [CI.md](CI.md)。
+
+不需要游戏就能看一份缺口分诊（夹具里的遭遇 ID 是虚构的）：
+
+```bash
+python tools/gap_triage.py tests/fixtures/gap_triage --catalog tests/fixtures/gap_triage/catalog.json
+```
+
 ### 用的时候注意
 
 **导入。** 打完的 `.run` 和进行中的 `current_run.save` 不是同一种 JSON。打完的记录没有地图列号，所以路线有层数和房间类型，没有左右位置。认不出的文件会停下来说明；看起来像加密或损坏时不会尝试解密。`progress.save` 是解锁和统计，不是一局。
@@ -123,7 +144,7 @@ python tools/bench.py
 - **DLL → YAML.** Read a game mod you already built (manifest JSON + DLL). When decompilation works, straight-line damage, block, draw, energy, heal and apply-power become the existing YAML, which you then edit, save and run in the mod editor. The DLL is not executed. Game files are not copied in.
 - **The official package can run `mentor-full` / `mentor-full-ev`.** It still does not ship spire-mentor. Both agents are in the full-run AI list and stay greyed out until configured. You do not rebuild DeckBench to attach them.
 
-Field-level detail, paths and known gaps: [SAVE_FORMAT.md](SAVE_FORMAT.md), [DLL_MODS.md](DLL_MODS.md), [MCP.md](MCP.md), [MOD_AUTHORS.md](MOD_AUTHORS.md) ([简体中文](MOD_AUTHORS.zh-CN.md)), [PERFORMANCE.md](PERFORMANCE.md), [DEVELOPER.md](DEVELOPER.md). The index of every doc is [INDEX.md](INDEX.md). The full changelog is [CHANGELOG.md](../CHANGELOG.md).
+Field-level detail, paths and known gaps: [SAVE_FORMAT.md](SAVE_FORMAT.md), [DLL_MODS.md](DLL_MODS.md), [MCP.md](MCP.md), [MOD_AUTHORS.md](MOD_AUTHORS.md) ([简体中文](MOD_AUTHORS.zh-CN.md)), [CALIBRATION.md](CALIBRATION.md), [PERFORMANCE.md](PERFORMANCE.md), [COVERAGE.md](COVERAGE.md), [CI.md](CI.md), [DEVELOPER.md](DEVELOPER.md). The note copied into the Windows zip is [gui/packaging/README-win.txt](../gui/packaging/README-win.txt). The index of every doc is [INDEX.md](INDEX.md). The full changelog is [CHANGELOG.md](../CHANGELOG.md).
 
 ### Try it
 
@@ -203,6 +224,27 @@ python tools/bench.py
 ```
 
 The `examples/spark` commands are in [MOD_AUTHORS.md](MOD_AUTHORS.md). `tests/test_mod_authors.py` runs them on the internal Python engine.
+
+### #41–#52
+
+The version is still 0.1.5. Merge order on `git log` is #41, #43, #42, #44, #45, #46, #47, #48, #49, #50, #51, #52.
+
+- **Coverage.** Tests now cover card-effect resolution, power and relic hooks, save parsing, calibration matching, and HTTP error paths. The snapshot and five edge bugs are in [COVERAGE.md](COVERAGE.md): a replayed X-cost card keeps the energy paid for that play; applying a power with `save` and no living target records 0; `{category, entry}` becomes `CATEGORY.ENTRY` (an entry alone is still just the entry); a summary no longer crashes on a non-object route step; a missing run folder is a 404, and a mod zip that lists a missing file returns that explanation instead of a `TypeError`. A normal play, a fixed seed, and AI choices are unchanged.
+- **Continuous integration.** GitHub Actions runs the full pytest suite on Ubuntu and Windows with Python 3.11 and 3.12 (fastapi, httpx, and python-multipart installed so the GUI tests run), writes a pytest-cov summary on the job, and runs ruff. Tests that need a local game install still skip. See [CI.md](CI.md).
+- **Bad input is a clear error.** `POST /api/import/batch`, `POST /api/calibrate`, `POST /api/calibrate/upload` and the read-only MCP tools answer a path outside an allowed folder, a symlink that escapes, an upload over 32MB, a broken JSONL line, a missing field or a wrong type with a 4xx or `{"ok": false, "error": ...}`, and the body has no stack trace. Simulation, seeds and AI are unchanged.
+- **The seed-preview cache on Windows.** Reads and writes allow shared delete, and `os.replace` waits briefly and retries on access denied. A reader still sees a complete old file or a complete new file. The mod-author guide's bash samples use Git Bash on Windows, and skip when it is missing. A worker for `python -m sts2sim --workers` does not enter the entry point again.
+- **The UI language follows the browser.** The sidebar 简体中文 / English switch (日本語 and 한국어 stay in the same menu) is stored in this browser's `localStorage` and wins over `settings.json`. With no saved choice it follows `navigator.language`. Decisions and Calibration use the same strings. Card and encounter ids are shown as stored.
+- **The Windows package can be built and checked on Actions without publishing it.** `.github/workflows/windows-package.yml` runs on a manual dispatch or a `v*` tag, on `windows-latest`, through the existing `build.ps1` (`-Version 0.1.5`). It then runs `dry_check.py --app` on the built directory and `audit.ps1` on the zip (the runner has no game, so there is no install-directory hash compare). From `sim/` inside the zip it runs `python -m sts2sim --help` and one training-dummy fight (`claude_v34` deck `probe_noengine`, `encounter: DUMMY`). The zip is only an Actions artifact. The workflow does not create a GitHub Release. Steps: [DEVELOPER.md](DEVELOPER.md#windows-打包版--building-the-windows-package). The workflow write-up is [CI.md](CI.md). The note that ships in the zip is [gui/packaging/README-win.txt](../gui/packaging/README-win.txt).
+- **简体中文 docs.** Calibration, CI, the coverage snapshot, the performance sample and the synthetic DLL fixture note are Chinese and English, and they are listed in [INDEX.md](INDEX.md). The mod-author guide is still English [MOD_AUTHORS.md](MOD_AUTHORS.md) plus 简体中文 [MOD_AUTHORS.zh-CN.md](MOD_AUTHORS.zh-CN.md).
+- **The packaging scripts run on Windows PowerShell 5.1.** `build.ps1`, `audit.ps1` and `win_api_test.ps1` under `gui/packaging` contain Chinese and are UTF-8 with a BOM. Without the BOM a multibyte character can swallow a quote, and `build.ps1` failed with “The string is missing the terminator”. A pure ASCII `.ps1` may omit the BOM. The XML comment in `ilspycmd-host.csproj` no longer contains `--` (the old `--version` / `--self-contained` text made MSBuild report MSB4025). `dry_check.py` rejects both kinds of problem.
+- **Gap triage.** `python tools/gap_triage.py` reads one or more `tools/calibrate.py --json` results and totals `likely_sim_gap` by encounter and by the enemy power or mechanic involved. Real HP lost above p95 means the sim was too optimistic; below p5 means too pessimistic. The Markdown points at `sts2sim/powers_enemy.py`, `sts2sim/powers.py` and `sts2sim/enemies.py`, and Thorns also points at the optional `mechanic_adjust`. `POST /api/gap_triage` and the read-only MCP tool `gap_triage` (also on `--import-only`) return the same summary. **Calibration** (`#/calibrate`) lists both sides under the comparison table, with the suggested source files. Simulation, seeds and AI are unchanged. See [CALIBRATION.md](CALIBRATION.md).
+- **A packaged HTTP smoke test, and UTF-8.** After the CLI smoke, `gui/packaging/smoke_api.ps1` extracts the new zip, starts the packaged `DeckBench.exe --serve` with no window, waits for `GET /api/health`, runs one training-dummy fight through `POST /api/runs`, and stops the process. The smoke log is an artifact. `--serve` no longer exits when local game data is missing; routes that need the game still return the same explanation. Opening the window still checks for the game. JSON responses, and text responses such as text/html, send `charset=utf-8`. The smoke reads the response bytes as UTF-8 and checks that the training dummy's `enc_name` is still 「木桩」, and that the deck name in the summary is Chinese. See [CI.md](CI.md).
+
+Gap triage can be looked at without the game. Encounter ids in the fixture are fictional:
+
+```bash
+python tools/gap_triage.py tests/fixtures/gap_triage --catalog tests/fixtures/gap_triage/catalog.json
+```
 
 ### Practical limits
 

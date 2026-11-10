@@ -1,37 +1,40 @@
 # 文档索引 / Documentation index
 
-仓库里的说明都从这里链出去。`docs/` 里多数页是中文和英文写在同一份文件里。mod 作者入门是两份：英文和简体中文。README 有四种语言。
+仓库里的说明都从这里链出去。`docs/` 里多数页是中文和英文写在同一份文件里。mod 作者入门是两份：英文和简体中文。README 有四种语言。Windows 安装包的说明在 `gui/packaging/`：打进 zip 的 `README-win.txt`、第三方声明，以及 `ship-manifest.txt`。
 
-*Every guide in the repository is linked from here. Most pages under `docs/` are Chinese and English in one file. The mod-author guide is two files, English and 简体中文. The README exists in four languages.*
+*Every guide in the repository is linked from here. Most pages under `docs/` are Chinese and English in one file. The mod-author guide is two files, English and 简体中文. The README exists in four languages. The Windows package notes live under `gui/packaging/`: `README-win.txt` (copied into the zip), the third-party notices, and `ship-manifest.txt`.*
 
 ## docs/
 
 | 文档 | 语言 | 内容 |
 | --- | --- | --- |
-| [RELEASE_0.1.5.md](RELEASE_0.1.5.md) | 中文、English | 0.1.5 发布说明，可作 GitHub Release 正文。覆盖已合并的 #4 与 #6–#39 |
+| [RELEASE_0.1.5.md](RELEASE_0.1.5.md) | 中文、English | 0.1.5 发布说明，可作 GitHub Release 正文。覆盖已合并的 #4 与 #6–#52（#40 把说明对齐到 #39；其后是 #41–#52） |
 | [MOD_AUTHORS.md](MOD_AUTHORS.md) | English | mod 作者入门。示例 `examples/spark/`（Arc、Lantern）。内部 Python 引擎，不需要游戏安装 |
 | [MOD_AUTHORS.zh-CN.md](MOD_AUTHORS.zh-CN.md) | 简体中文 | 同一份入门的简体中文 |
 | [MODDING.md](MODDING.md) | 中文 + English | YAML mod 的格式：整局，以及旧版战斗模拟器 |
 | [DLL_MODS.md](DLL_MODS.md) | 中文 + English | 把已经写好的游戏 mod DLL 读成 YAML。DLL 不执行 |
 | [SAVE_FORMAT.md](SAVE_FORMAT.md) | 中文 + English | 对局记录的两种 JSON、批量摘要、种子预览 |
-| [CALIBRATION.md](CALIBRATION.md) | 中文 + English | 真对局对照同一条选牌路径上的模拟掉血：匹配规则、百分位、界面和 HTTP、MCP，以及 `tools/gap_triage.py` 的缺口分诊 |
-| [MCP.md](MCP.md) | 中文 + English | MCP 对战，以及只读的 `import_save`、`import_history_batch`、`batch_run_summary`、`card_ab`、`explain_fight`、`calibrate` |
+| [CALIBRATION.md](CALIBRATION.md) | 中文 + English | 真对局对照同一条选牌路径上的模拟掉血：匹配规则、百分位、界面和 HTTP、MCP，以及缺口分诊（`tools/gap_triage.py`、`POST /api/gap_triage`、校准页） |
+| [MCP.md](MCP.md) | 中文 + English | MCP 对战，以及只读的 `import_save`、`import_history_batch`、`batch_run_summary`、`card_ab`、`explain_fight`、`calibrate`、`gap_triage` |
 | [PERFORMANCE.md](PERFORMANCE.md) | 中文 + English | `python tools/bench.py` 的样本、场/秒和内部战斗引擎改了什么 |
 | [COVERAGE.md](COVERAGE.md) | 中文 + English | 补测试那一次的语句覆盖率快照，以及当时修的五处边界 |
-| [CI.md](CI.md) | 中文 + English | GitHub Actions：Ubuntu / Windows、Python 3.11 与 3.12、pytest-cov 作业摘要、ruff 0.17.4，以及 Windows 安装包的接口冒烟 |
-| [DEVELOPER.md](DEVELOPER.md) | 中文 + English | 命令行、首次生成、spire-mentor、旧版战斗模拟器、目录、测试、Windows 打包。持续集成的说明在 [CI.md](CI.md) |
+| [CI.md](CI.md) | 中文 + English | GitHub Actions：Ubuntu / Windows、Python 3.11 与 3.12、pytest-cov 作业摘要、ruff 0.17.4；Windows 安装包工作流、接口冒烟，以及响应的 `charset=utf-8` |
+| [DEVELOPER.md](DEVELOPER.md) | 中文 + English | 命令行、首次生成、spire-mentor、旧版战斗模拟器、目录、测试。[Windows 打包](DEVELOPER.md#windows-打包版--building-the-windows-package) 含 `dry_check.py`、带 BOM 的 `.ps1`、csproj 注释和 Actions 工作流。持续集成的说明在 [CI.md](CI.md) |
 | [patches/spire-mentor-v0111-cards.patch](patches/spire-mentor-v0111-cards.patch) | — | 打在你自己的 spire-mentor 克隆上的代码补丁。不含游戏文本或数据 |
 
 ## 仓库根和界面 / Root and the desktop app
 
 | 文档 | 语言 | 内容 |
 | --- | --- | --- |
-| [CHANGELOG.md](../CHANGELOG.md) | 中文 + English | 更新日志。0.1.5 一节对齐 `main` 上的 #4 与 #6–#39 |
+| [CHANGELOG.md](../CHANGELOG.md) | 中文 + English | 更新日志。0.1.5 一节对齐 `main` 上的 #4 与 #6–#52 |
 | [README.md](../README.md) | 中文为主，段落附 English | 安装和使用 |
 | [README.en.md](../README.en.md) | English | 同一份说明的英文 |
 | [README.ja.md](../README.ja.md) | 日本語 | 同一份说明的日文 |
 | [README.ko.md](../README.ko.md) | 한국어 | 同一份说明的韩文 |
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | English + 中文 | 贡献须知。不接受任何游戏内容 |
 | [gui/README.md](../gui/README.md) | 中文 | 桌面界面的开发运行、结构和打包 |
+| [gui/packaging/README-win.txt](../gui/packaging/README-win.txt) | 中文 + English | 打进 Windows zip 的 `README.txt`：解压、第一次启动、可选的 mentor-full |
+| [gui/packaging/THIRD-PARTY-NOTICES.txt](../gui/packaging/THIRD-PARTY-NOTICES.txt) | 中文 + English | 安装包里的第三方声明。许可证全文在 `gui/packaging/notices/` |
+| [gui/packaging/ship-manifest.txt](../gui/packaging/ship-manifest.txt) | — | 0.1.5 安装包要带上的路径。`dry_check.py` 和 `audit.ps1` 对照这份清单 |
 | [mods/claude_v35/README.md](../mods/claude_v35/README.md) | 中文 | 示例 mod Claude娘 v3.5 接到整局引擎时的说明 |
 | [tests/fixtures/dllmod/README.md](../tests/fixtures/dllmod/README.md) | 中文 + English | DLL 导入夹具是合成的，不是游戏文件 |
