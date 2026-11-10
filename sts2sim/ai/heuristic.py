@@ -2,7 +2,7 @@
 不偷看牌堆：估值只看手牌数量与公开信息。"""
 from ..core import LoopAlarm
 from .. import explain
-from .base import Agent, _step, score_delta
+from .base import Agent, _step, evaluate, resources, score_delta
 
 
 class HeuristicAgent(Agent):
@@ -18,15 +18,20 @@ class HeuristicAgent(Agent):
             return None, 0
         log = explain.enabled()
         rows = [] if log else None
+        base_v = evaluate(C)
+        res0 = resources(C)
+        paid_of = C._legal_paid
+        hand = C.player.hand
+        enemies = C.enemies
         best, best_rank, best_s = None, -1e18, 0
         for i, t in acts:
-            card = C.player.hand[i]
-            paid = C.card_cost(card) or 0
+            card = hand[i]
+            paid = paid_of[i]
             sim = C.clone()
-            ti = None if t is None else C.enemies.index(t)
+            ti = None if t is None else enemies.index(t)
             try:
                 sim.play(i, None if ti is None else sim.enemies[ti])
-                s = score_delta(C, sim, paid)
+                s = score_delta(C, sim, paid, base_v=base_v, res0=res0)
             except LoopAlarm:
                 s = 50
             s += card.d.ai.get("bonus", 0)   # mod 作者可在卡表里写 ai: {bonus: N} 提示难以即时估值的牌

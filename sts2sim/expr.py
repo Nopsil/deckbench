@@ -18,9 +18,22 @@ def cur():
     return CUR[0]
 
 
+_BASE_NS = None
+
+
 def register_helper(name, fn):
+    global _BASE_NS
     HELPERS[name] = fn
+    _BASE_NS = None
     return fn
+
+
+def _blank_ns():
+    global _BASE_NS
+    if _BASE_NS is None:
+        _BASE_NS = dict(BASE)
+        _BASE_NS.update(HELPERS)
+    return _BASE_NS.copy()
 
 
 def _stacks(c, pid):
@@ -66,8 +79,7 @@ def ev(x, ctx, extra=None):
     if code is None:
         code = compile(x, "<expr>", "eval")
         _CACHE[x] = code
-    ns = dict(BASE)
-    ns.update(HELPERS)
+    ns = _blank_ns()
     ns.update(ctx.vars)
     ns.update(ctx.locals)
     ns["T"] = ctx.target

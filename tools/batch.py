@@ -258,6 +258,9 @@ def main():
     ap.add_argument("--n", type=int, default=20)
     ap.add_argument("--start", type=int, default=0)
     ap.add_argument("--procs", type=int, default=mp.cpu_count())
+    ap.add_argument("--workers", type=int, default=None,
+                    help="并行进程数。与 --procs 相同；两个都给时以 --workers 为准。"
+                         "每局只用自己的种子（以及由种子算出的 AI 种子），进程数不改变结果。")
     ap.add_argument("--out", default=None)
     ap.add_argument("--agent", default="heuristic", choices=["heuristic", "search", "strong", "strong-nosearch", "planner", "planner-search", "learned", "learned-search", "learned-boss", "imitation", "mentor-mcts", "mentor-boss", "mentor-full", "mentor-full-ev", "modai", "modai-boss", "modai-teacher", "modai-dagger"])
     ap.add_argument("--sims", type=int, default=0, help="mentor-*：每个决策的 MCTS 模拟次数（默认 1000）")
@@ -315,7 +318,9 @@ def main():
     explain_on = EX.requested(a.explain)
     if explain_on:
         os.environ["DECKBENCH_EXPLAIN"] = "1"
-    with mp.Pool(a.procs, initializer=_init, initargs=({"name": a.agent, "kw": akw, "mods": [os.path.abspath(m) for m in a.mod],
+    procs = a.workers if a.workers is not None else a.procs
+    procs = max(1, int(procs))
+    with mp.Pool(procs, initializer=_init, initargs=({"name": a.agent, "kw": akw, "mods": [os.path.abspath(m) for m in a.mod],
                                                                "variant": a.variant, "force": [x for x in a.force.split(",") if x],
                                                                "replace": [x for x in a.replace.split(",") if x], "log_dir": a.log_dir, "force_pick": [x for x in a.force_pick.split(",") if x], "style": a.style, "force_pick_first": a.force_pick_first, "timeout": a.timeout or (60 if a.agent == "heuristic" else 900), "explain": explain_on},)) as pool:
         res = pool.map(_one, jobs, chunksize=1)

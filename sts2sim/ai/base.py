@@ -63,11 +63,15 @@ def resources(C):
     return n, P.energy
 
 
-def score_delta(C0, C1, paid):
+def score_delta(C0, C1, paid, base_v=None, res0=None):
     """动作的得分：局面估值差 + 净资源收益（抽到的牌、回的能量）。花掉的能量不扣分，
-    这样 AI 会把能量用完；排序时再按费用做轻微的效率修正。"""
-    v = evaluate(C1) - evaluate(C0)
-    n0, e0 = resources(C0)
+    这样 AI 会把能量用完；排序时再按费用做轻微的效率修正。
+    base_v / res0 是同一决策里已经算过的 evaluate(C0) 和 resources(C0)，数值与现算相同。"""
+    v = evaluate(C1) - (evaluate(C0) if base_v is None else base_v)
+    if res0 is None:
+        n0, e0 = resources(C0)
+    else:
+        n0, e0 = res0
     n1, e1 = resources(C1)
     v += 1.5 * (n1 - n0 + 1) + 2.0 * (e1 - e0 + paid)
     return v
@@ -146,6 +150,8 @@ class Agent:
             log = explain.enabled()
             scored = [] if log else None
             floor = best_s
+            base_v = evaluate(C)
+            res0 = resources(C)
             for j, pid in enumerate(C.player.potions):
                 d = POTION_DEFS.get(pid)
                 if d is None:
@@ -155,7 +161,7 @@ class Agent:
                     sim = C.clone()
                     ti = None if t is None else C.enemies.index(t)
                     sim.use_potion(j, None if ti is None else sim.enemies[ti])
-                    sc = score_delta(C, sim, 0) - 1.5
+                    sc = score_delta(C, sim, 0, base_v=base_v, res0=res0) - 1.5
                     if log:
                         scored.append(_step(C, "potion", pid, getattr(d, "name", pid), t, sc))
                     if sc > best_s:

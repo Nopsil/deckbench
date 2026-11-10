@@ -1,6 +1,4 @@
 """遗物基类与注册表。mod 在 hooks.py 里用 @register_relic 定义遗物类。"""
-import copy
-
 RELIC_TYPES = {}
 
 
@@ -17,7 +15,8 @@ class Relic:
         self.data = {}
 
     def clone(self):
-        r = copy.copy(self)
+        r = object.__new__(type(self))
+        r.__dict__.update(self.__dict__)
         r.data = dict(self.data)
         return r
 

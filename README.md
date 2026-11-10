@@ -227,6 +227,16 @@ python tools/import_dll_mod.py "/path/to/Slay the Spire 2/mods/MyMod" --out mods
 - [gui/README.md](gui/README.md)：图形界面的结构和打包。
 - [CONTRIBUTING.md](CONTRIBUTING.md)：贡献须知（不接受任何游戏内容）。
 
+## 性能 / Performance
+
+内部 Python 战斗引擎（`python -m sts2sim` 用的那场战斗，不走本机游戏安装）里，时间主要花在两处：启发式 / 束搜索每一步都要复制整场战斗，以及每个事件都去找监听函数。复制改为按字段直接拷牌、能力和生物（不再走 `copy.copy` 的通用序列化），事件处理函数按类缓存，同一次决策里局面估值只算一遍。固定种子的胜负、层数、掉血和出牌统计与改前逐字段相同。
+
+`tools/batch.py --workers N` 与原来的 `--procs` 相同（两个都给时以 `--workers` 为准）。`python -m sts2sim --workers N` 与 `--jobs` 相同。每场战斗的随机数只由种子、卡组、幕、房间和场次决定，并且每场开始时重置牌的编号计数器，所以进程数（包括 1）不改变结果。
+
+同一套固定种子样本（Claude 模组，模组只加载一次；启发式 54 场，以及启发式加窄束搜索 36 场）：启发式约 **62.5 → 92.7 场/秒**，混入束搜索约 **39.1 → 56.0 场/秒**。
+
+*The internal Python fight engine (`python -m sts2sim`, no local game install) spent its time copying the whole fight for every heuristic or beam action, and looking up event handlers. Copies are now direct field copies of cards, powers and creatures, handler lookup is cached per class, and a decision reuses one position value. Fixed-seed outcomes — win/loss, floors, HP lost, cards played — match field for field. `tools/batch.py --workers N` is the same switch as `--procs` (`--workers` wins if both are set). `python -m sts2sim --workers N` is the same as `--jobs`. Each fight's RNG comes only from the seed, deck, act, room and index, and the card-id counter resets at the start of the fight, so the process count (including 1) does not change results. On one fixed-seed sample (Claude mod loaded once; 54 heuristic fights, and 36 fights mixing in a narrow beam): heuristic about **62.5 → 92.7 fights/s**, mixed about **39.1 → 56.0 fights/s**.*
+
 ## License
 
 MIT，仅限我们自己的代码，详见 [LICENSE](LICENSE)。*MIT for our own code only; see [LICENSE](LICENSE).*
