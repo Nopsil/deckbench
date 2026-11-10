@@ -1284,5 +1284,9 @@
   "bundle.err.kind": "这不是 DeckBench 的结果包。",
   "bundle.err.incomplete": "结果包缺了必要的文件。",
   "bundle.err.extra": "结果包里有清单没有列出的文件。",
-  "bundle.err.need": "请指定一次已完成的测试，或两次已完成的战斗实验。"
+  "bundle.err.need": "请指定一次已完成的测试，或两次已完成的战斗实验。",
+  "demo.load": "载入示例数据",
+  "demo.hint": "模拟器打的两场训练木桩，外加一份保存的牌组。不需要游戏文件。",
+  "demo.done": "已载入 {n} 次示例测试。",
+  "demo.missing": "这个安装里没有示例结果包。"
 }

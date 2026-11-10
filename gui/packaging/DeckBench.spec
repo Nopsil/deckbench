@@ -43,6 +43,20 @@ hidden = scan_stdlib_imports(SIM) + [
 hidden = [h for h in hidden if h not in ("signal",)] + ["signal"]
 
 
+def _demo_bundle():
+    """build.ps1 copies this spec into src/, where gui/demo sits beside it.
+    From the repo the zip is one directory up, under gui/demo.
+    """
+    for rel in (
+        os.path.join("gui", "demo", "sample.deckbench.zip"),
+        os.path.join("..", "demo", "sample.deckbench.zip"),
+    ):
+        path = os.path.normpath(os.path.join(HERE, rel))
+        if os.path.isfile(path):
+            return path
+    raise SystemExit("sample.deckbench.zip was not found for the PyInstaller bundle")
+
+
 def _changelog_source():
     """build.ps1 copies CHANGELOG.md next to this spec. From the repo, it sits two levels up."""
     for rel in ("CHANGELOG.md", os.path.join("..", "..", "CHANGELOG.md")):
@@ -57,7 +71,8 @@ a = Analysis(
     pathex=[HERE],
     datas=[(os.path.join(HERE, "gui", "web", "dist"), "gui_web"),
            (os.path.join(HERE, "gui", "locales"), os.path.join("gui", "locales")),   # 界面翻译表（gui/i18n.py 读）
-           (_changelog_source(), ".")],
+           (_changelog_source(), "."),
+           (_demo_bundle(), "demo")],
     hiddenimports=hidden,
     excludes=["tkinter", "sts2sim", "claude_v35", "batch", "v34_data", "cs2py_core", "cs_patches", "parse_monster_ai", "helpers",
               "pytest", "playwright"],

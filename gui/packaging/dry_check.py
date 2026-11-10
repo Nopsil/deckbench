@@ -37,6 +37,8 @@ REQUIRED_PATHS = (
     "sim/gui/worker.py",
     "sim/gui/backend.py",
     "sim/gui/i18n.py",
+    "sim/gui/demo.py",
+    "sim/gui/demo/sample.deckbench.zip",
     "app/README.txt",
     "app/decompiler/ilspycmd-host.exe",
 )
@@ -339,6 +341,8 @@ def check(root=None):
         bad.append("build.ps1 does not build and copy gui/web/dist")
     if "gui_web" not in spec_text:
         bad.append("DeckBench.spec does not bundle gui/web/dist as gui_web")
+    if "sample.deckbench.zip" not in spec_text:
+        bad.append("DeckBench.spec does not bundle the demo sample")
     for hidden in ("dnfile", "pefile"):
         if f'"{hidden}"' not in spec_text:
             bad.append(f"DeckBench.spec missing hiddenimport {hidden} (dllmod metadata)")

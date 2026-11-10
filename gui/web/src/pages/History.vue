@@ -19,7 +19,14 @@
     </div>
     <div class="panel" style="padding:6px 6px">
       <n-data-table :columns="cols" :data="rows" :row-key="(r) => r.id" v-model:checked-row-keys="checked" :pagination="{ pageSize: 12 }" :bordered="false" size="medium" />
-      <div v-if="!rows.length" class="empty"><div class="big">{{ t('hist.none') }}</div><div>{{ t('hist.noneHint') }}</div></div>
+      <div v-if="!rows.length" class="empty">
+        <div class="big">{{ t('hist.none') }}</div>
+        <div>{{ t('hist.noneHint') }}</div>
+        <div v-if="!store.runs.length" class="demo">
+          <n-button size="small" type="primary" data-action="load-demo" :loading="loadingDemo" @click="loadDemo">{{ t('demo.load') }}</n-button>
+          <div>{{ t('demo.hint') }}</div>
+        </div>
+      </div>
     </div>
     <n-modal v-model:show="renaming" preset="card" :title="t('hist.rename')" style="width:440px">
       <n-input v-model:value="newTitle" @keyup.enter="doRename" />
@@ -45,6 +52,7 @@ const checked = ref([])
 const renaming = ref(false)
 const newTitle = ref('')
 const bundleInput = ref(null)
+const loadingDemo = ref(false)
 let renameId = null
 
 const rows = computed(() => store.runs.filter((r) => (kind.value === 'all' || r.kind === kind.value) && (!q.value || runTitle(r).includes(q.value))))
@@ -83,6 +91,16 @@ async function act(k, r) {
 }
 async function doRename() { await api.patch('/api/runs/' + renameId, { title: newTitle.value }); renaming.value = false; store.loadRuns() }
 function pickBundle() { if (bundleInput.value) bundleInput.value.click() }
+async function loadDemo() {
+  if (loadingDemo.value) return
+  loadingDemo.value = true
+  try {
+    const body = await api.post('/api/demo/load')
+    await store.loadRuns()
+    msg.success(t('demo.done', { n: (body.runs || []).length }))
+  } catch (e) { msg.error(e.message) }
+  finally { loadingDemo.value = false }
+}
 async function onBundle(ev) {
   const file = ev.target.files && ev.target.files[0]
   ev.target.value = ''
@@ -111,4 +129,5 @@ async function onBundle(ev) {
 :deep(.k.combat) { background: rgba(127,167,201,.14); color: #9DC0DE; }
 :deep(.hl) { display: flex; gap: 16px; font-size: 13px; color: #8A857E; }
 :deep(.hl b) { color: #EDE9E3; font-weight: 650; }
+.demo { margin-top: 14px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 </style>

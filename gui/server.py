@@ -687,6 +687,20 @@ async def import_bundle(file: UploadFile = File(...)):
         raise _bundle_status(err) from None
 
 
+@app.post("/api/demo/load")
+def load_demo_data():
+    """把内置示例结果包导入。和上传导入同一条校验路径，不执行包里的文件。"""
+    from gui.demo import DemoError, load_builtin
+    from sts2sim.bundle import BundleError
+
+    try:
+        return load_builtin()
+    except DemoError:
+        raise HTTPException(404, T("demo.missing")) from None
+    except BundleError as err:
+        raise _bundle_status(err) from None
+
+
 @app.get("/api/runs/{rid}/report")
 def report(rid: str):
     _need(rid)

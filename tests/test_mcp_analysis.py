@@ -328,10 +328,10 @@ def test_server_registers_analysis_tools_on_play_and_import_only():
     mcp = _load_mcp()
     play = mcp.build()
     names = [t.name for t in play._tool_manager.list_tools()]
-    assert names[-17:] == [
+    assert names[-18:] == [
         "batch_run_summary", "card_ab", "compare_runs", "explain_fight", "calibrate", "gap_triage",
-        "export_report", "export_bundle", "import_bundle", "list_cards", "list_encounters", "save_deck",
-        "head_to_head", "card_impact", "run_progress", "cancel_run", "check_update",
+        "export_report", "export_bundle", "import_bundle", "load_demo", "list_cards", "list_encounters",
+        "save_deck", "head_to_head", "card_impact", "run_progress", "cancel_run", "check_update",
     ]
     tools = {t.name: t for t in play._tool_manager.list_tools()}
     assert tools["batch_run_summary"].parameters["required"] == ["path"]
@@ -365,7 +365,7 @@ def test_server_registers_analysis_tools_on_play_and_import_only():
     assert only_names == [
         "import_save", "import_history_batch", "batch_run_summary", "card_ab", "compare_runs",
         "explain_fight", "calibrate", "gap_triage", "export_report", "export_bundle", "import_bundle",
-        "list_cards", "list_encounters", "save_deck", "head_to_head", "card_impact",
+        "load_demo", "list_cards", "list_encounters", "save_deck", "head_to_head", "card_impact",
         "run_progress", "cancel_run", "check_update",
     ]
     impact = tools["card_impact"]

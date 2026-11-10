@@ -137,6 +137,7 @@ python tools/import_dll_mod.py "/path/to/Slay the Spire 2/mods/MyMod" --out mods
 - 後半の 2 行は、ゲームに入っている MOD（マニフェスト JSON + DLL）を YAML にします。DLL は実行しません。画面は **「MODエディター → ゲームMODを読み込む」**。
 - 録画用シードを `mentor-full` で選ぶとき：公式パッケージから選べますが、spire-mentor 自体は同梱されません。アプリの横に `mentor.local.json`（`site`、`py`、`python`）を置き、`python` は `sts2_rs` をビルドした Python に向けてください。フォールバックがほぼ 100% の勝率は使わないでください。詳しくは [docs/DEVELOPER.md](docs/DEVELOPER.md)。
 - リリースノートの #59–#64：ブラウザ試験が終わると Playwright のイベントループを解放します。保存したデッキ 2 つを対戦できます（`#/decks`）。長いテストは進捗を出し、中止は戦闘のあいだです。leave-one-out でカードの影響を見ます。Windows パッケージはリポジトリにある `0.1.5` を使い、更新確認は手動のままです。戦闘バッチは `workers` を指定できます（既定 1）。
+- #65–#67：この版の更新を画面で見られます。サイドバーで简体中文と English を切り替えられます。終わったテストは `.deckbench.zip` にまとめて、別の DeckBench で読み込めます。ゲームファイルがなくても、空の履歴からデモデータを読み込めます（訓練用の木人との短い戦闘 2 件と、保存したデッキ 1 つ。既存の戦闘ワーカーが生成します）。
 
 ## 実際のランを読み込む
 
