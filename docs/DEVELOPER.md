@@ -11,7 +11,7 @@
 - [可选：spire-mentor](#可选spire-mentor更强的-ai--optional-spire-mentor)
 - [旧版 YAML 战斗模拟器](#旧版-yaml-战斗模拟器--legacy-yaml-combat-simulator)
 - [目录结构](#目录结构--layout)
-- [测试](#测试--tests)
+- [测试](#测试--tests)（持续集成见 [CI.md](CI.md)，覆盖率快照见 [COVERAGE.md](COVERAGE.md)）
 - [Claude娘专用工具](#claude娘示例-mod专用工具--claude-mod-tools)
 - [Windows 打包版](#windows-打包版--building-the-windows-package)
 - [已知限制](#已知限制--known-limitations)
@@ -323,6 +323,8 @@ tests/               单元测试
 - 需要本机生成的缓存（没有时自动 skip）：`test_engine.py`、`test_ai_upgrade.py`、`test_claude_v35.py`、`test_status_damage.py`。
 - 需要旧版模拟器的本机数据（spire-codex JSON + `mods/vanilla/`，没有时不收集）：`test_claude.py`、`test_intents.py`、`test_shensu.py`。
 - 图形界面端到端：`gui/tests_e2e.py`（Playwright，先 `python -m gui.app --serve --port 8765`）。
+- 持续集成在 Ubuntu 和 Windows 上用 Python 3.11 与 3.12 跑上面这套 pytest，并把 pytest-cov 的摘要写进作业；lint 是 `ruff==0.17.4` 的 `ruff check .`。作业怎么拆、摘要表长什么样，见 [CI.md](CI.md)。补测试那一次的模块覆盖率见 [COVERAGE.md](COVERAGE.md)。校准的匹配规则见 [CALIBRATION.md](CALIBRATION.md)。
+  *Continuous integration runs this pytest suite on Ubuntu and Windows with Python 3.11 and 3.12, writes a pytest-cov summary on the job, and lints with `ruff==0.17.4` (`ruff check .`). The jobs are described in [CI.md](CI.md). The per-module snapshot from the coverage pass is [COVERAGE.md](COVERAGE.md). Calibration matching is [CALIBRATION.md](CALIBRATION.md).*
 
 ## Claude娘（示例 mod）专用工具 / Claude-mod tools
 

@@ -4,10 +4,10 @@
 
 `tools/bench.py` 给内部 Python 战斗引擎计时。不读游戏安装，也不用 `mods/vanilla`。样本有两块：
 
-- **内部对战**：`sts2sim.fightcheck` 里的合成卡组和合成怪物（和固定种子的确定性测试是同一批种子）。启发式默认是 6 个种子 × 3 套牌 × 每套 3 场 = **54 场**。混入窄束搜索是 6 个种子 × 3 套牌 × 1 场 ×（启发式 + 束搜索）= **36 场**。束搜索宽度 3、深度 2。
+- **内部对战**：`sts2sim.fightcheck` 里的合成卡组（`start`、`burst`、`draw`）和合成怪物。种子是 `1000 + 序号 × 17`，和 `tests/test_sim_determinism.py` 用的是同一套算法。场数不一样：那份测试锁的是启发式 4 个种子 × 每套 2 场，以及束搜索 2 个种子 × 每套 1 场。`tools/bench.py` 的默认是启发式 6 个种子 × 3 套牌 × 每套 3 场 = **54 场**。混入窄束搜索是 6 个种子 × 3 套牌 × 1 场 ×（启发式 + 束搜索）= **36 场**。束搜索宽度 3、深度 2（`BeamAgent`）。
 - **训练木桩**：`encounter: DUMMY`（9999 血、不攻击）。牌组是 `probe_A`、`probe_D`、`probe_noengine`，各 4 场，最多 4 回合，种子 1000，启发式。共 **12 场**。这三套牌不依赖仓库里没有的原版「打击 / 防御」。
 
-*Times the internal Python fight engine. No game install and no `mods/vanilla`. Two batches: the synthetic decks and monsters in `sts2sim.fightcheck` (the same fixed seeds as the determinism test), and a training dummy (`encounter: DUMMY`, 9999 HP, no attack) on `probe_A`, `probe_D` and `probe_noengine`.*
+*Times the internal Python fight engine. No game install and no `mods/vanilla`. Two batches: the synthetic decks and monsters in `sts2sim.fightcheck` (seeds `1000 + index × 17`, the same formula as `tests/test_sim_determinism.py`; the bench defaults are a larger count than the locked fixtures), and a training dummy (`encounter: DUMMY`, 9999 HP, no attack) on `probe_A`, `probe_D` and `probe_noengine`.*
 
 ```bash
 python tools/bench.py
@@ -68,11 +68,11 @@ Python 3.12。数字会随机器变，前后是同一条命令、同一进程设
 - 表达式如果只是一个名字（卡牌 `vars` 里的 `dmg` 这类），直接按和 `eval` 相同的顺序取值，不编译、不复制命名空间。带运算符的表达式仍走原来的编译缓存。
 - `calc_damage` 读力量、活力、虚弱、易伤、无实体时用和 `amt` / `has` 相同的判断，不再为每次判断多调用一层方法。
 - 复制战斗的 `data` 时，`dict` / `list` / `set` 直接 `copy()`。别的带 `copy` 方法的对象仍调用它。嵌套容器仍是浅拷贝。
-- Claude 模组里每次出牌和估值都会读的 `STS2SIM_FANJI`、`STS2SIM_FLQ`、`STS2SIM_GRANT`、`STS2SIM_FANJI_AI`、`STS2SIM_FENLEIQI`，按当前值缓存。环境变量改了，下一次读取用新值。默认仍是关反击、`flat` 分类器。
+- Claude 模组（`mods/claude_v34/hooks.py`）里 `STS2SIM_FANJI`、`STS2SIM_FLQ`、`STS2SIM_GRANT`、`STS2SIM_FENLEIQI` 按当前值缓存：环境变量改了，下一次读取用新值。`STS2SIM_FANJI_AI` 没有这层缓存，每次直接读。默认是 `STS2SIM_FANJI=off`、`STS2SIM_FLQ=flat`、`STS2SIM_FENLEIQI=v34`。
 
 没有改默认 AI、没有改种子，也没有改「每场随机数只由种子决定」。前瞻仍按原来的 `_clone_n * 7919 + turn` 播种。
 
-*Handlers are stored on the instance, so dispatch does not look the class dict up on every listener. A bare expression name is returned in the same lookup order as `eval`, without compiling. `calc_damage` uses the same strength / vigor / weak / vulnerable / intangible checks as `amt` and `has`. `dict` / `list` / `set` values in fight data are copied directly. The Claude mod caches the environment switches it reads on every play and still notices when the variable changes. Default AI, seeds, and the per-fight RNG rule are unchanged.*
+*Handlers are stored on the instance, so dispatch does not look the class dict up on every listener. A bare expression name is returned in the same lookup order as `eval`, without compiling. `calc_damage` uses the same strength / vigor / weak / vulnerable / intangible checks as `amt` and `has`. `dict` / `list` / `set` values in fight data are copied directly. The Claude mod caches `STS2SIM_FANJI`, `STS2SIM_FLQ`, `STS2SIM_GRANT` and `STS2SIM_FENLEIQI`, and reads `STS2SIM_FANJI_AI` every time. Defaults stay `off`, `flat` and `v34`. Default AI, seeds, and the per-fight RNG rule are unchanged.*
 
 固定种子的胜负、回合、掉血、出牌、敌人血量和能力层数与改前逐字段相同。`tests/test_sim_determinism.py` 把启发式和束搜索的记录再打一遍，并和改前写下的 `tests/fixtures/fight_seeds.json`、`tests/fixtures/fight_seeds_beam.json` 比较。同一组种子打两遍也必须相同。
 
