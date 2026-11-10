@@ -169,14 +169,17 @@ python tools/import_dll_mod.py "/path/to/Slay the Spire 2/mods/MyMod" --out mods
 
 ## 怎么看结果 / Reading results
 
-- **胜率**：打赢最终首领的局数占比。
+- **胜率**：打赢最终首领的局数占比。旁边会给 **Wilson 95% 置信区间**（同样的打法再跑很多局，胜率大多会落在这个范围里）。
 - **平均层数 / 各幕通过率**：AI 平均能走到第几层、有多少局过了第 1、2、3 幕。胜率很低时（比如高进阶），看层数更有区分度。
 - **死因**：每局死在哪场战斗（哪种怪 / 精英 / 首领），帮你找到卡组扛不住的地方。
-- **单卡 A/B**：两组用同样的随机种子，唯一区别是那张卡，所以差值就是这张卡的影响；样本少时差值会抖，局数越多越可信。
+- **单卡 A/B**：两组用同样的随机种子，唯一区别是那张卡，所以差值就是这张卡的影响。胜率差另给 **两比例 z 检验的 p 值**（双侧；p 很小才说明这点差不太像碰巧）。原来的配对差和 95% 区间还在。
+- **局数太少**：任一组有效局数 **少于 30** 时，报告会写「样本不足，不能下结论」。数字仍会打出来，但不要据此判断一张牌强不强。
+
+命令行里这三样会出现在：`python tools/batch.py` 跑完的文本；`python tools/ab_card.py ... --format text`（默认，Markdown / JSON 用 `--format markdown` 或 `--format json`）；`python tools/ab_table.py <目录> --format markdown`（还有 `text`、`json`）；`python tools/ai_summary.py a.jsonl b.jsonl`（`--json` 改打 JSON，第二个文件起相对第一个给 p 值）。图形界面的报告和单卡 A/B 用的接口（`/api/runs/{id}/summary`、`/api/ab`）在原来的 JSON 上多了这些字段，旧字段不变。
 
 **重要**：AI 不是真人高手，这些数字**不是真实玩家的胜率**。它们适合在**同一套设置下互相比较**（新卡 vs 旧卡、改数值前 vs 改后、你的角色 vs 原版角色），不适合当成绝对水平。
 
-*Win rate = runs that beat the final boss; floors / act clear rates show how far the AI gets (more useful when win rates are low); death causes show which fights kill you; single-card A/B uses identical seeds so the difference is the card's effect. These are not real player win rates: compare results only under the same settings.*
+*Win rate = runs that beat the final boss, with a Wilson 95% confidence interval. Floors / act clear rates show how far the AI gets (more useful when win rates are low). Death causes show which fights kill you. Single-card A/B uses identical seeds so the difference is the card's effect, and the win-rate gap also has a two-proportion z-test p-value (two-sided); the paired difference and 95% interval are still there. If either group has fewer than 30 valid runs, the report says the sample is too small to conclude — the numbers are still printed, but do not treat them as a verdict on the card. CLI: `tools/batch.py`; `tools/ab_card.py --format text|markdown|json`; `tools/ab_table.py --format markdown|text|json`; `tools/ai_summary.py` (`--json`, and a p-value against the first file when you pass two or more). The report and A/B HTTP endpoints add these fields and keep the old ones. These are not real player win rates: compare results only under the same settings.*
 
 ## 常见问题 / FAQ
 

@@ -301,6 +301,13 @@ def main():
     floors = sorted(r["floor"] for r in res)
     print(f"{a.char} A{a.asc} [{a.agent}, style {a.style}]: {wins}/{len(res)} wins, errors {len(errs)}, median floor {floors[len(floors)//2]}, "
           f"acts reached {[sum(1 for r in res if r['act'] >= k) for k in range(3)]}, {dt:.1f}s ({len(res)/dt:.2f} runs/s)")
+    _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if _root not in sys.path:
+        sys.path.insert(0, _root)
+    from sts2sim.stats import format_win_rate, win_rate_report
+    ok = [r for r in res if not r.get("error")]
+    # 区间按不含出错的有效局算，和图形界面的胜率同一口径；上面那一行的分母仍含出错局。
+    print(format_win_rate(win_rate_report(sum(bool(r.get("victory")) for r in ok), len(ok)), "text"), end="")
     import collections
     loss = collections.defaultdict(list)
     for r in res:

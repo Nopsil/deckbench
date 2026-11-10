@@ -6,6 +6,15 @@ import math
 import os
 import statistics
 
+from sts2sim.stats import (
+    ab_win_report,
+    format_ab,
+    format_win_rate,
+    min_sample_fields,
+    proportion_compare_fields,
+    win_rate_report,
+)
+
 ROOM_ZH = {"Monster": "普通", "Elite": "精英", "Boss": "首领"}
 
 
@@ -36,6 +45,14 @@ def batch_summary(res):
         "win": sum(bool(r["victory"]) for r in ok) / n,
         "wins": sum(bool(r["victory"]) for r in ok),
     })
+    # 只追加：Wilson 95% 区间、样本警告，以及同一份文字 / Markdown。旧的 win / wins 不变。
+    rate = win_rate_report(out["wins"], n)
+    for key in ("wins", "n", "win"):
+        rate.pop(key)
+    out.update(rate)
+    shown = win_rate_report(out["wins"], n)
+    out["win_rate_text"] = format_win_rate(shown, "text").rstrip("\n")
+    out["win_rate_markdown"] = format_win_rate(shown, "markdown").rstrip("\n")
     # 幕 1 每场掉血（按房间类型）
     loss = collections.defaultdict(list)
     for r in ok:
@@ -106,6 +123,7 @@ AB_KEYS = [("floor", lambda r: r["floor"], False),
 def batch_ab(a, b):
     sa, sb = batch_summary(a), batch_summary(b)
     rows = []
+    win_rep = None
     from . import i18n
     for k, key, pct in AB_KEYS:
         p = paired(a, b, key)
@@ -116,8 +134,20 @@ def batch_ab(a, b):
             row["significant"] = p["ci95"] > 0 and abs(p["diff"]) > p["ci95"]
             if p["ci95"] == 0 and p["diff"] == 0:
                 row["significant"] = False
+        if pct:
+            ka = sum(bool(key(r)) for r in a if not r.get("error"))
+            kb = sum(bool(key(r)) for r in b if not r.get("error"))
+            row.update(proportion_compare_fields(ka, sa.get("n") or 0, kb, sb.get("n") or 0))
+            if k == "win":
+                win_rep = ab_win_report(ka, sa.get("n") or 0, kb, sb.get("n") or 0)
+        else:
+            row.update(min_sample_fields(p["n"] if p else 0))
         rows.append(row)
-    return {"a": sa, "b": sb, "rows": rows}
+    out = {"a": sa, "b": sb, "rows": rows}
+    if win_rep is not None:
+        out["win_ab_text"] = format_ab(win_rep, "text").rstrip("\n")
+        out["win_ab_markdown"] = format_ab(win_rep, "markdown").rstrip("\n")
+    return out
 
 
 # ---------------------------------------------------------------- 战斗实验
@@ -175,7 +205,10 @@ def combat_ab(da, db):
         pa, pb = x["win"] / 100, r["win"] / 100
         se = math.sqrt(pa * (1 - pa) / x["n"] + pb * (1 - pb) / r["n"])
         d = pb - pa
-        rows.append({"deck": r["deck"], "act": r["act"], "room": r["room"], "a": pa, "b": pb, "diff": d, "ci95": 1.96 * se,
-                     "significant": se > 0 and abs(d) > 1.96 * se, "na": x["n"], "nb": r["n"],
-                     "a_turns": x["turns"], "b_turns": r["turns"], "a_loss": x["hp_loss"], "b_loss": r["hp_loss"]})
+        # 格子胜率来自 cells.csv 里保留一位的百分数；检验用同一比例，不另编整数胜场。
+        row = {"deck": r["deck"], "act": r["act"], "room": r["room"], "a": pa, "b": pb, "diff": d, "ci95": 1.96 * se,
+               "significant": se > 0 and abs(d) > 1.96 * se, "na": x["n"], "nb": r["n"],
+               "a_turns": x["turns"], "b_turns": r["turns"], "a_loss": x["hp_loss"], "b_loss": r["hp_loss"]}
+        row.update(proportion_compare_fields(pa * x["n"], x["n"], pb * r["n"], r["n"]))
+        rows.append(row)
     return {"rows": rows}

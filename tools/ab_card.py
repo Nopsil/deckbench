@@ -6,6 +6,8 @@
 
 强制加牌发生在进入第一幕之前，种子相同 → 地图、遭遇、奖励池的随机序列相同，两边的差别只来自牌组（以及因此改变的决策）。
 输出：平均层数差（配对，带标准误和 95% 区间）、到达幕 1 首领/幕 2 比例差、胜率差、幕 1 每场掉血差。
+胜率另给 Wilson 95% 区间和两比例 z 检验的 p 值；任一组有效局数 < 30 时标明不能下结论。
+`--format markdown` 或 `--format json` 只打这份胜率 A/B。
 B 组可以另外指定 --variant（例如比较 宪法分类器 原版 vs 平加变体：两边都 --force CLAUDE_CLASSIFIER，B 组 --variant classifier_flat）。
 """
 import argparse
@@ -60,6 +62,9 @@ def main():
     ap.add_argument("--base-variant", default=None)
     ap.add_argument("--procs", type=int, default=mp.cpu_count())
     ap.add_argument("--out", default=None, help="把两组原始结果写到 <out>_A.jsonl / <out>_B.jsonl")
+    ap.add_argument("--format", choices=("text", "markdown", "json"), default="text",
+                    help="胜率报告格式。text 在原来的对照后面多打 Wilson 区间、两比例 p 值和样本警告；"
+                         "markdown / json 只打这份胜率 A/B（旧字段都在 json 里）")
     ap.add_argument("--style", default="standard", choices=batch.STYLE_IDS, help="打法风格（两组都用同一个）：standard / juggler，见 tools/batch.py --help")
     ap.add_argument("--mod", action="append", default=[], help="YAML 模组文件夹（可多次）；牌 id 写游戏里的 id，如 CLAUDE_CLASSIFIER")
     a = ap.parse_args()
@@ -79,15 +84,26 @@ def main():
                     f.write(json.dumps(r, default=str, ensure_ascii=False) + "\n")
     sa, sb = stats(A), stats(B)
     lab = f"+{a.force}" + (f" -{a.replace}" if a.replace else "") + (f" [{a.variant}]" if a.variant else "")
-    print(f"{a.char} A{a.asc} {a.agent}{'' if a.style == 'standard' else ' style ' + a.style} N={a.n}  A=基线{(' +' + a.base_force) if a.base_force else ''}  B={lab}  ({time.time() - t:.0f}s)")
-    for k, name in (("floor", "平均层数"), ("boss1", "到达幕1首领"), ("act2", "到达幕2"), ("win", "胜率"), ("loss_a1", "幕1每场掉血")):
-        print(f"  {name:8s} A {sa[k]:.3f}  B {sb[k]:.3f}")
-    for name, key in (("层数", lambda r: r["floor"]), ("到达幕2", lambda r: float(r["act"] >= 1)),
-                      ("胜", lambda r: float(r["victory"]))):
-        m, se, nd = paired(A, B, key)
-        print(f"  配对差 {name}: {m:+.3f} ± {1.96 * se:.3f} (95%)  [不同的种子 {nd}/{sa['n']}]")
-    if sa["err"] or sb["err"]:
-        print(f"  errors A {sa['err']} B {sb['err']}")
+    _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if _root not in sys.path:
+        sys.path.insert(0, _root)
+    from sts2sim.stats import ab_win_report, format_ab
+    def _wins(res):
+        return sum(bool(r.get("victory")) for r in res if not r.get("error"))
+    win_ab = ab_win_report(_wins(A), sa["n"], _wins(B), sb["n"])
+    if a.format == "text":
+        print(f"{a.char} A{a.asc} {a.agent}{'' if a.style == 'standard' else ' style ' + a.style} N={a.n}  A=基线{(' +' + a.base_force) if a.base_force else ''}  B={lab}  ({time.time() - t:.0f}s)")
+        for k, name in (("floor", "平均层数"), ("boss1", "到达幕1首领"), ("act2", "到达幕2"), ("win", "胜率"), ("loss_a1", "幕1每场掉血")):
+            print(f"  {name:8s} A {sa[k]:.3f}  B {sb[k]:.3f}")
+        for name, key in (("层数", lambda r: r["floor"]), ("到达幕2", lambda r: float(r["act"] >= 1)),
+                          ("胜", lambda r: float(r["victory"]))):
+            m, se, nd = paired(A, B, key)
+            print(f"  配对差 {name}: {m:+.3f} ± {1.96 * se:.3f} (95%)  [不同的种子 {nd}/{sa['n']}]")
+        if sa["err"] or sb["err"]:
+            print(f"  errors A {sa['err']} B {sb['err']}")
+        print(format_ab(win_ab, "text"), end="")
+    else:
+        print(format_ab(win_ab, a.format), end="")
 
 
 if __name__ == "__main__":

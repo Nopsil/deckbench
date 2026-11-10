@@ -151,10 +151,13 @@ For now this only works from source: `pip install -r requirements-mcp.txt`, then
 
 ## Reading results
 
-- **Win rate**: the share of runs that beat the final boss.
+- **Win rate**: the share of runs that beat the final boss, with a **Wilson 95% confidence interval**.
 - **Average floor / act clear rates**: how far the AI gets on average, and how many runs cleared acts 1, 2 and 3. When win rates are very low (for example at high ascension), floors tell setups apart better.
 - **Death causes**: which fight each run died in (which enemy / elite / boss), to help you find where your deck can't hold up.
-- **Single-card A/B**: both groups use the same random seeds, and the only difference is that one card, so the gap is that card's effect. With few runs the gap jumps around; the more runs, the more you can trust it.
+- **Single-card A/B**: both groups use the same random seeds, and the only difference is that one card, so the gap is that card's effect. The win-rate gap also has a **two-proportion z-test p-value** (two-sided). The paired difference and its 95% interval are still reported.
+- **Too few runs**: if either group has **fewer than 30** valid runs, the report says the sample is too small to conclude. The numbers are still printed; do not treat them as a verdict on the card.
+
+On the command line this shows up in `python tools/batch.py`, `python tools/ab_card.py ... --format text` (or `markdown` / `json`), `python tools/ab_table.py <dir> --format markdown` (also `text` / `json`), and `python tools/ai_summary.py a.jsonl b.jsonl` (`--json` prints JSON; from the second file on, a p-value against the first). The report and A/B HTTP APIs (`/api/runs/{id}/summary`, `/api/ab`) add these fields and keep the old ones.
 
 **Important**: the AI is not a skilled human player, so these numbers are **not real player win rates**. They're good for **comparing things under the same settings** (new card vs. old card, before vs. after a number change, your character vs. a base-game character), not as an absolute measure of strength.
 
