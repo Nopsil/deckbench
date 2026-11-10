@@ -1,17 +1,19 @@
 """单回合束搜索 AI：在本回合内搜索出牌序列（宽度 width、深度 depth），
 按序列结束时的局面估值选最好的序列，执行它的第一步，然后重新搜索。
-比启发式慢约一个数量级，用来对照启发式 AI 是否打得太笨。日后可在这里换成 MCTS。"""
+比启发式慢约一个数量级，用来对照启发式 AI 是否打得太笨。日后可在这里换成 MCTS。
+mechanic_aware（默认开）和启发式用同一套荆棘 / 受击格挡 / 总伤害修正，记在序列上，不额外抽随机数。"""
 from ..core import LoopAlarm
 from .. import explain
-from .base import Agent, _step, evaluate, resources
+from .base import Agent, _copy_note, _step, as_bool, evaluate, mechanic_adjust, resources
 
 
 class BeamAgent(Agent):
     name = "beam"
 
-    def __init__(self, width=4, depth=4):
+    def __init__(self, width=4, depth=4, mechanic_aware=True):
         self.width = width
         self.depth = depth
+        self.mechanic_aware = as_bool(mechanic_aware)
 
     def _expand(self, C):
         acts = C.legal_actions()
@@ -32,13 +34,22 @@ class BeamAgent(Agent):
                 sim.play(i, None if ti is None else sim.enemies[ti])
             except LoopAlarm:
                 sim.data["_loopish"] = True
+            else:
+                if self.mechanic_aware:
+                    pen, note = mechanic_adjust(C, sim, card, t, paid_of[i])
+                    if pen:
+                        sim.data["_mech"] = float(sim.data.get("_mech", 0.0)) + pen
+                    if note:
+                        sim.data["_mech_note"] = note
             sim.data["_bonus"] = bonus0 + card.d.ai.get("bonus", 0)
             out.append(((i, t), sim))
         return out
 
     def _v(self, C0, n0, e0, sim):
         n1, e1 = resources(sim)
-        return evaluate(sim) + 1.5 * (n1 - n0 + sim.data.get("_plays", 0)) + 2.0 * (e1 - e0 + sim.data.get("_paid", 0)) + sim.data.get("_bonus", 0)
+        return (evaluate(sim) + 1.5 * (n1 - n0 + sim.data.get("_plays", 0))
+                + 2.0 * (e1 - e0 + sim.data.get("_paid", 0)) + sim.data.get("_bonus", 0)
+                - float(sim.data.get("_mech", 0.0)))
 
     def best_action(self, C):
         n0, e0 = resources(C)
@@ -53,6 +64,7 @@ class BeamAgent(Agent):
         beam = []
         best_v, best_a = -1e18, None
         best_for = {} if log else None
+        note_for = {} if log else None
         for a, sim in first:
             v = self._v(C, n0, e0, sim) + (50 if sim.data.get("_loopish") else 0)
             beam.append((v, a, sim))
@@ -60,6 +72,8 @@ class BeamAgent(Agent):
                 best_v, best_a = v, a
             if log:
                 best_for[a] = v
+                if sim.data.get("_mech_note"):
+                    note_for[a] = sim.data["_mech_note"]
         for _ in range(self.depth - 1):
             beam.sort(key=lambda x: -x[0])
             beam = beam[: self.width]
@@ -82,7 +96,11 @@ class BeamAgent(Agent):
             for a, v in best_for.items():
                 i, t = a
                 card = C.player.hand[i]
-                rows.append(_step(C, "play", card.id, card.name, t, v - base_v, hand=i))
+                step = _step(C, "play", card.id, card.name, t, v - base_v, hand=i)
+                note = note_for.get(a) if log else None
+                if note:
+                    step["note"] = note
+                rows.append(step)
             self._explain_rows = rows
             self._explain_best = best_a
         return best_a, best_v - base_v
@@ -95,6 +113,7 @@ class BeamAgent(Agent):
             i, t = act
             card = C.player.hand[i]
             chosen = _step(C, "play", card.id, card.name, t, None, hand=i)
+            _copy_note(chosen, rows)
         else:
             chosen = {"kind": "end", "id": "end_turn"}
         explain.publish(explain.from_steps(rows or [], chosen, turn=C.turn, threshold=0.05))

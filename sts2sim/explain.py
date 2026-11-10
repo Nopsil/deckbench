@@ -410,6 +410,8 @@ def _fmt_cand(c):
     if c.get("target"):
         bits.append("→ " + str(c["target"]))
     label = " ".join(bits) if bits else "?"
+    if c.get("note"):
+        label += " [" + str(c["note"]) + "]"
     if c.get("picked"):
         label += " ←"
     score = c.get("score")
@@ -435,6 +437,8 @@ def _fmt_chosen(ch):
     name = ch.get("name") or ch.get("id") or "?"
     if ch.get("target"):
         name = f"{name} → {ch['target']}"
+    if ch.get("note"):
+        name = f"{name} [{ch['note']}]"
     if ch.get("score") is not None:
         return f"{name} ({ch['score']})"
     return str(name)
