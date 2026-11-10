@@ -10,6 +10,8 @@ spire-mentor 的整局 AI = 战斗 MCTS + 局外 PPO（每角色一个 ONNX 网�
 import os
 
 from ..rt.boot import game as G
+from .. import explain
+from .agents import _cid_up, _entry_id, explain_place
 from .mentor import lib
 
 CHARS = {"IRONCLAD": "Ironclad", "SILENT": "Silent", "DEFECT": "Defect", "NECROBINDER": "Necrobinder", "REGENT": "Regent"}
@@ -97,7 +99,27 @@ class PpoNonCombat:
             return None
         k[0] += 1
         i = int(r["argmax"])
+        if explain.enabled():
+            pr = r.get("probs") or r.get("probabilities")
+            self._explain_probs = [float(x) for x in pr] if pr else None
         return r["actions"][i], r["responses"][i]
+
+    def _publish_ppo(self, kind, ids, chosen_id):
+        if not explain.enabled():
+            return
+        probs = getattr(self, "_explain_probs", None) or []
+        cands = []
+        for k, ident in enumerate(ids):
+            item = {"id": ident}
+            if k < len(probs):
+                item["score"] = round(float(probs[k]), 4)
+            cands.append(item)
+        chosen = next((dict(c) for c in cands if c["id"] == chosen_id), {"id": chosen_id})
+        if kind == "shop":
+            chosen = [] if chosen_id in (None, "leave") else [chosen]
+        rec = {"kind": kind, "chosen": chosen, "candidates": cands, "note": "ppo"}
+        rec.update(explain_place(self))
+        explain.publish([rec])
 
     # ---------- 地图 ----------
     def choose_map_point(self, points, run):
@@ -114,7 +136,9 @@ class PpoNonCombat:
         if cs:
             r = self._ppo("card_reward", {"type": "card_reward", "cards": [_card(c) for c in cs], "can_skip": True})
             if r is not None:
-                return cs[int(r[1]["index"])] if r[1].get("action") == "choose" else None
+                picked = cs[int(r[1]["index"])] if r[1].get("action") == "choose" else None
+                self._publish_ppo("reward", [_cid_up(c) for c in cs] + ["skip"], "skip" if picked is None else _cid_up(picked))
+                return picked
         return super().card_reward(cards, alternatives)
 
     # ---------- 休息 ----------
@@ -173,6 +197,11 @@ class PpoNonCombat:
             return super().shop(inventory, run)
         act, resp = r
         e = ents[int(resp["index"])]
+        if explain.enabled():
+            ids = []
+            for ent in ents:
+                ids.append("leave" if ent is None else (_entry_id(ent) or "?"))
+            self._publish_ppo("shop", ids, "leave" if e is None else (_entry_id(e) or "?"))
         if e is None:
             return []
         if act.get("action") == "shop_remove_card":

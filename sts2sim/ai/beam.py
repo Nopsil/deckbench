@@ -2,7 +2,8 @@
 按序列结束时的局面估值选最好的序列，执行它的第一步，然后重新搜索。
 比启发式慢约一个数量级，用来对照启发式 AI 是否打得太笨。日后可在这里换成 MCTS。"""
 from ..core import LoopAlarm
-from .base import Agent, evaluate, resources
+from .. import explain
+from .base import Agent, _step, evaluate, resources
 
 
 class BeamAgent(Agent):
@@ -35,15 +36,22 @@ class BeamAgent(Agent):
         n0, e0 = resources(C)
         base_v = evaluate(C)
         first = self._expand(C)
+        log = explain.enabled()
         if not first:
+            if log:
+                self._explain_rows = []
+                self._explain_best = None
             return None, 0
         beam = []
         best_v, best_a = -1e18, None
+        best_for = {} if log else None
         for a, sim in first:
             v = self._v(C, n0, e0, sim) + (50 if sim.data.get("_loopish") else 0)
             beam.append((v, a, sim))
             if v > best_v:
                 best_v, best_a = v, a
+            if log:
+                best_for[a] = v
         for _ in range(self.depth - 1):
             beam.sort(key=lambda x: -x[0])
             beam = beam[: self.width]
@@ -56,10 +64,32 @@ class BeamAgent(Agent):
                     nb.append((v, a0, s1))
                     if v > best_v:
                         best_v, best_a = v, a0
+                    if log and v > best_for.get(a0, -1e18):
+                        best_for[a0] = v
             if not nb:
                 break
             beam = nb
+        if log:
+            rows = []
+            for a, v in best_for.items():
+                i, t = a
+                card = C.player.hand[i]
+                rows.append(_step(C, "play", card.id, card.name, t, v - base_v, hand=i))
+            self._explain_rows = rows
+            self._explain_best = best_a
         return best_a, best_v - base_v
+
+    def _log_play(self, C, act, played):
+        rows = getattr(self, "_explain_rows", None)
+        if not rows and not played:
+            return
+        if played and act is not None:
+            i, t = act
+            card = C.player.hand[i]
+            chosen = _step(C, "play", card.id, card.name, t, None, hand=i)
+        else:
+            chosen = {"kind": "end", "id": "end_turn"}
+        explain.publish(explain.from_steps(rows or [], chosen, turn=C.turn, threshold=0.05))
 
     def play_turn(self, C):
         C.data["_plays"] = 0
@@ -70,7 +100,11 @@ class BeamAgent(Agent):
                 break
             a, s = self.best_action(C)
             if a is None or s <= 0.05:
+                if explain.enabled():
+                    self._log_play(C, a, False)
                 break
+            if explain.enabled():
+                self._log_play(C, a, True)
             C.play(*a)
         C.data.pop("_plays", None)
         C.data.pop("_paid", None)

@@ -183,32 +183,50 @@ def check_style(style_id, agent_name):
     return sid
 
 
+def _explain_on():
+    if AGENT.get("explain"):
+        return True
+    from sts2sim import explain as EX
+    return EX.requested(False)
+
+
 def _one(args):
     import signal
     char, asc, seed = args
     _load_mods(char)
     from sts2sim.engine.run import play_run
+    expl = _explain_on()
+    if expl:
+        from sts2sim import explain as EX
+        EX.configure(on=True, reset=True)
+        EX.set_ctx(seed=str(seed), char=str(char), asc=int(asc))
     signal.signal(signal.SIGALRM, _alarm)
     signal.alarm(AGENT.get("timeout", 600))
+    d = None
     try:
         hooks = [force_cards_hook(AGENT["force"], AGENT.get("replace", ()))] if AGENT.get("force") or AGENT.get("replace") else []
         ag = wrap_log(build_agent(seed), char, asc, seed)
         r = play_run(char, asc, seed, agent=ag, setup_hooks=hooks)
+        d = r.to_dict()
+        d["style"] = AGENT.get("style") or "standard"
+        if AGENT.get("force_pick") or (AGENT.get("style") or "standard") != "standard":
+            d["forced_picks"] = getattr(ag, "forced", None)
+        if getattr(ag, "mstats", None):
+            d["mstats"] = ag.mstats
+        d["seed"] = seed
+        d["char"] = char
+        d["asc"] = asc
     except RunTimeout:
         import traceback
-        return {"victory": False, "floor": -1, "act": 0, "path": [], "combats": [], "seed": seed, "char": char,
-                "asc": asc, "error": "RunTimeout\n" + "".join(traceback.format_exc().splitlines(True)[-14:])}
+        d = {"victory": False, "floor": -1, "act": 0, "path": [], "combats": [], "seed": seed, "char": char,
+             "asc": asc, "error": "RunTimeout\n" + "".join(traceback.format_exc().splitlines(True)[-14:])}
     finally:
         signal.alarm(0)
-    d = r.to_dict()
-    d["style"] = AGENT.get("style") or "standard"
-    if AGENT.get("force_pick") or (AGENT.get("style") or "standard") != "standard":
-        d["forced_picks"] = getattr(ag, "forced", None)
-    if getattr(ag, "mstats", None):
-        d["mstats"] = ag.mstats
-    d["seed"] = seed
-    d["char"] = char
-    d["asc"] = asc
+        if expl:
+            rows = EX.take()
+            EX.configure(on=False, reset=True)
+            if rows and d is not None:
+                d["_explain"] = rows
     return d
 
 
@@ -261,6 +279,8 @@ def main():
     ap.add_argument("--force-pick", default="", help="风格规则：卡牌奖励/商店里见到这些牌（ID，逗号分隔）就拿，例 JUGGLING")
     ap.add_argument("--seed", default="", help="指定真游戏种子（逗号分隔，可多个）；给了就只打这些局，忽略 --n/--start")
     ap.add_argument("--log-dir", default="", help="逐步决策日志目录（每局一个 JSONL）")
+    ap.add_argument("--explain", action="store_true",
+                    help="每步出牌、目标、药水、奖励和商店写候选分数。文件在 --out 旁边（*.explain.jsonl）。也认环境变量 DECKBENCH_EXPLAIN=1")
     a = ap.parse_args()
     a.style = check_style(a.style, a.agent)
     if str(a.agent).startswith("mentor"):
@@ -291,9 +311,13 @@ def main():
             akw["boss_sims"] = a.boss_sims
         if a.elite_sims:
             akw["elite_sims"] = a.elite_sims
+    from sts2sim import explain as EX
+    explain_on = EX.requested(a.explain)
+    if explain_on:
+        os.environ["DECKBENCH_EXPLAIN"] = "1"
     with mp.Pool(a.procs, initializer=_init, initargs=({"name": a.agent, "kw": akw, "mods": [os.path.abspath(m) for m in a.mod],
                                                                "variant": a.variant, "force": [x for x in a.force.split(",") if x],
-                                                               "replace": [x for x in a.replace.split(",") if x], "log_dir": a.log_dir, "force_pick": [x for x in a.force_pick.split(",") if x], "style": a.style, "force_pick_first": a.force_pick_first, "timeout": a.timeout or (60 if a.agent == "heuristic" else 900)},)) as pool:
+                                                               "replace": [x for x in a.replace.split(",") if x], "log_dir": a.log_dir, "force_pick": [x for x in a.force_pick.split(",") if x], "style": a.style, "force_pick_first": a.force_pick_first, "timeout": a.timeout or (60 if a.agent == "heuristic" else 900), "explain": explain_on},)) as pool:
         res = pool.map(_one, jobs, chunksize=1)
     dt = time.time() - t
     wins = sum(r["victory"] for r in res)
@@ -335,6 +359,11 @@ def main():
     for r in errs[:5]:
         ls = r["error"].splitlines()
         print("ERR", r["seed"], ls[0][:200], "|", ls[-2][:200] if len(ls) > 1 else "")
+    explain_rows = EX.peel(res, "_explain")
+    if explain_on:
+        path = EX.sibling_path(a.out)
+        EX.write_jsonl(path, explain_rows)
+        print(f"explain: {path}")
     if a.out:
         with open(a.out, "w") as f:
             for r in res:

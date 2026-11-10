@@ -9,7 +9,8 @@
   * 战斗：精英和 Boss 用更深的前瞻（2 回合、更宽）；普通怪 1 回合。
 """
 from ..rt.boot import game as G
-from .agents import _name, dvar, card_cost
+from .. import explain
+from .agents import _cid_up, _entry_id, _name, dvar, card_cost, explain_place
 from .search import SearchAgent
 from .combat import alive_enemies
 from .weights import W
@@ -357,14 +358,27 @@ class StrongAgent(SearchAgent):
         self._run = run
 
     def card_reward(self, cards, alternatives):
-        deck = list(self.player.Deck.Cards) if self.player else []
-        best, bv = None, -99.0
-        for r in cards:
-            c = r.Card if hasattr(r, "Card") else r
-            m = self.marginal(c, deck)
-            if m > bv:
-                best, bv = c, m
-        return best if bv >= self._threshold(deck) else None
+        with explain.scope():
+            deck = list(self.player.Deck.Cards) if self.player else []
+            best, bv = None, -99.0
+            log = explain.enabled()
+            cands = [] if log else None
+            for r in cards:
+                c = r.Card if hasattr(r, "Card") else r
+                m = self.marginal(c, deck)
+                if log:
+                    cands.append({"id": _cid_up(c), "score": round(float(m), 4)})
+                if m > bv:
+                    best, bv = c, m
+            thresh = self._threshold(deck)
+            result = best if bv >= thresh else None
+            if log:
+                cands.append({"id": "skip", "score": round(float(thresh), 4)})
+                chosen = {"id": "skip", "score": round(float(thresh), 4)} if result is None else {"id": _cid_up(result), "score": round(float(bv), 4)}
+                rec = {"kind": "reward", "chosen": chosen, "candidates": cands, "threshold": round(float(thresh), 4)}
+                rec.update(explain_place(self))
+                explain.publish([rec])
+            return result
 
     def choose_bundle(self, bundles):
         deck = list(self.player.Deck.Cards) if self.player else []
@@ -467,27 +481,51 @@ class StrongAgent(SearchAgent):
 
     # ---------- 商店 ----------
     def shop(self, inventory, run):
-        p = self.player
-        deck = list(p.Deck.Cards)
-        buys = []
-        rem = inventory.CardRemovalEntry
-        if rem is not None and rem.IsStocked:
-            buys.append(rem)
-        for e in inventory.RelicEntries:
-            if e.IsStocked:
-                buys.append(e)
-        cards = []
-        for e in inventory.CardEntries:
-            if e.IsStocked and e.CreationResult is not None:
-                m = self.marginal(e.CreationResult.Card, deck)
-                if m >= self._threshold(deck) + W["s_margin"]:
-                    cards.append((m, e))
-        cards.sort(key=lambda x: -x[0])
-        buys += [e for _, e in cards[:2]]
-        empty = sum(1 for x in p.PotionSlots if x is None)
-        if empty:
-            for e in inventory.PotionEntries:
-                if e.IsStocked and e.Cost <= 75 and empty > 0:
+        with explain.scope():
+            p = self.player
+            deck = list(p.Deck.Cards)
+            buys = []
+            log = explain.enabled()
+            cands = [] if log else None
+            rem = inventory.CardRemovalEntry
+            if rem is not None and rem.IsStocked:
+                buys.append(rem)
+                if log:
+                    cands.append({"id": "CARD_REMOVAL", "score": 1.0, "cost": int(rem.Cost)})
+            for e in inventory.RelicEntries:
+                if e.IsStocked:
                     buys.append(e)
-                    empty -= 1
-        return buys
+                    if log:
+                        cands.append({"id": _entry_id(e), "score": 1.0, "cost": int(e.Cost)})
+            cards = []
+            cut = self._threshold(deck) + W["s_margin"]
+            for e in inventory.CardEntries:
+                if e.IsStocked and e.CreationResult is not None:
+                    m = self.marginal(e.CreationResult.Card, deck)
+                    if log:
+                        cands.append({"id": _cid_up(e.CreationResult.Card), "score": round(float(m), 4), "cost": int(e.Cost)})
+                    if m >= cut:
+                        cards.append((m, e))
+            cards.sort(key=lambda x: -x[0])
+            buys += [e for _, e in cards[:2]]
+            empty = sum(1 for x in p.PotionSlots if x is None)
+            if empty:
+                for e in inventory.PotionEntries:
+                    if e.IsStocked and e.Cost <= 75 and empty > 0:
+                        buys.append(e)
+                        if log:
+                            cands.append({"id": _entry_id(e), "score": 1.0, "cost": int(e.Cost)})
+                        empty -= 1
+            if log:
+                by_id = {c.get("id"): c.get("score") for c in cands}
+                chosen = []
+                for e in buys:
+                    eid = _entry_id(e)
+                    item = {"id": eid}
+                    if by_id.get(eid) is not None:
+                        item["score"] = by_id[eid]
+                    chosen.append(item)
+                rec = {"kind": "shop", "chosen": chosen, "candidates": cands, "threshold": round(float(cut), 4)}
+                rec.update(explain_place(self))
+                explain.publish([rec])
+            return buys

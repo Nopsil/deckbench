@@ -12,6 +12,7 @@ spire-mentor 不在本仓库里（它的仓库带游戏文本/数据），需要
 import re
 
 from ..rt.boot import game as G
+from .. import explain
 from .combat import alive_enemies, hand
 
 class Unsupported(Exception):
@@ -283,6 +284,53 @@ def to_wire(cs, player, room_kind="Monster", ascension=0, seed=0):
     return w, alive
 
 
+def _mcts_score(x):
+    if not isinstance(x, dict):
+        return None
+    for k in ("q", "q_value", "value", "ev", "score", "prior"):
+        v = x.get(k)
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            return float(v)
+    v = x.get("visits")
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        return float(v)
+    return None
+
+
+def _log_mcts(cs, chosen, info):
+    from .agents import explain_view
+    view = explain_view(chosen, cs)
+    alts = info.get("_alts") if isinstance(info, dict) else None
+    steps = []
+    for x in alts or []:
+        sc = _mcts_score(x)
+        if x.get("is_best"):
+            step = dict(view)
+            if sc is not None:
+                step["score"] = sc
+                view["score"] = sc
+            steps.append(step)
+            continue
+        act = (x.get("action") or {}) if isinstance(x, dict) else {}
+        kind = act.get("action")
+        if kind == "end_turn":
+            step = {"kind": "end", "id": "end_turn"}
+        elif kind in ("potion", "drink_potion"):
+            step = {"kind": "potion", "id": "slot%s" % act.get("slot")}
+        else:
+            step = {"kind": "play", "id": "card%s" % act.get("card_index")}
+            if act.get("target_index") is not None:
+                step["target"] = "#%s" % act.get("target_index")
+        if sc is not None:
+            step["score"] = sc
+        steps.append(step)
+    try:
+        turn = int(cs.RoundNumber)
+    except Exception:  # noqa
+        turn = None
+    explain.publish(explain.from_steps(steps or [view], view, turn=turn, note="mcts"))
+
+
 def mcts_action(cs, player, acts, room_kind="Monster", ascension=0, sims=1000, threads=1, seed=0, **kw):
     """返回 (我们的动作, 信息)。不支持时抛 Unsupported。"""
     rs, _ = lib()
@@ -296,17 +344,25 @@ def mcts_action(cs, player, acts, room_kind="Monster", ascension=0, sims=1000, t
     if best is None:
         raise Unsupported("no recommendation")
     try:
-        return map_action(best["action"], player, acts, alive), best
+        mapped = map_action(best["action"], player, acts, alive)
     except Unsupported as e:
         # 最优动作在我们这边被挡掉（多为 combat.py 的 MAX_SAME_CARD 防死循环限制）：按 Q 排名取下一个能映射的动作
         for x in r["actions"]:
             if x is best:
                 continue
             try:
-                return map_action(x["action"], player, acts, alive), dict(x, alt_of=str(e))
+                info = dict(x, alt_of=str(e))
+                if explain.enabled():
+                    info["_alts"] = list(r.get("actions") or [])
+                return map_action(x["action"], player, acts, alive), info
             except Unsupported:
                 pass
         raise
+    info = best
+    if explain.enabled():
+        info = dict(best)
+        info["_alts"] = list(r.get("actions") or [])
+    return mapped, info
 
 
 def map_action(a, player, acts, alive):
@@ -366,6 +422,8 @@ def make_mentor_agent(seed=0, sims=1000, threads=1, fallback_search=True, mentor
                 try:
                     a, info = mcts_action(cs, player, acts, self.room_kind, getattr(getattr(self, "_run", None), "ascension", 0),
                                        sims=self.room_sims.get(self.room_kind, self.sims), threads=self.threads, seed=(seed * 7919 + self._k) & 0xFFFFFFFF)
+                    if explain.enabled():
+                        _log_mcts(cs, a, info)
                     self.mstats["mentor"] += 1
                     if "alt_of" in info:
                         self.mstats["alt"] = self.mstats.get("alt", 0) + 1

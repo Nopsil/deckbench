@@ -17,7 +17,8 @@ import math
 import os
 
 from ..rt.boot import game as G
-from .agents import _name, dvar, card_cost
+from .. import explain
+from .agents import _cid_up, _entry_id, _name, dvar, card_cost, explain_place, explain_view
 from .strong import StrongAgent, card_power, _kw, _src_hits
 
 MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "data", "modai_model.json")
@@ -309,6 +310,8 @@ class ModAIAgent(StrongAgent):
                 self._stat(surface, 1)
                 return None
             self._stat(surface, 0)
+            if explain.enabled():
+                self._explain_scores = [float(x) for x in tp[0]]
             return tp[1]
         net = self.nets.get(surface)
         if net is None:
@@ -316,25 +319,45 @@ class ModAIAgent(StrongAgent):
             return None
         self._stat(surface, 0)
         s = [net.score(x) for x in X]
-        return max(range(len(s)), key=lambda i: s[i])
+        pick = max(range(len(s)), key=lambda i: s[i])
+        if explain.enabled():
+            self._explain_scores = [float(x) for x in s]
+        return pick
 
     # ---------- 卡牌奖励 ----------
     def card_reward(self, cards, alternatives):
         from .mentor_full import _card
-        cs = [(x.Card if hasattr(x, "Card") else x) for x in cards]
-        if not cs:
-            return super().card_reward(cards, alternatives)
-        n = len(cs)
+        with explain.scope():
+            cs = [(x.Card if hasattr(x, "Card") else x) for x in cards]
+            if not cs:
+                return super().card_reward(cards, alternatives)
+            n = len(cs)
 
-        def mapper(act, resp):
-            return int(resp["index"]) if resp.get("action") == "choose" else n
+            def mapper(act, resp):
+                return int(resp["index"]) if resp.get("action") == "choose" else n
 
-        i = self._decide("card_reward", opts_card_reward(self, cs),
-                         lambda: self._teacher_probs("card_reward", {"type": "card_reward", "cards": [_card(c) for c in cs],
-                                                                      "can_skip": True}, n + 1, mapper))
-        if i is None:
-            return super().card_reward(cards, alternatives)
-        return cs[i] if i < n else None
+            i = self._decide("card_reward", opts_card_reward(self, cs),
+                             lambda: self._teacher_probs("card_reward", {"type": "card_reward", "cards": [_card(c) for c in cs],
+                                                                          "can_skip": True}, n + 1, mapper))
+            if i is None:
+                return super().card_reward(cards, alternatives)
+            if explain.enabled():
+                scores = getattr(self, "_explain_scores", None) or []
+                cands = []
+                for k, c in enumerate(cs):
+                    item = {"id": _cid_up(c)}
+                    if k < len(scores):
+                        item["score"] = round(float(scores[k]), 4)
+                    cands.append(item)
+                skip = {"id": "skip"}
+                if n < len(scores):
+                    skip["score"] = round(float(scores[n]), 4)
+                cands.append(skip)
+                chosen = skip if i >= n else {"id": _cid_up(cs[i]), "score": cands[i].get("score")}
+                rec = {"kind": "reward", "chosen": chosen, "candidates": cands, "note": "modai"}
+                rec.update(explain_place(self))
+                explain.publish([rec])
+            return cs[i] if i < n else None
 
     # ---------- 地图 ----------
     def choose_map_point(self, points, run):
@@ -411,11 +434,24 @@ class ModAIAgent(StrongAgent):
         def mapper(act, resp):
             return int(resp["index"])
 
-        i = self._decide("shop", opts_shop(self, items), lambda: self._teacher_probs("shop", msg, len(opts), mapper))
-        if i is None:
-            return super().shop(inventory, run)
-        e = ents[i]
-        return [] if e is None else [e]
+        with explain.scope():
+            i = self._decide("shop", opts_shop(self, items), lambda: self._teacher_probs("shop", msg, len(opts), mapper))
+            if i is None:
+                return super().shop(inventory, run)
+            e = ents[i]
+            if explain.enabled():
+                scores = getattr(self, "_explain_scores", None) or []
+                cands = []
+                for k, ent in enumerate(ents):
+                    item = {"id": "leave" if ent is None else (_entry_id(ent) or "?")}
+                    if k < len(scores):
+                        item["score"] = round(float(scores[k]), 4)
+                    cands.append(item)
+                chosen = [] if e is None else [{"id": cands[i]["id"], "score": cands[i].get("score")}]
+                rec = {"kind": "shop", "chosen": chosen, "candidates": cands, "note": "modai"}
+                rec.update(explain_place(self))
+                explain.publish([rec])
+            return [] if e is None else [e]
 
 
 def make_modai_agent(seed=0, mode="student", boss_search=False, **kw):
@@ -575,6 +611,21 @@ class CombatDistill:
         if combat_mode in ("student", "dagger") and "combat" not in self.nets:
             self.nets = dict(self.nets, **{k: v for k, v in load_model(getattr(self, "_model_path", None)).items()})
 
+    def _explain_combat_net(self, cs, acts, scores, index):
+        if not explain.enabled() or getattr(self, "_in_child", False):
+            return
+        steps = []
+        for a, sc in zip(acts, scores):
+            step = explain_view(a, cs)
+            step["score"] = float(sc)
+            steps.append(step)
+        try:
+            turn = int(cs.RoundNumber)
+        except Exception:  # noqa
+            turn = None
+        chosen = steps[index] if 0 <= index < len(steps) else explain_view(acts[index], cs)
+        explain.publish(explain.from_steps(steps, chosen, turn=turn, note="modai"))
+
     def combat_action(self, cs, player, acts):
         cm_ = getattr(self, "combat_mode", "learned")
         if cm_ == "learned" or self._in_child or len(acts) <= 1:
@@ -599,6 +650,7 @@ class CombatDistill:
                 st[1] += 1
                 return super().combat_action(cs, player, acts)
             st[0] += 1
+            self._explain_combat_net(cs, acts, lab[0], lab[2])
             return acts[lab[2]]
         net = self.nets.get("combat")
         if net is None:
@@ -615,7 +667,9 @@ class CombatDistill:
                 if len(st) < 3:
                     st.append(0)
                 st[2] += 1
+                self._explain_combat_net(cs, acts, s, h)
                 return acts[h]
+        self._explain_combat_net(cs, acts, s, b)
         return acts[b]
 
 

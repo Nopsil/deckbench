@@ -12,7 +12,8 @@ import os
 import numpy as np
 
 from ..rt.boot import game as G
-from .agents import _name, dvar, card_cost
+from .. import explain
+from .agents import _name, dvar, card_cost, explain_view
 from .combat import alive_enemies
 from .strong import StrongAgent
 
@@ -273,4 +274,16 @@ class ImitationAgent(StrongAgent):
             return super().combat_action(cs, player, acts)
         X = action_features(self, cs, player, acts)
         s = np.hstack([base_score(X)[:, None], (X - self._mu) / self._sd]) @ self._w
-        return acts[int(np.argmax(s))]
+        i = int(np.argmax(s))
+        if explain.enabled() and not self._in_child:
+            steps = []
+            for a, sc in zip(acts, s):
+                step = explain_view(a, cs)
+                step["score"] = float(sc)
+                steps.append(step)
+            try:
+                turn = int(cs.RoundNumber)
+            except Exception:  # noqa
+                turn = None
+            explain.publish(explain.from_steps(steps, steps[i], turn=turn))
+        return acts[i]

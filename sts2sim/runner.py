@@ -51,7 +51,30 @@ class Dummy(EN.Enemy):
 
 
 def run_fight(mod_names, deck_id, act, room, idx, seed, agent_name="heuristic", max_turns=30,
-              encounter_id=None, log=False, agent_kw=None, potions=None):
+              encounter_id=None, log=False, agent_kw=None, potions=None, explain=None):
+    from . import explain as EX
+    if explain is None:
+        explain = EX.requested(False)
+    if explain:
+        EX.configure(on=True, reset=True)
+        EX.set_ctx(deck=str(deck_id), act=act, room=room, seed=seed, fight=idx,
+                   encounter=None if encounter_id is None else str(encounter_id))
+    try:
+        out = _run_fight(mod_names, deck_id, act, room, idx, seed, agent_name, max_turns,
+                         encounter_id, log, agent_kw, potions)
+    finally:
+        if explain:
+            rows = EX.take()
+            EX.configure(on=False, reset=True)
+        else:
+            rows = None
+    if rows:
+        out["explain"] = rows
+    return out
+
+
+def _run_fight(mod_names, deck_id, act, room, idx, seed, agent_name="heuristic", max_turns=30,
+               encounter_id=None, log=False, agent_kw=None, potions=None):
     M = get_modset(mod_names)
     rng = random.Random(_seed(seed, deck_id, act, room, idx, encounter_id))
     P, relics, dk = M.build_player(deck_id)
@@ -115,7 +138,8 @@ def plan(exp, M, fights=None):
     return tasks
 
 
-def run_experiment(path, fights=None, jobs=None, seed=None, agent=None, out_dir=None):
+def run_experiment(path, fights=None, jobs=None, seed=None, agent=None, out_dir=None, explain=None):
+    from . import explain as EX
     exp = yaml.safe_load(open(path, encoding="utf-8"))
     if seed is not None:
         exp["seed"] = seed
@@ -125,8 +149,14 @@ def run_experiment(path, fights=None, jobs=None, seed=None, agent=None, out_dir=
         exp["fights"] = fights
     for k, v in (exp.get("env") or {}).items():   # 变体开关：子进程继承环境变量
         os.environ[str(k)] = str(v)
+    explain = bool(explain) or bool(exp.get("explain")) or EX.requested(False)
+    if explain:
+        os.environ["DECKBENCH_EXPLAIN"] = "1"
     M = get_modset(exp["mods"])
     tasks = plan(exp, M, fights)
+    if explain:
+        for t in tasks:
+            t[1]["explain"] = True
     jobs = jobs or os.cpu_count() or 1
     t0 = time.time()
     if jobs > 1:
@@ -144,11 +174,17 @@ def run_experiment(path, fights=None, jobs=None, seed=None, agent=None, out_dir=
     out_dir = out_dir or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "reports", exp["name"])
     os.makedirs(out_dir, exist_ok=True)
     meta = {"exp": exp, "n_tasks": len(tasks), "wall_secs": wall, "jobs": jobs, "approx": allapprox}
+    if explain:
+        meta["explain"] = True
+    explain_rows = []
     with open(os.path.join(out_dir, "raw.jsonl"), "w", encoding="utf-8") as f:
         for r in results:
             r = dict(r)
             r.pop("log", None)
+            explain_rows.extend(r.pop("explain", []) or [])
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
+    if explain:
+        EX.write_jsonl(os.path.join(out_dir, "explain.jsonl"), explain_rows)
     json.dump(meta, open(os.path.join(out_dir, "meta.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     from .report import make_report
     make_report(out_dir, M)
@@ -169,9 +205,13 @@ def main():
     ap.add_argument("--seed", type=int)
     ap.add_argument("--agent")
     ap.add_argument("--out")
+    ap.add_argument("--explain", action="store_true",
+                    help="把每步出牌、目标和药水的候选分数写到输出目录的 explain.jsonl（也认 DECKBENCH_EXPLAIN=1，或实验 YAML 的 explain: true）")
     a = ap.parse_args()
-    out, wall, n = run_experiment(a.experiment, a.fights, a.jobs, a.seed, a.agent, a.out)
+    out, wall, n = run_experiment(a.experiment, a.fights, a.jobs, a.seed, a.agent, a.out, explain=a.explain)
     print(f"完成 {n} 场，用时 {wall:.1f} 秒，报告在 {out}")
+    if a.explain or os.environ.get("DECKBENCH_EXPLAIN", "").strip().lower() in ("1", "true", "yes", "on"):
+        print(f"说明日志 / explanation: {os.path.join(out, 'explain.jsonl')}")
 
 
 if __name__ == "__main__":

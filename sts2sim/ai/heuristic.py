@@ -1,7 +1,8 @@
 """启发式 AI：对每个合法动作（卡 × 目标）复制战斗、实际结算一次，用局面估值打分，贪心选最高。
 不偷看牌堆：估值只看手牌数量与公开信息。"""
 from ..core import LoopAlarm
-from .base import Agent, score_delta
+from .. import explain
+from .base import Agent, _step, score_delta
 
 
 class HeuristicAgent(Agent):
@@ -15,6 +16,8 @@ class HeuristicAgent(Agent):
         acts = C.legal_actions()
         if not acts:
             return None, 0
+        log = explain.enabled()
+        rows = [] if log else None
         best, best_rank, best_s = None, -1e18, 0
         for i, t in acts:
             card = C.player.hand[i]
@@ -28,9 +31,26 @@ class HeuristicAgent(Agent):
                 s = 50
             s += card.d.ai.get("bonus", 0)   # mod 作者可在卡表里写 ai: {bonus: N} 提示难以即时估值的牌
             rank = s - self.cost_weight * paid
+            if log:
+                rows.append(_step(C, "play", card.id, card.name, t, rank, value=s, hand=i))
             if rank > best_rank:
                 best, best_rank, best_s = (i, t), rank, s
+        if log:
+            self._explain_rows = rows
+            self._explain_best = best
         return best, best_s
+
+    def _log_play(self, C, act, played):
+        rows = getattr(self, "_explain_rows", None)
+        if not rows:
+            return
+        if played and act is not None:
+            i, t = act
+            card = C.player.hand[i]
+            chosen = _step(C, "play", card.id, card.name, t, None, hand=i)
+        else:
+            chosen = {"kind": "end", "id": "end_turn"}
+        explain.publish(explain.from_steps(rows, chosen, turn=C.turn, threshold=self.threshold))
 
     def play_turn(self, C):
         while C.result is None:
@@ -38,5 +58,9 @@ class HeuristicAgent(Agent):
                 break
             act, s = self.best_action(C)
             if act is None or s <= self.threshold:
+                if explain.enabled():
+                    self._log_play(C, act, False)
                 break
+            if explain.enabled():
+                self._log_play(C, act, True)
             C.play(*act)

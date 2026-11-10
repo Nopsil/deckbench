@@ -110,6 +110,14 @@ Linux/macOS: see [docs/DEVELOPER.md](docs/DEVELOPER.md).
 In **New test → Full runs**, fill in **Game seed** with the seed shown in the game (for example `7F3K9Q2ZB8MA`). The AI then plays just that one run and records every decision, which you can look through on the results page.
 Lowercase letters, and the letters O and I, are converted to uppercase and the digits 0 and 1 automatically, just like the game does. Command line: `python tools/batch.py --char Silent --seed 7F3K9Q2ZB8MA --log-dir steps`.
 
+## Why the AI played that
+
+Off by default. When you turn it on, each card play, target choice, potion use, and reward or shop pick writes the candidates that were already scored (the top few, with scores, and which one was chosen) to a JSONL file next to that run's output. The flag does not draw random numbers, so a fixed seed plays the same whether it is on or off.
+
+- Full runs: `python tools/batch.py --explain --out runs.jsonl` (or `DECKBENCH_EXPLAIN=1`) writes `runs.explain.jsonl`.
+- Legacy fight experiments: `python -m sts2sim experiments/quick.yaml --explain`, or `explain: true` in the experiment YAML, writes `explain.jsonl` next to `raw.jsonl`.
+- Read one fight: `python tools/explain_fight.py runs.explain.jsonl --fight 0`.
+
 ## Try 0.1.5 features
 
 From the repo root. The release notes (suitable as a GitHub Release body) are in [docs/RELEASE_0.1.5.md](docs/RELEASE_0.1.5.md).

@@ -15,6 +15,8 @@
 from ..rt.boot import game as G
 from .agents import _name, dvar, card_cost, PLAY_ADJUST
 from .combat import alive_enemies, cm
+from .. import explain
+from .agents import explain_view
 from .strong import StrongAgent
 
 MAX_NODES = 1500
@@ -339,6 +341,8 @@ class PlannerMixin:
         v0, _ = self._eval_plan([], ctx)
         best["v"] = v0
         nodes = [0]
+        track = explain.enabled() and not getattr(self, "_in_child", False)
+        first_scores = {} if track else None
 
         def dfs(i, energy_left, chosen):
             if nodes[0] > MAX_NODES:
@@ -350,6 +354,11 @@ class PlannerMixin:
                 if v > best["v"] + 1e-6:
                     best["v"] = v
                     best["plan"] = [(c, t) for (c, _), t in zip(plan, tg)]
+                if track and plan:
+                    head = plan[0][0]["card"].Id.Entry
+                    prev = first_scores.get(head)
+                    if prev is None or v > prev:
+                        first_scores[head] = v
             for j in range(i, len(items)):
                 ci, cnt, g = items[j]
                 used = sum(1 for c, _ in chosen if c is ci)
@@ -363,10 +372,21 @@ class PlannerMixin:
                 chosen.pop()
         dfs(0, energy, [])
         # 药水：危险时/精英首领开局（沿用启发式规则），在规划之前用
+        pots = [] if track else None
         for a in acts:
-            if a[0] == "potion" and self._score_potion(a[1], a[2], cs, player, ctx["need"] - best_block(best["plan"]), hp) >= 0.9:
-                return a
+            if a[0] == "potion":
+                sc = self._score_potion(a[1], a[2], cs, player, ctx["need"] - best_block(best["plan"]), hp)
+                if track:
+                    step = explain_view(a, cs)
+                    step["score"] = sc
+                    pots.append(step)
+                if sc >= 0.9:
+                    if track:
+                        self._publish_plan(cs, a, pots, first_scores, v0, best["v"])
+                    return a
         if not best["plan"]:
+            if track:
+                self._publish_plan(cs, acts[-1], pots, first_scores, v0, best["v"])
             return acts[-1]
         ci, t = best["plan"][0]
         # 找对应动作
@@ -375,11 +395,36 @@ class PlannerMixin:
             if (c.Id.Entry, bool(getattr(c, "IsUpgraded", False)), card_cost(c)) == \
                     (ci["card"].Id.Entry, bool(getattr(ci["card"], "IsUpgraded", False)), ci["cost"] if not ci["xcost"] else card_cost(c)):
                 if t is None or a[2] is t:
+                    if track:
+                        self._publish_plan(cs, a, pots, first_scores, v0, best["v"])
                     return a
         for a in plays:
             if a[1] is ci["card"]:
+                if track:
+                    self._publish_plan(cs, a, pots, first_scores, v0, best["v"])
                 return a
+        if track:
+            self._publish_plan(cs, acts[-1], pots, first_scores, v0, best["v"])
         return acts[-1]
+
+    def _publish_plan(self, cs, action, pots, first_scores, v0, best_v):
+        try:
+            turn = int(cs.RoundNumber)
+        except Exception:  # noqa
+            turn = None
+        steps = []
+        for cid, v in first_scores.items():
+            steps.append({"kind": "play", "id": cid, "name": cid, "score": round(float(v), 4)})
+        steps.append({"kind": "play", "id": "end_turn", "score": round(float(v0), 4)})
+        steps.extend(pots or [])
+        view = explain_view(action, cs)
+        if view.get("kind") == "play" and view.get("id") in first_scores:
+            view["score"] = round(float(first_scores[view["id"]]), 4)
+        elif view.get("kind") == "end":
+            view["score"] = round(float(v0), 4)
+        elif best_v is not None and view.get("score") is None and view.get("kind") == "play":
+            view["score"] = round(float(best_v), 4)
+        explain.publish(explain.from_steps(steps, view, turn=turn))
 
 
 def best_block(plan):
@@ -395,12 +440,13 @@ class PlannerAgent(PlannerMixin, StrongAgent):
         super().__init__(seed=seed, search=search, **kw)
 
     def combat_action(self, cs, player, acts):
-        if len(acts) <= 1:
-            return acts[0]
-        if self.search and not self._in_child and (not self.selective or self._consequential(cs, player, acts)):
-            from .search import SearchAgent
-            return SearchAgent.combat_action(self, cs, player, acts)
-        return self.plan_action(cs, player, acts)
+        with explain.scope():
+            if len(acts) <= 1:
+                return acts[0]
+            if self.search and not self._in_child and (not self.selective or self._consequential(cs, player, acts)):
+                from .search import SearchAgent
+                return SearchAgent.combat_action(self, cs, player, acts)
+            return self.plan_action(cs, player, acts)
 
     def rollout_action(self, cs, player, acts):
         return self.plan_action(cs, player, acts)

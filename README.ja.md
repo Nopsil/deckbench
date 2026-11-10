@@ -110,6 +110,14 @@ Linux/macOS の場合は [docs/DEVELOPER.md](docs/DEVELOPER.md) を参照して�
 「新規テスト → フルラン一括」で **「ゲームのシード指定」** に、ゲーム内に表示されるシード（例：`7F3K9Q2ZB8MA`）を入力すると、AI はその 1 ランだけをプレイし、各ステップで何を選んだかを記録します。記録は結果ページで確認できます。
 小文字、英字の O と I は、ゲームと同じルールで自動的に大文字、数字の 0 と 1 に変換されます。コマンドラインの場合：`python tools/batch.py --char Silent --seed 7F3K9Q2ZB8MA --log-dir steps`。
 
+## AI がなぜその手を打ったか
+
+既定では書きません。有効にすると、カードを出す・対象を選ぶ・ポーションを使う・報酬や店で選ぶたびに、そのとき計算済みの上位候補（スコアと選んだもの）を、その実行の出力の隣の JSONL に 1 行ずつ書きます。無効のときは元の経路のままです。乱数は引きません。同じシードなら、フラグのオンとオフで結果は同じです。
+
+- フルラン：`python tools/batch.py --explain --out runs.jsonl`（または環境変数 `DECKBENCH_EXPLAIN=1`）→ `runs.explain.jsonl`
+- 旧戦闘実験：`python -m sts2sim experiments/quick.yaml --explain`、または実験 YAML の `explain: true` → レポートディレクトリの `explain.jsonl`
+- 1 戦闘を読む：`python tools/explain_fight.py runs.explain.jsonl --fight 0`
+
 ## 0.1.5 の機能を試す / Try 0.1.5 features
 
 リポジトリのルートで実行します。リリースノートは [docs/RELEASE_0.1.5.md](docs/RELEASE_0.1.5.md)（中国語・英語。GitHub Release の本文にそのまま使えます）。
