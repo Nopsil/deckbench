@@ -24,8 +24,9 @@
           <stat :label="t('rep.avgFloor')" :value="fmt.num(S.avg_floor)" :sub="t('rep.medianMax', { med: S.median_floor, max: S.max_floor })" hl />
           <stat :label="t('metric.boss1')" :value="fmt.pct(S.boss1)" :bar="S.boss1" :sub="t('rep.xOfN', { x: Math.round(S.boss1 * S.n), n: S.n })" />
           <stat :label="t('metric.act2')" :value="fmt.pct(S.act2)" :bar="S.act2" :sub="t('rep.act3Sub', { p: fmt.pct(S.act3) })" />
-          <stat :label="t('rep.winRate')" :value="fmt.pct(S.win)" :bar="S.win" :sub="t('rep.xOfN', { x: S.wins, n: S.n }) + (S.errors ? ' · ' + t('rep.errorsN', { n: S.errors }) : '')" />
+          <stat :label="t('rep.winRate')" :value="fmt.pct(S.win)" :bar="S.win" :sub="winRateSub" />
         </div>
+        <div v-if="S.sample_warning" class="hint warn">{{ t('rep.sampleSmall', { n: S.n, min: S.min_n }) }}</div>
         <div class="grid" style="grid-template-columns: 3fr 2fr; margin-top:16px">
           <div class="panel"><h3>{{ t('rep.survival') }}</h3><div class="hint" style="margin:-8px 0 6px">{{ t('rep.survivalHint') }}</div><chart :option="survivalOpt" :height="300" /></div>
           <div class="panel"><h3>{{ t('rep.deathRoom') }}</h3><chart :option="roomOpt" :height="300" /></div>
@@ -40,7 +41,7 @@
       <template v-else>
         <div class="grid g4">
           <stat :label="t('rep.totalFights')" :value="S.fights" :sub="t('rep.cellsSub', { n: S.cells.length })" />
-          <stat :label="t('rep.overallWin')" :value="fmt.pct(S.win)" :bar="S.win" hl />
+          <stat :label="t('rep.overallWin')" :value="fmt.pct(S.win)" :bar="S.win" :sub="combatWinSub" hl />
           <stat :label="t('rep.bestCell')" :value="best ? best.win.toFixed(1) + '%' : '—'" :sub="best ? `${best.deck} · ${tr('room.', best.room)}` : ''" />
           <stat :label="t('rep.simTime')" :value="fmt.secs(S.wall_secs)" />
         </div>
@@ -84,6 +85,19 @@ const err = ref('')
 const tab = ref('overview')
 
 const runOptions = computed(() => store.runs.filter((r) => r.status === 'done').map((r) => ({ label: `${runTitle(r)}  ·  ${fmt.time(r.created)}`, value: r.id })))
+const winRateSub = computed(() => {
+  const s = S.value
+  if (!s || meta.value?.kind !== 'batch') return ''
+  const parts = [t('rep.xOfN', { x: s.wins, n: s.n })]
+  if (s.errors) parts.push(t('rep.errorsN', { n: s.errors }))
+  if (s.win_ci_low != null && s.win_ci_high != null) parts.push(t('rep.wilson', { lo: fmt.pct(s.win_ci_low), hi: fmt.pct(s.win_ci_high) }))
+  return parts.join(' · ')
+})
+const combatWinSub = computed(() => {
+  const s = S.value
+  if (!s || s.win_ci_low == null || s.win_ci_high == null) return ''
+  return t('rep.wilson', { lo: fmt.pct(s.win_ci_low), hi: fmt.pct(s.win_ci_high) })
+})
 const chips = computed(() => {
   const p = meta.value?.params || {}
   if (meta.value?.kind === 'batch') {
@@ -189,6 +203,7 @@ const cellCols = [
 
 <style scoped>
 .pick { margin-bottom: 18px; }
+.hint.warn { color: #E0A86C; }
 .hero { padding: 4px 2px 18px; }
 .ht { font-size: 21px; font-weight: 700; }
 :deep(.n-tabs .n-tab-pane) { padding-top: 14px; }

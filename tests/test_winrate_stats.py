@@ -14,6 +14,7 @@ Wilson 95%（z=1.96）对照 Newcombe 1998, Statistics in Medicine 17:857–872�
 """
 import json
 import os
+import re
 import sys
 
 import pytest
@@ -277,3 +278,34 @@ def test_ab_table_and_ai_summary_surface_the_same_numbers(tmp_path, capsys, monk
     tiny_out = capsys.readouterr().out
     assert "不足，不能下结论" in tiny_out
     assert "n=10 < 30" in tiny_out
+
+
+def test_gui_views_show_wilson_pvalue_and_sample_warning():
+    """报告页和 A/B 页要把接口里的区间、p 值、样本警告画出来，四种语言都有对应的键。"""
+    report = open(os.path.join(ROOT, "gui", "web", "src", "pages", "Report.vue"), encoding="utf-8").read()
+    ab = open(os.path.join(ROOT, "gui", "web", "src", "pages", "AB.vue"), encoding="utf-8").read()
+    for name in ("win_ci_low", "win_ci_high", "sample_warning", "rep.wilson", "rep.sampleSmall"):
+        assert name in report
+    for name in ("win_ci_low", "win_ci_high", "p_value", "sample_warning", "_ci_low", "_ci_high",
+                 "ab.sideWin", "ab.wilson", "ab.pValue", "ab.sampleSmall", "ab.sampleSmallAny"):
+        assert name in ab
+    keys = (
+        "rep.wilson", "rep.sampleSmall", "ab.sideWin", "ab.wilson", "ab.pValue", "ab.pValueLabel",
+        "ab.sampleSmall", "ab.sampleSmallAny", "ab.tooSmallTag",
+    )
+    placeholders = {
+        "rep.wilson": {"lo", "hi"},
+        "rep.sampleSmall": {"n", "min"},
+        "ab.sideWin": {"win", "lo", "hi"},
+        "ab.wilson": {"lo", "hi"},
+        "ab.pValue": {"p"},
+        "ab.pValueLabel": set(),
+        "ab.sampleSmall": {"na", "nb", "min"},
+        "ab.sampleSmallAny": {"min"},
+        "ab.tooSmallTag": set(),
+    }
+    for lang in ("zhs", "en", "ja", "ko"):
+        table = json.load(open(os.path.join(ROOT, "gui", "locales", f"{lang}.json"), encoding="utf-8"))
+        for key in keys:
+            assert key in table and table[key].strip()
+            assert set(re.findall(r"\{(\w+)\}", table[key])) == placeholders[key]
