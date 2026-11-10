@@ -1,7 +1,8 @@
 # Build the Windows zip, check it, and upload it as an Actions artifact.
 # Starts from the Actions tab, or when a tag named v* is pushed.
 # Does not create a GitHub Release and does not publish the zip anywhere else.
-# The runner has no game install. DeckBench.exe is not launched.
+# The runner has no game install. The CLI smoke uses sim/ from the zip.
+# The API smoke launches the packaged DeckBench.exe --serve with no window.
 
 name: Windows package
 
@@ -176,10 +177,33 @@ jobs:
             Pop-Location
           }
 
+      - name: Smoke the packaged HTTP API
+        id: api-smoke
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          $Work = Join-Path $env:RUNNER_TEMP "deckbench-build"
+          $zip = Join-Path $Work "DeckBench-$($env:PACKAGE_VERSION)-win64.zip"
+          $log = Join-Path $env:RUNNER_TEMP "deckbench-api-smoke.log"
+          New-Item -ItemType File -Force -Path $log | Out-Null
+          & powershell.exe -ExecutionPolicy Bypass -File (Join-Path $env:GITHUB_WORKSPACE "gui\packaging\smoke_api.ps1") `
+            -Zip $zip -Log $log -ExpectedVersion $env:PACKAGE_VERSION
+          if ($LASTEXITCODE -ne 0) { throw "smoke_api.ps1 failed ($LASTEXITCODE)" }
+
       - name: Upload the Windows zip
         uses: actions/upload-artifact@v7
         with:
           name: DeckBench-0.1.5-win64
           path: ${{ runner.temp }}/deckbench-build/DeckBench-0.1.5-win64.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload the API smoke log
+        if: always() && (steps.api-smoke.outcome == 'success' || steps.api-smoke.outcome == 'failure')
+        uses: actions/upload-artifact@v7
+        with:
+          name: DeckBench-0.1.5-api-smoke-log
+          path: ${{ runner.temp }}/deckbench-api-smoke.log
           if-no-files-found: error
           retention-days: 30

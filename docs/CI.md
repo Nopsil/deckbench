@@ -54,3 +54,9 @@ python .github/scripts/coverage_summary.py coverage.json
 [COVERAGE.md](COVERAGE.md) 里的百分比是补测试那一次记下的快照，不是这张每次作业重新算的表。
 
 *After pytest, `.github/scripts/coverage_summary.py` always runs. It sums statement coverage for `sts2sim`, `gui` and `tools` (anything else is `other`) and appends a Markdown table to the job summary. With `GITHUB_STEP_SUMMARY` unset it prints the same table. Nothing is uploaded. The percentages in [COVERAGE.md](COVERAGE.md) are an earlier snapshot, not this per-job table.*
+
+## Windows 安装包 / Windows package
+
+安装包工作流是 `.github/workflows/windows-package.yml`，不是上面的 `CI`。手动运行，或推送名字以 `v` 开头的标签时，在 `windows-latest` 上打包。核对和命令行冒烟之后，`gui/packaging/smoke_api.ps1` 把 `DeckBench-0.1.5-win64.zip` 解到临时目录，用 `DeckBench.exe --serve` 无界面启动，等 `GET /api/health`，再通过 `POST /api/runs` 打一场不需要游戏的木桩（`claude_v34` 的 `probe_noengine`，`encounter: DUMMY`，1 回合），然后结束进程。任一步失败，工作流失败。冒烟日志作为 Actions artifact 上传。不创建 GitHub Release。打包细节见 [DEVELOPER.md](DEVELOPER.md)。
+
+*The package workflow is `.github/workflows/windows-package.yml`, separate from `CI` above. A manual run or a `v*` tag builds it on `windows-latest`. After the package check and the CLI smoke, `gui/packaging/smoke_api.ps1` extracts `DeckBench-0.1.5-win64.zip`, starts `DeckBench.exe --serve` with no window, waits for `GET /api/health`, runs one training-dummy fight that does not need a game through `POST /api/runs` (`claude_v34` deck `probe_noengine`, `encounter: DUMMY`, one turn), and stops the process. A failed step fails the workflow. The smoke log is uploaded as an Actions artifact. The workflow does not create a GitHub Release. Packaging details are in [DEVELOPER.md](DEVELOPER.md).*
