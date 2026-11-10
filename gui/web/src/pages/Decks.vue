@@ -82,6 +82,11 @@
             <n-input v-model:value="deckId" maxlength="32" /></div>
           <div class="field" data-deck="name"><div class="label">{{ t('deck.name') }}</div>
             <n-input v-model:value="deckName" maxlength="80" /></div>
+          <div class="field">
+            <div class="label">{{ t('deck.maxTurns') }}</div>
+            <input data-deck="turns" type="number" :min="1" :max="turnLimit" :value="maxTurns" @input="onTurns" />
+            <div class="hint">{{ t('deck.maxTurnsHint') }}</div>
+          </div>
           <div data-deck="save">
             <n-button type="primary" block :loading="saving" :disabled="!canSave" @click="save">{{ t('deck.save') }}</n-button>
           </div>
@@ -120,10 +125,37 @@ const deckMod = ref('')
 const deckId = ref('')
 const deckName = ref('')
 const encounters = ref([{ id: 'DUMMY', fights: 1 }])
+const maxTurns = ref(1)
+const fullTurns = ref(0)
+const turnLimit = ref(200)
+const turnsTouched = ref(false)
+const turnsReady = ref(false)
 const saving = ref(false)
 const savedId = ref('')
 let timer
-watch(encounters, () => { savedId.value = '' }, { deep: true })
+function onlyDummy(list) {
+  return (list || []).length > 0 && list.every((row) => row.id === 'DUMMY')
+}
+function applyTurnDefault() {
+  if (turnsTouched.value || !fullTurns.value) return
+  maxTurns.value = onlyDummy(encounters.value) ? 1 : fullTurns.value
+}
+watch(encounters, () => { savedId.value = ''; applyTurnDefault() }, { deep: true })
+function onTurns(event) {
+  turnsTouched.value = true
+  savedId.value = ''
+  const n = Number.parseInt(event.target.value, 10)
+  if (Number.isFinite(n)) maxTurns.value = n
+}
+async function loadTurnCap() {
+  try {
+    const data = await api.get('/api/encounters?limit=1')
+    if (data.full_turns) fullTurns.value = data.full_turns
+    if (data.turn_limit) turnLimit.value = data.turn_limit
+    applyTurnDefault()
+  } catch (e) { /* omitted max_turns still uses the server default */ }
+  finally { turnsReady.value = true }
+}
 
 const any = () => ({ label: t('deck.any'), value: '' })
 function opt(list) { return [any(), ...(list || []).map((v) => ({ label: v, value: v }))] }
@@ -261,6 +293,7 @@ async function save() {
       cards: rows.value.map((row) => ({ id: row.id, count: row.count, upgrade: !!row.upgrade })),
       encounters: encounters.value.map((row) => ({ id: row.id, fights: Number(row.fights) || 1 })),
     }
+    if (turnsTouched.value || (turnsReady.value && fullTurns.value)) body.max_turns = maxTurns.value
     const saved = await api.post('/api/decks', body)
     savedId.value = saved.id
     await store.loadCatalog()
@@ -270,7 +303,7 @@ async function save() {
     saving.value = false
   }
 }
-onMounted(load)
+onMounted(() => { load(); loadTurnCap() })
 </script>
 
 <style scoped>
@@ -297,6 +330,7 @@ svg { width: 100%; height: auto; display: block; margin: 4px 0 10px; }
 .drow [data-upgrade].on { background: rgba(217,119,87,.3); color: #F0A486; }
 .up { color: #F0A486; margin-left: 4px; }
 .field { margin: 10px 0; }
+.field input[type="number"] { width: 100%; box-sizing: border-box; background: #1A1A1E; color: #EDE9E3; border: 1px solid #2E2E34; border-radius: 8px; padding: 6px 8px; font: inherit; }
 .hint.warn { color: #E0A86C; }
 .hint.ok { color: #8FBF8F; }
 @media (max-width: 980px) {

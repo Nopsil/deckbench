@@ -45,9 +45,9 @@
 | `room` | `normal` / `elite` / `boss`，也认 `普通` / `精英` / `首领` 和 `Monster` / `Elite` / `Boss` |
 | `offset` / `limit` | 分页。`limit` 为 1–200，默认 40 |
 
-返回 `total`、`offset`、`limit`、`encounters`（每条有 `id`、`name_zh`、`name_en`、`act`、`room`）、`probe`（训练木桩）、`acts`、`rooms`，以及 `gauntlets`。连战不是另一份名单：`act1_elite` 就是第 1 幕精英里 `encounter_pool` 返回的全部遭遇，第 2、3 幕和普通、首领同样现算。空的连战不出现。`offset` 不是整数、`limit` 超出 1–200、幕或房间不对、筛选里带 `..` 或空字节，是 400，一句说明，没有堆栈。
+返回 `total`、`offset`、`limit`、`encounters`（每条有 `id`、`name_zh`、`name_en`、`act`、`room`）、`probe`（训练木桩）、`acts`、`rooms`、`gauntlets`，以及 `full_turns`（出厂整场回合上限）和 `turn_limit`（允许的最大回合，200）。连战不是另一份名单：`act1_elite` 就是第 1 幕精英里 `encounter_pool` 返回的全部遭遇，第 2、3 幕和普通、首领同样现算。空的连战不出现。`offset` 不是整数、`limit` 超出 1–200、幕或房间不对、筛选里带 `..` 或空字节，是 400，一句说明，没有堆栈。
 
-*`q` matches the Chinese name, the English name and the id (80 characters). `act` is `1`, `2` or `3`. `room` is `normal`, `elite` or `boss` (Chinese room names and `Monster` / `Elite` / `Boss` are accepted). `offset` / `limit` page the list; `limit` is 1–200 and defaults to 40. The body has `total`, `offset`, `limit`, `encounters` (each with `id`, `name_zh`, `name_en`, `act`, `room`), `probe` (the training dummy), `acts`, `rooms` and `gauntlets`. A gauntlet is not a second roster: `act1_elite` is every Act 1 elite `encounter_pool` returns, and the same is built for acts 2 and 3 and for normal fights and bosses. An empty gauntlet is omitted. A non-integer `offset`, a `limit` outside 1–200, a bad act or room, or `..` or a null byte in a filter is a 400 with one sentence and no stack trace.*
+*`q` matches the Chinese name, the English name and the id (80 characters). `act` is `1`, `2` or `3`. `room` is `normal`, `elite` or `boss` (Chinese room names and `Monster` / `Elite` / `Boss` are accepted). `offset` / `limit` page the list; `limit` is 1–200 and defaults to 40. The body has `total`, `offset`, `limit`, `encounters` (each with `id`, `name_zh`, `name_en`, `act`, `room`), `probe` (the training dummy), `acts`, `rooms`, `gauntlets`, `full_turns` (the shipped full-fight cap) and `turn_limit` (the highest cap that can be saved, 200). A gauntlet is not a second roster: `act1_elite` is every Act 1 elite `encounter_pool` returns, and the same is built for acts 2 and 3 and for normal fights and bosses. An empty gauntlet is omitted. A non-integer `offset`, a `limit` outside 1–200, a bad act or room, or `..` or a null byte in a filter is a 400 with one sentence and no stack trace.*
 
 ## 保存 / Save
 
@@ -71,15 +71,19 @@
 
 `encounters` 和 `gauntlet` 都可以不写。都不写时仍是一场训练木桩（`encounter: DUMMY`，1 场，1 回合）。`encounters` 里每一项是 `{id, fights}`，也可以只写遭遇 id。`fights` 是这种遭遇打几场，1 到 100 的整数。`gauntlet` 取上面的连战 id，例如 `act1_elite`；可选的顶层 `fights` 是这一组里每种遭遇的场数，默认 1。两组一起给时，连战先展开，同 id 的显式项再盖过场数。同一份预设最多 40 种遭遇、合计最多 400 场。
 
+`max_turns` 是这一份预设里每一场的回合上限，写在文件顶层，也写进 `extra` 的每一行（模拟器打额外遭遇时用的是这一行自己的 `max_turns`）。不写时：名单里只有训练木桩，就是 1 回合；只要有一场不是木桩，就用出厂 `experiments/*.yaml` 顶层共用的那个整场上限（它们不一致时取出现最多的；和 `run_fight` 的默认打平则用默认）。自己写的话必须是 1 到 200 的整数，和新建测试里最大回合的上限一样。超过、不是整数，是 400，一句说明，没有堆栈。
+
 *`encounters` and `gauntlet` can both be omitted. Omitting both is still one training-dummy fight (`encounter: DUMMY`, one fight, one turn). Each `encounters` item is `{id, fights}`, or just an encounter id. `fights` is how many times that encounter is fought, a whole number from 1 to 100. `gauntlet` is one of the ids above, such as `act1_elite`. Optional top-level `fights` is the count for each encounter in that gauntlet, and defaults to 1. When both are sent, the gauntlet is expanded first and an explicit item with the same id replaces its fight count. One preset holds at most 40 encounters and 400 fights in total.*
+
+*`max_turns` is the turn cap for every fight in the preset. It is stored at the top of the file and on each `extra` row, because the simulator uses the row's own `max_turns` for an extra encounter. When it is omitted, a dummy-only list is 1 turn. Any other encounter uses the full-fight cap shared by the top-level `max_turns` of the shipped `experiments/*.yaml` files (the value that appears most often when they differ; a tie with the `run_fight` default uses that default). An explicit value has to be a whole number from 1 to 200, the same ceiling as max turns on New test. Past that ceiling, or not an integer, is a 400 with one sentence and no stack trace.*
 
 `character` 可以不写。模组只有一个角色时用那一个。`cards` 里同一张牌、同一种升级会合并。每张最多 15 张，一共最多 60 张。
 
-校验走模拟器自己的规则。牌：模组要存在，角色要在这个模组里，每张牌要能被 `find_card` 找到（这套 mod 或内置状态牌），拼出来的 `id`、`id+`、`id×张数` 要能被 `parse_deck` 读懂。遭遇：id 必须是 `DUMMY`，或者 `encounter_pool` 会拿去打的那一场；连战也只从这份池子展开。通过之后只写用户预设目录里的 `<id>.yaml`（默认是界面数据目录下的 `presets/`，也就是 `STS2SIM_GUI_DATA/presets`）。文件格式和 `experiments/*.yaml` 相同：`mods`、`decks`、`rooms`、`seed`、`agent`，另外 `rooms` 为空，`extra` 里每种勾选的遭遇一行（`encounter`、`fights`、`max_turns: 1`、幕和房间）。模拟器本来就会按 `extra` 打这些遭遇，出牌、种子和 AI 都不改。没有本机怪物数据时仍可以只打训练木桩。文件里多一个 `user_deck`，只给界面在这次测试自己的目录里生成临时 mod 用；交给模拟器的那份实验 YAML 会拿掉它。
+校验走模拟器自己的规则。牌：模组要存在，角色要在这个模组里，每张牌要能被 `find_card` 找到（这套 mod 或内置状态牌），拼出来的 `id`、`id+`、`id×张数` 要能被 `parse_deck` 读懂。遭遇：id 必须是 `DUMMY`，或者 `encounter_pool` 会拿去打的那一场；连战也只从这份池子展开。通过之后只写用户预设目录里的 `<id>.yaml`（默认是界面数据目录下的 `presets/`，也就是 `STS2SIM_GUI_DATA/presets`）。文件格式和 `experiments/*.yaml` 相同：`mods`、`decks`、`rooms`、`seed`、`agent`，另外 `rooms` 为空，`extra` 里每种勾选的遭遇一行（`encounter`、`fights`、`max_turns`、幕和房间）。模拟器本来就会按 `extra` 打这些遭遇，出牌、种子和 AI 都不改。没有本机怪物数据时仍可以只打训练木桩。文件里多一个 `user_deck`，只给界面在这次测试自己的目录里生成临时 mod 用；交给模拟器的那份实验 YAML 会拿掉它。
 
 *The `character` field can be omitted. A mod with one character uses that character. Copies of the same card and the same upgrade are merged. At most 15 of one card, and 60 cards in the deck.*
 
-*Validation uses the simulator's own rules. For cards, the mod has to exist, the character has to belong to it, each card has to be found by `find_card` (that mod, or a built-in status card), and the `id` / `id+` / `id×count` line has to survive `parse_deck`. For encounters, the id has to be `DUMMY` or an encounter `encounter_pool` would actually run; a gauntlet expands from that same pool. The only file written is `<id>.yaml` in the user presets folder (by default `presets/` under the GUI data directory, `STS2SIM_GUI_DATA/presets`). The shape matches `experiments/*.yaml`: `mods`, `decks`, `rooms`, `seed`, `agent`. `rooms` is empty, and `extra` has one row per ticked encounter (`encounter`, `fights`, `max_turns: 1`, act and room). The simulator already runs those `extra` rows. Play, seeds and AI are unchanged. With no local monster codex the preset can still be the training dummy alone. `user_deck` in that file is only for the GUI, which builds a temporary mod inside that one run's folder. The experiment YAML handed to the simulator does not include `user_deck`.*
+*Validation uses the simulator's own rules. For cards, the mod has to exist, the character has to belong to it, each card has to be found by `find_card` (that mod, or a built-in status card), and the `id` / `id+` / `id×count` line has to survive `parse_deck`. For encounters, the id has to be `DUMMY` or an encounter `encounter_pool` would actually run; a gauntlet expands from that same pool. The only file written is `<id>.yaml` in the user presets folder (by default `presets/` under the GUI data directory, `STS2SIM_GUI_DATA/presets`). The shape matches `experiments/*.yaml`: `mods`, `decks`, `rooms`, `seed`, `agent`. `rooms` is empty, and `extra` has one row per ticked encounter (`encounter`, `fights`, `max_turns`, act and room). The simulator already runs those `extra` rows. Play, seeds and AI are unchanged. With no local monster codex the preset can still be the training dummy alone. `user_deck` in that file is only for the GUI, which builds a temporary mod inside that one run's folder. The experiment YAML handed to the simulator does not include `user_deck`.*
 
 下面这些直接拒绝，不写出厂文件，正文里没有堆栈，也不回显提交的原文：
 
@@ -90,7 +94,7 @@
 - 目标文件是符号链接，或目录本身是跳出去的符号链接
 - 正文超过 64KB、不是 JSON、缺字段、类型不对
 - 牌不存在、张数不在 1–15、角色不对
-- 遭遇不在模拟器会打的名单里、场数不在 1–100、超过 40 种或合计超过 400 场、连战 id 对不上或那一组是空的
+- 遭遇不在模拟器会打的名单里、场数不在 1–100、超过 40 种或合计超过 400 场、连战 id 对不上或那一组是空的、回合上限不在 1–200
 
 同一 id 再存一次会更新用户自己的那一份，不会去碰出厂预设。
 
@@ -103,17 +107,17 @@
 - *a target that is a symlink, or a presets directory that is a symlink pointing out*
 - *a body over 64KB, a body that is not JSON, a missing field, or a wrong type*
 - *an unknown card, a count outside 1–15, or a character the mod does not have*
-- *an encounter the simulator would not run, a fight count outside 1–100, more than 40 encounters or 400 fights in total, or a gauntlet id that does not match or is empty*
+- *an encounter the simulator would not run, a fight count outside 1–100, more than 40 encounters or 400 fights in total, a gauntlet id that does not match or is empty, or a turn cap outside 1–200*
 
 *Saving the same id again replaces that user preset. Shipped presets stay untouched.*
 
 界面上张数、费用曲线和攻击 / 技能 / 能力的比例随编辑更新。费用曲线是页面里的 SVG，不请求网络。遭遇列表可以按幕和房间筛选，勾选几种并给每种设场数。连战按钮（例如第 1 幕精英）用上面的 `gauntlets` 一次勾上那一组。存好之后，新建测试的预设下拉里会出现「名称 (id)」。选中它再开始，打的就是勾选的那些遭遇；没改过选择时仍是一场木桩。
 
-新建测试的自定义战斗里也可以勾选遭遇、给每种设场数，或点同一个连战。勾了之后这次测试打这些遭遇，不再从房间里随机抽；最大回合数用这一页上的设置。一张预设保存时每种遭遇仍是 1 回合，和训练木桩一样，这样没有长时间的模拟也能开打。
+组牌页上可以改最大回合。只留着训练木桩时显示 1；勾了别的遭遇、又没自己改过，就显示 `GET /api/encounters` 返回的 `full_turns`（出厂整场上限）。新建测试的自定义战斗里也可以勾选遭遇、给每种设场数，或点同一个连战。勾了之后这次测试打这些遭遇，不再从房间里随机抽；最大回合数用这一页上的设置。
 
 *On the page, size, the cost curve and the attack / skill / power split follow the deck as you edit. The curve is an SVG in the page. It does not load anything from the network. The encounter list filters by act and room. Tick several and set the fights on each one. A gauntlet button (for example Act 1 elites) ticks that whole group from `gauntlets`. After a save, New test's preset list shows "name (id)". Choosing it and starting runs the encounters you ticked. Leaving the selection alone is still one dummy fight.*
 
-*New test's custom combat can tick encounters, set fights on each one, or use the same gauntlet. With any ticked, that test runs those encounters instead of drawing at random from the rooms, and each fight uses the max turns on that page. A saved preset still gives every encounter one turn, the same as the training dummy, so it can start without a long simulation.*
+*The deck builder has a max-turns field. A dummy-only preset shows 1. After another encounter is ticked, and the field has not been edited, it shows `full_turns` from `GET /api/encounters` (the shipped full-fight cap). New test's custom combat can tick encounters, set fights on each one, or use the same gauntlet. With any ticked, that test runs those encounters instead of drawing at random from the rooms, and each fight uses the max turns on that page.*
 
 ## MCP
 

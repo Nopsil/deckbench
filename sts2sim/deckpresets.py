@@ -31,6 +31,9 @@ MAX_FILE = 2_000_000
 MAX_ENCOUNTERS = 40
 MAX_FIGHTS_EACH = 100
 MAX_FIGHTS_TOTAL = 400
+# Same ceiling as the New test max-turns control. The default cap is not this
+# number: it is read from shipped experiments, or from the runner default.
+TURN_LIMIT = 200
 _ID = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,31}$")
 _MOD = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,40}$")
 _CARD_ID = re.compile(r"^[A-Za-z0-9_]{1,80}$")
@@ -680,6 +683,8 @@ def list_encounters(q="", act="", room="", offset=0, limit=40):
         "acts": acts,
         "rooms": rooms,
         "gauntlets": _gauntlet_list(playable),
+        "full_turns": full_fight_turns(),
+        "turn_limit": TURN_LIMIT,
     }
 
 
@@ -784,11 +789,80 @@ def resolve_encounters(payload, allow_default=True):
     return chosen
 
 
-def fight_rows(deck_ids, chosen, max_turns=1):
-    """写成实验 YAML 的 ``extra`` 行。模拟器本来就会按 encounter 打这些行。"""
-    turns = max_turns if isinstance(max_turns, int) and not isinstance(max_turns, bool) else 1
-    if turns < 1 or turns > 200:
-        turns = 1
+def _runner_turn_default():
+    import inspect
+
+    from sts2sim.runner import run_fight
+    value = inspect.signature(run_fight).parameters["max_turns"].default
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        return None
+    return value
+
+
+def _shipped_turn_caps():
+    """出厂实验顶层的 max_turns。extra 里木桩用的更短上限不算。"""
+    folder = os.path.join(_sim_root(), "experiments")
+    try:
+        names = sorted(os.listdir(folder))
+    except OSError:
+        return []
+    found = []
+    for name in names:
+        if not name.endswith(".yaml"):
+            continue
+        path = os.path.join(folder, name)
+        if os.path.islink(path) or not os.path.isfile(path) or not _within(path, folder):
+            continue
+        try:
+            if os.path.getsize(path) > MAX_FILE:
+                continue
+            with open(path, encoding="utf-8") as fh:
+                loaded = yaml.safe_load(fh)
+        except (OSError, yaml.YAMLError):
+            continue
+        if not isinstance(loaded, dict):
+            continue
+        turns = loaded.get("max_turns")
+        if isinstance(turns, bool) or not isinstance(turns, int) or turns < 1:
+            continue
+        found.append(turns)
+    return found
+
+
+def full_fight_turns():
+    """出厂实验共用的整场回合上限。它们不一致时，取出现最多的那个；和模拟器默认打平则用默认。"""
+    fallback = _runner_turn_default()
+    counts = {}
+    for turns in _shipped_turn_caps():
+        counts[turns] = counts.get(turns, 0) + 1
+    if not counts:
+        return fallback if fallback is not None else 1
+    best = max(counts.values())
+    modes = [turns for turns, count in counts.items() if count == best]
+    if fallback in modes:
+        return fallback
+    return min(modes)
+
+
+def _checked_turns(value):
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise DeckPresetError("bad_type", field="max_turns", expected="integer")
+    if value < 1 or value > TURN_LIMIT:
+        raise DeckPresetError("max_turns", n=TURN_LIMIT)
+    return value
+
+
+def preset_turns(payload, chosen):
+    """一份预设的回合上限。只含训练木桩且没写 max_turns 时是 1，否则用整场上限。"""
+    dummy_only = bool(chosen) and all(item.get("id") == "DUMMY" for item in chosen)
+    if not isinstance(payload, dict) or "max_turns" not in payload or payload.get("max_turns") is None:
+        return 1 if dummy_only else full_fight_turns()
+    return _checked_turns(payload.get("max_turns"))
+
+
+def fight_rows(deck_ids, chosen, max_turns):
+    """写成实验 YAML 的 ``extra`` 行。模拟器按每一行自己的 max_turns 打。"""
+    turns = _checked_turns(max_turns)
     rows = []
     for did in deck_ids:
         for enc in chosen:
@@ -1034,17 +1108,18 @@ def save_preset(payload):
         raise DeckPresetError("missing", field="character")
     tokens = _tokens(modset, mod_name, rows)
     chosen = resolve_encounters(payload)
+    turns = preset_turns(payload, chosen)
     exp = {
         "name": pid,
         "title": name,
         "mods": [mod_name, pid],
         "seed": seed,
         "fights": 1,
-        "max_turns": 1,
+        "max_turns": turns,
         "agent": agent,
         "rooms": [],
         "decks": [pid],
-        "extra": fight_rows([pid], chosen, max_turns=1),
+        "extra": fight_rows([pid], chosen, turns),
         "user_deck": {
             "id": pid,
             "name": name,
@@ -1056,7 +1131,8 @@ def save_preset(payload):
     }
     text = (
         "# User deck preset. extra lists the encounters this deck runs against.\n"
-        "# Each fight is one turn. This file is not a shipped experiment.\n"
+        "# max_turns is the fight cap. A dummy-only preset defaults to 1 turn.\n"
+        "# This file is not a shipped experiment.\n"
     )
     text += yaml.safe_dump(exp, allow_unicode=True, sort_keys=False)
     folder = presets_dir(create=True)
@@ -1071,6 +1147,7 @@ def save_preset(payload):
         "character": character,
         "encounters": [enc["id"] for enc in chosen],
         "fights": sum(enc["fights"] for enc in chosen),
+        "max_turns": turns,
     }
 
 

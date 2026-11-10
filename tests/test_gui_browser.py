@@ -586,8 +586,13 @@ def test_deck_builder_saves_two_encounters_and_runs_them(gui):
     page.locator("[data-deck='save'] button").click()
     gui.expect(page.locator("[data-deck='saved']")).to_have_text("Saved preset twoenc")
     saved = (gui.data / "presets" / "twoenc.yaml").read_text(encoding="utf-8")
+    from sts2sim.deckpresets import full_fight_turns
+    cap = full_fight_turns()
+    assert cap > 1
+    gui.expect(page.locator("[data-deck='turns']")).to_have_value(str(cap))
     assert "NIB_ELITE_A" in saved and "NIB_ELITE_B" in saved
     assert "DUMMY" not in saved
+    assert f"max_turns: {cap}" in saved
     _save_shot(page, "deck-encounters.png")
     _assert_clean(gui, "two-encounters")
 
@@ -612,4 +617,6 @@ def test_deck_builder_saves_two_encounters_and_runs_them(gui):
     fights = [json.loads(line) for line in raw_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     assert [row["encounter"] for row in fights] == ["NIB_ELITE_A", "NIB_ELITE_B"]
     assert fights[0]["enc_name"] == "小钉精英甲"
+    decided = [row for row in fights if row["result"] in ("win", "loss")]
+    assert decided and len(decided) * 2 >= len(fights)
     _assert_clean(gui, "two-encounter-run")

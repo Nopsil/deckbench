@@ -525,10 +525,12 @@ def save_deck(deck: str = "") -> str:
     character 可以省略，模组只有一个角色时用那一个。
     encounters 是可选的遭遇列表（{id, fights}，或遭遇 id 字符串）。fights 是这种遭遇打几场，1 到 100。
     gauntlet 是可选的连战 id，例如 act1_elite（第 1 幕全部精英），从模拟器已经会打的遭遇拼出来。
-    两者都省略时仍是一场训练木桩（encounter: DUMMY）。一场预设合计最多 400 场。
+    两者都省略时仍是一场训练木桩（encounter: DUMMY，1 回合）。
+    max_turns 可选：不写时，只有木桩是 1 回合，有别的遭遇则用出厂实验的整场回合上限。自己写必须是 1 到 200 的整数。
+    一场预设合计最多 400 场。
     只写用户预设目录里的 <id>.yaml。不覆盖出厂预设、mods/、种子或配置。路径类字段直接拒绝。
-    成功是 JSON：ok、id、file（文件名，不是绝对路径）、encounters。失败也是 JSON（ok 为 false，error 为
-    bad_id / shipped / path / unknown_card / unknown_encounter / gauntlet / fights / empty / bad_type / …），
+    成功是 JSON：ok、id、file（文件名，不是绝对路径）、encounters、max_turns。失败也是 JSON（ok 为 false，error 为
+    bad_id / shipped / path / unknown_card / unknown_encounter / gauntlet / fights / max_turns / empty / bad_type / …），
     不抛异常，正文没有堆栈。
     """
     from sts2sim.deckpresets import DeckPresetError, save_preset

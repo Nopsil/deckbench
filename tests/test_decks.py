@@ -125,6 +125,8 @@ def test_save_writes_only_a_user_preset_and_can_run(client, allowed):
     assert "XIAOBENBEN×2" in text
     assert "encounter: DUMMY" in text
     assert "rooms: []" in text
+    assert body["max_turns"] == 1
+    assert "max_turns: 1" in text
     assert _read(QUICK) == before_quick
     assert _read(SHIPPED_DECKS) == before_decks
     assert set(os.listdir(os.path.join(ROOT, "experiments"))) == before_names
@@ -305,6 +307,10 @@ def test_encounters_without_a_codex_list_only_the_dummy(client, allowed, monkeyp
     assert body["probe"]["name_zh"] == "木桩"
     assert body["probe"]["name_en"] == "Training dummy"
     assert body["gauntlets"] == []
+    from sts2sim.deckpresets import full_fight_turns
+    assert body["full_turns"] == full_fight_turns()
+    assert body["full_turns"] > 1
+    assert body["turn_limit"] >= body["full_turns"]
     assert body["total"] == 1
     assert not (allowed / "presets").exists()
     assert _read(QUICK) == before
@@ -389,12 +395,16 @@ def test_save_two_encounters_and_run_them(client, allowed, codex):
     res = client.post("/api/decks", headers=EN, json=payload)
     assert res.status_code == 200, res.text
     body = res.json()
+    from sts2sim.deckpresets import full_fight_turns
+    cap = full_fight_turns()
     assert body["encounters"] == ["NIB_ELITE_A", "NIB_ELITE_B"]
     assert body["fights"] == 3
+    assert body["max_turns"] == cap and cap > 1
     saved = (allowed / "presets" / "twodeck.yaml").read_text(encoding="utf-8")
     assert "NIB_ELITE_A" in saved and "NIB_ELITE_B" in saved
     assert "DUMMY" not in saved
     assert "rooms: []" in saved
+    assert f"max_turns: {cap}" in saved
     assert os.path.dirname(QUICK) not in res.text
     assert _read(QUICK) == before_quick
     assert _read(SHIPPED_DECKS) == before_decks
@@ -415,6 +425,9 @@ def test_save_two_encounters_and_run_them(client, allowed, codex):
     fights = [json.loads(line) for line in (run / "out" / "raw.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     assert [row["encounter"] for row in fights] == ["NIB_ELITE_A", "NIB_ELITE_B", "NIB_ELITE_B"]
     assert fights[0]["enc_name"] == "小钉精英甲"
+    decided = [row for row in fights if row["result"] in ("win", "loss")]
+    assert len(decided) * 2 >= len(fights)
+    assert any(row["result"] != "timeout" for row in fights)
     assert fights[0]["deck"] == "twodeck"
     assert _read(QUICK) == before_quick
 
@@ -425,7 +438,9 @@ def test_gauntlet_save_and_custom_run_use_the_sim_pool(client, allowed, codex):
     payload["fights"] = 1
     res = client.post("/api/decks", headers=ZHS, json=payload)
     assert res.status_code == 200, res.text
+    from sts2sim.deckpresets import full_fight_turns
     assert res.json()["encounters"] == ["NIB_ELITE_A", "NIB_ELITE_B"]
+    assert res.json()["max_turns"] == full_fight_turns()
     text = (allowed / "presets" / "gauntlet.yaml").read_text(encoding="utf-8")
     assert text.index("NIB_ELITE_A") < text.index("NIB_ELITE_B")
     assert "DUMMY" not in text
@@ -526,6 +541,27 @@ def test_encounter_save_rejects_bad_input_without_echoing_it(client, allowed, co
     assert too_many.status_code == 400
     assert "1" in _detail(too_many)
     monkeypatch.setattr("sts2sim.deckpresets.MAX_ENCOUNTERS", 40)
+    short = client.post("/api/decks", headers=EN, json={
+        **_payload("shortenc"),
+        "encounters": [{"id": "NIB_ELITE_A", "fights": 1}],
+        "max_turns": 4,
+    })
+    assert short.status_code == 200, short.text
+    assert short.json()["max_turns"] == 4
+    assert "max_turns: 4" in (allowed / "presets" / "shortenc.yaml").read_text(encoding="utf-8")
+
+    zero_turns = client.post("/api/decks", headers=EN, json={**_payload("turn0"), "max_turns": 0})
+    assert zero_turns.status_code == 400
+    assert "1" in _detail(zero_turns)
+    huge_turns = client.post("/api/decks", headers=EN, json={**_payload("turnbig"), "max_turns": 201})
+    assert huge_turns.status_code == 400
+    assert "200" in _detail(huge_turns)
+    bad_turns = client.post("/api/decks", headers=EN, json={**_payload("turnbad"), "max_turns": SECRET})
+    assert bad_turns.status_code == 400
+    assert "max_turns" in _detail(bad_turns)
+    assert SECRET not in bad_turns.text
+    assert not (allowed / "presets" / "turnbig.yaml").exists()
+
     monkeypatch.setattr("sts2sim.deckpresets.MAX_FIGHTS_TOTAL", 1)
     too_fights = client.post("/api/decks", headers=EN, json={
         **_payload("fightenc"),

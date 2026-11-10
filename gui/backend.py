@@ -159,6 +159,7 @@ def _apply_run_encounters(exp, params):
         MAX_FIGHTS_TOTAL,
         DeckPresetError,
         fight_rows,
+        preset_turns,
         resolve_encounters,
     )
     try:
@@ -171,7 +172,11 @@ def _apply_run_encounters(exp, params):
     total = len(decks) * sum(item["fights"] for item in chosen)
     if not decks or total < 1 or total > MAX_FIGHTS_TOTAL:
         raise _deck_run_error(DeckPresetError("too_many_fights", n=MAX_FIGHTS_TOTAL))
-    turns = exp.get("max_turns", 1)
+    try:
+        turns = preset_turns(params, chosen)
+    except DeckPresetError as err:
+        raise _deck_run_error(err) from err
+    exp["max_turns"] = turns
     exp["extra"] = fight_rows(decks, chosen, turns)
     exp["rooms"] = []
 
