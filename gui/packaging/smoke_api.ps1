@@ -9,6 +9,10 @@
 # The fight matches the CLI smoke (claude_v34, probe_noengine, encounter DUMMY)
 # and does not need a game install. The preset file is written only into the
 # extracted sim\experiments so the shipped zip and the repo stay unchanged.
+# HTTP bodies are read as bytes and decoded as UTF-8. Windows PowerShell 5.1
+# otherwise uses ISO-8859-1 when Content-Type has no charset. JSON responses
+# must send charset=utf-8. DUMMY enc_name must survive that round trip.
+# This file stays pure ASCII; the expected name is code points, not a literal.
 param(
   [Parameter(Mandatory = $true)][string]$Zip,
   [Parameter(Mandatory = $true)][string]$Log,
@@ -25,6 +29,34 @@ $script:Packed = ""
 $script:DataDir = ""
 $script:Failed = $false
 $script:Utf8 = [System.Text.UTF8Encoding]::new($false)
+# DUMMY enc_name is U+6728 U+6869 (the training dummy). Code points keep this file ASCII.
+$script:DummyEncName = -join @([char]0x6728, [char]0x6869)
+. (Join-Path $PSScriptRoot "http_utf8.ps1")
+
+function Format-CodePoints([string]$Value) {
+  if ([string]::IsNullOrEmpty($Value)) { return "<empty>" }
+  return (($Value.ToCharArray() | ForEach-Object { "U+{0:X4}" -f [int]$_ }) -join " ")
+}
+
+function Test-HasCjk([string]$Value) {
+  if ([string]::IsNullOrEmpty($Value)) { return $false }
+  foreach ($ch in $Value.ToCharArray()) {
+    $n = [int]$ch
+    if ($n -ge 0x4E00 -and $n -le 0x9FFF) { return $true }
+  }
+  return $false
+}
+
+function Convert-FightLines([string]$Text) {
+  # Keep the list in script scope. Returning it from a function makes
+  # Windows PowerShell 5.1 unwrap a one-element array.
+  $script:FightLines = @()
+  foreach ($fightLine in ($Text -split "[\r\n]+")) {
+    $fightLine = $fightLine.Trim()
+    if ($fightLine -eq "") { continue }
+    $script:FightLines += ,($fightLine | ConvertFrom-Json)
+  }
+}
 
 function Write-Log([string]$Message) {
   $line = "{0} {1}" -f (Get-Date).ToString("o"), $Message
@@ -110,7 +142,7 @@ function Wait-Health([string]$Base, [int]$TimeoutSec) {
       throw ("server exited before health code={0}" -f $script:Server.ExitCode)
     }
     try {
-      return Invoke-RestMethod -Uri "$Base/api/health" -TimeoutSec 5
+      return Invoke-Utf8Json -Uri "$Base/api/health" -TimeoutSec 5
     } catch {
       $last = $_.Exception.Message
       Start-Sleep -Seconds 1
@@ -197,7 +229,7 @@ try {
   }
   $body = $bodyObj | ConvertTo-Json -Depth 6 -Compress
   Write-Log "POST /api/runs $body"
-  $started = Invoke-RestMethod -Method Post -Uri "$base/api/runs" `
+  $started = Invoke-Utf8Json -Method POST -Uri "$base/api/runs" `
     -Body ([Text.Encoding]::UTF8.GetBytes($body)) `
     -ContentType "application/json; charset=utf-8" -TimeoutSec 60
   if (-not $started.id) { throw "POST /api/runs returned no id" }
@@ -210,7 +242,7 @@ try {
     if ($script:Server.HasExited) {
       throw ("server exited during the run code={0}" -f $script:Server.ExitCode)
     }
-    $meta = Invoke-RestMethod -Uri "$base/api/runs/$($started.id)" -TimeoutSec 30
+    $meta = Invoke-Utf8Json -Uri "$base/api/runs/$($started.id)" -TimeoutSec 30
     if ($meta.status -ne "running" -and $meta.status -ne "queued") { break }
     Start-Sleep -Seconds 1
   } while ((Get-Date) -lt $deadline)
@@ -229,18 +261,15 @@ try {
     throw "run status $($meta.status)"
   }
 
-  # Windows PowerShell 5.1 turns Invoke-WebRequest bytes into "123 34 100 ...".
-  # Read the file the server wrote, as UTF-8, then parse the JSON.
+  # The file on disk is the simulator's own UTF-8. The HTTP body is decoded
+  # from bytes below; do not cast those bytes through a string (PS 5.1 prints
+  # them as "123 34 100 ...").
   $rawPath = Join-Path $script:DataDir ("runs\{0}\out\raw.jsonl" -f $started.id)
   if (-not (Test-Path -LiteralPath $rawPath)) { throw "raw.jsonl missing: $rawPath" }
   $rawText = [System.IO.File]::ReadAllText($rawPath, $script:Utf8).Trim()
   Write-Log ("raw.jsonl " + $rawText)
-  $parsed = @()
-  foreach ($fightLine in ($rawText -split "`r`n")) {
-    $fightLine = $fightLine.Trim()
-    if ($fightLine -eq "") { continue }
-    $parsed += ,($fightLine | ConvertFrom-Json)
-  }
+  Convert-FightLines $rawText
+  $parsed = $script:FightLines
   if ($parsed.Count -lt 1) { throw "raw.jsonl had no fight" }
   $fight = $parsed[0]
   Write-Log ("fight deck={0} encounter={1} result={2} turns={3}" -f $fight.deck, $fight.encounter, $fight.result, $fight.turns)
@@ -250,11 +279,46 @@ try {
   if ([string]$fight.deck -ne "probe_noengine") {
     throw ("smoke fight did not use the packaged probe deck (deck={0})" -f $fight.deck)
   }
-  $summary = Invoke-RestMethod -Uri "$base/api/runs/$($started.id)/summary" -TimeoutSec 30
+
+  $rawUri = "$base/api/runs/$($started.id)/files/raw.jsonl"
+  $rawHttp = Get-Utf8Response -Uri $rawUri -TimeoutSec 30
+  Write-Log ("raw.jsonl http content-type={0} bytes={1}" -f $rawHttp.ContentType, $rawHttp.Bytes)
+  Convert-FightLines ([string]$rawHttp.Text)
+  $httpFights = $script:FightLines
+  if ($httpFights.Count -lt 1) { throw "HTTP raw.jsonl had no fight" }
+  $httpFight = $httpFights[0]
+  $gotName = [string]$httpFight.enc_name
+  Write-Log ("HTTP enc_name code points {0}" -f (Format-CodePoints $gotName))
+  if ($gotName -ne $script:DummyEncName) {
+    throw ("DUMMY enc_name did not round-trip (got {0})" -f (Format-CodePoints $gotName))
+  }
+  if ($gotName -ne [string]$fight.enc_name) {
+    throw "HTTP enc_name does not match raw.jsonl on disk"
+  }
+  if ([string]$httpFight.encounter -ne "DUMMY") {
+    throw ("HTTP fight was not the training dummy (encounter={0})" -f $httpFight.encounter)
+  }
+
+  $summaryUri = "$base/api/runs/$($started.id)/summary"
+  $summaryGot = Get-Utf8Response -Uri $summaryUri -TimeoutSec 30
+  Write-Log ("summary content-type={0}" -f $summaryGot.ContentType)
+  $summary = ConvertFrom-Utf8Response -Response $summaryGot -Uri $summaryUri
   Write-Log ("summary " + ($summary.summary | ConvertTo-Json -Compress -Depth 4))
   $fights = 0
   if ($summary.summary -and $null -ne $summary.summary.fights) { $fights = [int]$summary.summary.fights }
   if ($fights -lt 1) { throw "summary fights=$fights" }
+  $decks = @()
+  if ($summary.summary -and $null -ne $summary.summary.cells) {
+    $decks = @($summary.summary.cells | ForEach-Object { [string]$_.deck })
+  }
+  $sawCjk = $false
+  foreach ($deckName in $decks) {
+    if (Test-HasCjk $deckName) { $sawCjk = $true }
+  }
+  if (-not $sawCjk) {
+    $shown = ($decks | ForEach-Object { Format-CodePoints $_ }) -join "; "
+    throw "summary deck name was not UTF-8 Chinese ($shown)"
+  }
   Write-Log "PASS"
 } catch {
   $script:Failed = $true

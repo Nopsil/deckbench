@@ -99,6 +99,50 @@ async def lang_middleware(request, call_next):
         i18n._REQ_LANG.reset(tok)
 
 
+# 这些类型的正文是 UTF-8 文本。text/* 上 Starlette 已经加过 charset 的不再重复。
+_TEXTUAL_MEDIA = {
+    "application/json",
+    "application/javascript",
+    "application/xml",
+    "application/yaml",
+    "application/x-yaml",
+}
+
+
+def with_utf8_charset(content_type: str) -> str:
+    """给 JSON 和文本响应补上 charset=utf-8。
+
+    Windows PowerShell 5.1 在 Content-Type 没有 charset 时按 ISO-8859-1 解码，
+    中文会变成乱码。zip、图片、octet-stream 这类二进制不加。
+    """
+    if not content_type or not content_type.strip():
+        return content_type
+    parts = [part.strip() for part in content_type.split(";") if part.strip()]
+    if not parts:
+        return content_type
+    media = parts[0].lower()
+    for param in parts[1:]:
+        name, sep, _value = param.partition("=")
+        if sep and name.lower() == "charset":
+            return content_type
+    textual = media.startswith("text/") or media in _TEXTUAL_MEDIA or media.endswith(("+json", "+xml"))
+    if not textual:
+        return content_type
+    return content_type.rstrip() + "; charset=utf-8"
+
+
+@app.middleware("http")
+async def utf8_charset_middleware(_request, call_next):
+    response = await call_next(_request)
+    current = response.headers.get("content-type")
+    if not current:
+        return response
+    fixed = with_utf8_charset(current)
+    if fixed != current:
+        response.headers["content-type"] = fixed
+    return response
+
+
 class StartReq(BaseModel):
     kind: str
     params: dict

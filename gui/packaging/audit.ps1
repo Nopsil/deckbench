@@ -10,6 +10,8 @@ param(
   [switch]$AllowMissingDecompiler
 )
 $ErrorActionPreference = "Stop"
+# Windows PowerShell 5.1 reads text as the ANSI code page unless UTF-8 is named.
+$Utf8 = New-Object System.Text.UTF8Encoding $false
 $root = $Path
 if ($Path -like "*.zip") {
   $root = Join-Path ([IO.Path]::GetDirectoryName((Resolve-Path $Path))) ("audit-" + [IO.Path]::GetFileNameWithoutExtension($Path))
@@ -38,7 +40,7 @@ foreach ($f in $all) {
 # 2) 内容：反编译 C# / 大段转译代码的特征（只查文本类文件）
 $text = $all | Where-Object { $_.Extension -in '.py', '.json', '.txt', '.yaml', '.yml', '.md', '.tsv', '.js', '.html' -and $_.Length -lt 20MB }
 foreach ($f in $text) {
-  $c = [IO.File]::ReadAllText($f.FullName)
+  $c = [IO.File]::ReadAllText($f.FullName, $Utf8)
   if ($c -match 'namespace MegaCrit\.Sts2|using MegaCrit\.Sts2') { Hit "decompiled C# marker" $f }
   if ($f.Extension -eq '.py' -and $f.Length -gt 400KB) { Hit "suspiciously large .py (generated?)" $f }
   if ($c -match 'class [A-Za-z]+\(CardModel\)|class [A-Za-z]+\(MonsterModel\)') { Hit "transpiled game class" $f }
@@ -71,7 +73,7 @@ function Find-AppRoot([string]$scanRoot) {
 $manifestPath = Join-Path $PSScriptRoot "ship-manifest.txt"
 if (-not (Test-Path -LiteralPath $manifestPath)) { throw "missing ship-manifest.txt next to audit.ps1" }
 $appRoot = Find-AppRoot $root
-foreach ($line in Get-Content -LiteralPath $manifestPath) {
+foreach ($line in [IO.File]::ReadAllLines($manifestPath, $Utf8)) {
   $t = ($line -replace '#.*', '').Trim()
   if (-not $t) { continue }
   $parts = $t -split '\s+'
@@ -82,7 +84,7 @@ foreach ($line in Get-Content -LiteralPath $manifestPath) {
   $full = Join-Path $appRoot ($relPath -replace '/', '\')
   if (-not (Test-Path -LiteralPath $full)) { [void]$bad.Add("missing required :: $rel"); continue }
   if ($pointer) {
-    $c = [IO.File]::ReadAllText($full)
+    $c = [IO.File]::ReadAllText($full, $Utf8)
     if ($c -notmatch 'mentor\.local\.json') { [void]$bad.Add("missing mentor.local.json pointer :: $rel") }
     if ($c -notmatch 'docs/DEVELOPER\.md') { [void]$bad.Add("missing docs/DEVELOPER.md pointer :: $rel") }
   }
