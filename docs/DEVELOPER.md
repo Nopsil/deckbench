@@ -357,6 +357,25 @@ powershell -ExecutionPolicy Bypass -File gui\packaging\audit.ps1 -Path <工作�
 - `sim/gui`：我们自己的界面 Python（不含 `web/`、不含 `packaging/`），给玩家本机的 CPython 跑 `mentor-full` / `mentor-full-ev`。不要把 `sts2_rs`、`sts2_hint`、`.onnx`、`champions.toml`、`mentor.local.json` 或 `mentor\` 放进 zip。`audit.ps1` 会拒收这些路径和扩展名，并按 `ship-manifest.txt` 要求 `sim/` 里的导入 / 种子预览 / dllmod、`decompiler\ilspycmd-host.exe`，以及 `README.txt` 里的 `mentor.local.json` / `docs/DEVELOPER.md` 说明。还没编反编译器时加 `-AllowMissingDecompiler`。
   *`sim/gui` is our own UI code so the player's CPython can run the mentor agents. Do not put `sts2_rs`, `sts2_hint`, `.onnx`, `champions.toml`, `mentor.local.json` or a `mentor\` directory in the zip. `audit.ps1` rejects those paths and, via `ship-manifest.txt`, requires the import / seed-preview / dllmod files under `sim/`, `decompiler\ilspycmd-host.exe`, and the `mentor.local.json` / `docs/DEVELOPER.md` pointer in `README.txt`. Pass `-AllowMissingDecompiler` only when that host has not been built yet.*
 
+### GitHub Actions 打包 / Package workflow
+
+`.github/workflows/windows-package.yml` 不在每次推送或 pull request 上跑。两种方式会启动它：Actions 页面里手动运行（`workflow_dispatch`），以及推送名字以 `v` 开头的标签（`v*`）。运行器是 `windows-latest`。
+
+它按上面的路径打包：Python 3.12 的 venv（`requirements-gui.txt` + pyinstaller）、当前 Node.js LTS、.NET 8 与 .NET 9 SDK、`ilspycmd` 9.1.0.7988、自包含发布 `gui/packaging/decompiler`，然后：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File gui\packaging\build.ps1 -Work <运行器临时目录>\deckbench-build -Py <该目录>\buildenv\Scripts\python.exe -Decompiler <decompiler 目录> -Version 0.1.5
+```
+
+构建之后：
+
+- `python gui/packaging/dry_check.py --app <工作目录>\dist\DeckBench`（仓库清单和打出来的目录一起查）。
+- `powershell -ExecutionPolicy Bypass -File gui\packaging\audit.ps1 -Path <工作目录>\DeckBench-0.1.5-win64.zip`。运行器上没有游戏安装，所以不加 `-GameDir` / `-Cache`，不做逐文件哈希对照。
+- 冒烟用 **zip 里的 `sim/`**，不用仓库工作副本。`python -m sts2sim --help` 必须成功，并且输出里有 `--fights`。然后再打一场内部引擎的木桩：`mods: [claude_v34]`、卡组 `probe_noengine`、`encounter: DUMMY`、`--workers 1`、1 回合。不需要游戏。不启动 `DeckBench.exe`（它会去找本机游戏并打开界面）。
+- 把 `DeckBench-0.1.5-win64.zip` 上传为 Actions artifact，保留 30 天。不创建 GitHub Release，也不把 zip 发到别的地方。
+
+*`.github/workflows/windows-package.yml` does not run on every push or pull request. It starts from the Actions tab (`workflow_dispatch`) or from a tag named `v*`, on `windows-latest`. It follows the packager above: a Python 3.12 venv (`requirements-gui.txt` + pyinstaller), current Node.js LTS, the .NET 8 and .NET 9 SDKs, ilspycmd 9.1.0.7988, a self-contained publish of `gui/packaging/decompiler`, then `build.ps1` with `-Version 0.1.5`. It runs `python gui/packaging/dry_check.py --app` on `dist\DeckBench` and `audit.ps1` on `DeckBench-0.1.5-win64.zip`. The runner has no game install, so the audit is not given `-GameDir` or `-Cache` and does not hash files against one. The smoke test uses `sim/` from the zip, not the checkout: `python -m sts2sim --help` must succeed and mention `--fights`, then one internal-engine training-dummy fight (`claude_v34`, deck `probe_noengine`, `encounter: DUMMY`, `--workers 1`, one turn). That fight does not need a game. `DeckBench.exe` is not started. The zip is uploaded as an Actions artifact kept for 30 days. The workflow does not create a GitHub Release and does not publish the zip anywhere else.*
+
 ## 已知限制 / Known limitations
 
 - 模拟结果只适合在同一套假设下横向比较，不是真实胜率。
