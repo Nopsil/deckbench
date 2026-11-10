@@ -1,22 +1,26 @@
 # 覆盖率 / Coverage
 
-这次用 `pytest-cov` 量的是 `sts2sim`、`gui`、`tools`。不需要本机游戏安装。整局引擎（`sts2sim/engine/` 里依赖生成缓存的部分）和转译器在这张表里仍是 0%，因为现有测试不加载它们；这次没有改它们的出牌、种子或 AI。
+[← 返回 README](../README.md) · [文档索引](INDEX.md) · [持续集成](CI.md)
 
-*Measured with pytest-cov over `sts2sim`, `gui`, and `tools`, with no game install. The full-run engine modules that need a generated cache, and the translators, stay at 0% because the existing tests do not load them. This pass does not change their plays, seeds, or AI choices.*
+这次用 `pytest-cov` 量的是 `sts2sim`、`gui`、`tools`。不需要本机游戏安装。整局引擎（`sts2sim/engine/` 里依赖生成缓存的部分）和转译器在这张表里仍是 0%，因为当时的测试不加载它们；这次没有改它们的出牌、种子或 AI。
+
+下面的百分比是补上那五份测试时记下的快照，不是每次持续集成重新算的数字。GitHub Actions 每次作业用 `.github/scripts/coverage_summary.py` 按当次的 `coverage.json` 写摘要，说明见 [CI.md](CI.md)。
+
+*Measured with pytest-cov over `sts2sim`, `gui`, and `tools`, with no game install. The full-run engine modules that need a generated cache, and the translators, stay at 0% in this table because the tests at that time do not load them. This pass does not change their plays, seeds, or AI choices. The percentages are the snapshot from that test pass, not the table CI rebuilds on every job. See [CI.md](CI.md).*
 
 ```bash
 pip install -r requirements.txt pytest pytest-cov fastapi httpx python-multipart
 python -m pytest tests --cov=sts2sim --cov=gui --cov=tools --cov-report=term-missing
 ```
 
-| | Statements | Covered | Coverage |
+| | 语句 / Statements | 覆盖 / Covered | 覆盖率 / Coverage |
 |---|---:|---:|---:|
 | Before these tests | 25274 | 8678 | 34.3% |
 | After | 25285 | 9118 | 36.1% |
 
-语句数增加是因为修边界时加了几行。测试：原来收集 241 个；现在 `271 passed, 16 skipped`（跳过的仍是要本机数据或可选依赖的用例）。
+语句数增加是因为修边界时加了几行。测试：原来收集 241 个；那一次是 `271 passed, 16 skipped`（跳过的仍是要本机数据或可选依赖的用例）。后来的提交又加过测试。写这条说明时，同一条 `python -m pytest -q tests`（另装了 fastapi、httpx、python-multipart）是 **290 passed, 16 skipped**。
 
-*The statement count went up by the lines added for the edge fixes. Tests: 241 collected before; now 271 passed and 16 skipped (the skips are still the cases that need a local install or an optional dependency).*
+*The statement count went up by the lines added for the edge fixes. Tests: 241 collected before; that pass was 271 passed and 16 skipped (the skips are still the cases that need a local install or an optional dependency). Later commits added more tests. When this note was written, the same `python -m pytest -q tests` (with fastapi, httpx and python-multipart installed) was **290 passed, 16 skipped**.*
 
 ## 最容易算错的地方 / Least-covered risky areas
 
@@ -24,7 +28,7 @@ python -m pytest tests --cov=sts2sim --cov=gui --cov=tools --cov-report=term-mis
 
 *These five areas are what the new tests cover. The percentages are statement coverage for that file.*
 
-| Area | Modules | Before | After |
+| 范围 / Area | 模块 / Modules | 之前 / Before | 之后 / After |
 |---|---|---:|---:|
 | Card effect resolution | `sts2sim/cards.py`（效果 op、打出、重放） | 72.9% | 95.5% |
 | | `sts2sim/core.py`（伤害、格挡、施加、事件） | 83.2% | 89.4% |
@@ -94,7 +98,7 @@ python -m pytest tests --cov=sts2sim --cov=gui --cov=tools --cov-report=term-mis
 
 *Statement coverage, including modules the tests never load. Empty `__init__.py` files are omitted.*
 
-| Coverage | Statements | Missed | Module |
+| 覆盖率 / Coverage | 语句 / Statements | 未覆盖 / Missed | 模块 / Module |
 |---:|---:|---:|---|
 | 0.0% | 178 | 178 | `gui/app.py` |
 | 0.0% | 19 | 19 | `gui/modpatch.py` |

@@ -151,7 +151,7 @@ python tools/calibrate.py tests/fixtures/calibrate/real.run tests/fixtures/calib
 python tools/calibrate.py path/to/history/123.run path/to/runs.jsonl --json -
 ```
 
-`POST /api/calibrate` takes `{"real","sim"}`. `sim` has to sit in an allowed directory (the same rule as `batch_run_summary`); `real` is one run file. MCP `calibrate(real, sim)` is read-only and is also on `--import-only`. It does not start a simulation and does not modify saves. The ids in the fixture are fictional.
+`POST /api/calibrate` takes `{"real","sim"}`. `sim` has to sit in an allowed directory (the same rule as `batch_run_summary`); `real` is one run file. MCP `calibrate(real, sim)` is read-only and is also on `--import-only`. It does not start a simulation and does not modify saves. The ids in the fixture are fictional. Matching rules, the percentile and the other endpoints are in [docs/CALIBRATION.md](docs/CALIBRATION.md).
 
 **Calibration** in the sidebar (`#/calibrate`) picks an imported real run and a `runs.jsonl` in an allowed folder, or an uploaded file. The table shows floor, room, encounter, real HP lost, simulated mean / p10 / p90 and percentile, and highlights a likely sim gap. Unmatched floors are grey, with the reason. Each fight has a strip for the simulated band and the real value.
 
@@ -208,8 +208,8 @@ After installing the .NET 9 SDK, open a **new** PowerShell window, run the `dotn
 
 ## Advanced
 
-- [docs/INDEX.md](docs/INDEX.md): index of the docs (English and Chinese; the mod-author guide also has zh-CN).
-- [docs/DEVELOPER.md](docs/DEVELOPER.md): command-line batch runs (all options), how the first-time data generation works, the optional spire-mentor AI, the legacy combat simulator, folder layout, tests (including Linux/macOS commands).
+- [docs/INDEX.md](docs/INDEX.md): index of the docs (English and Chinese; the mod-author guide also has zh-CN). Calibration: [docs/CALIBRATION.md](docs/CALIBRATION.md). Continuous integration: [docs/CI.md](docs/CI.md). The coverage snapshot: [docs/COVERAGE.md](docs/COVERAGE.md).
+- [docs/DEVELOPER.md](docs/DEVELOPER.md): command-line batch runs (all options), how the first-time data generation works, the optional spire-mentor AI, the legacy combat simulator, folder layout, tests (including Linux/macOS commands). CI itself is [docs/CI.md](docs/CI.md).
 - Optional stronger AI: after you build the third-party [spire-mentor](https://github.com/tfriedel/spire-mentor) yourself, the official package can run `mentor-full` / `mentor-full-ev` (MCTS for fights, PPO for out-of-combat choices; base-game characters only) without rebuilding DeckBench. spire-mentor is not shipped with this project. On the Windows package, set `python` in `mentor.local.json` to the interpreter that built `sts2_rs`. It has a known loading problem with 19 new cards from v0.111 (SIDESTEP etc.), and we provide a small local patch. Smoke steps and packaging rules: [docs/DEVELOPER.md](docs/DEVELOPER.md#可选spire-mentor更强的-ai--optional-spire-mentor).
 - [docs/MOD_AUTHORS.md](docs/MOD_AUTHORS.md) ([中文](docs/MOD_AUTHORS.zh-CN.md)): getting started for mod authors. The example is `examples/spark/`. The internal Python engine runs the tiny sample with no game install.
 - [docs/MODDING.md](docs/MODDING.md): write your own mod in YAML + Python (cards, powers, relics, decks, experiments).

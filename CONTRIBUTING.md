@@ -32,6 +32,12 @@ By contributing you agree your contribution is licensed under the MIT license in
 
 ## Checks / 检查
 
+需要本机游戏安装的测试会自动跳过。持续集成在 Ubuntu 和 Windows、Python 3.11 与 3.12 上跑同一套 pytest，并用 `ruff==0.17.4` 执行 `ruff check .`。作业说明见 [docs/CI.md](docs/CI.md)。
+
+*Tests that need a local game install are skipped. CI runs the same pytest suite on Ubuntu and Windows with Python 3.11 and 3.12, and runs `ruff check .` with `ruff==0.17.4`. See [docs/CI.md](docs/CI.md).*
+
 ```bash
-python -m pytest -q tests        # tests needing a local install are skipped automatically
+python -m pytest -q tests
+python -m pip install ruff==0.17.4
+ruff check .
 ```

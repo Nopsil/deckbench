@@ -14,9 +14,12 @@
 | [MODDING.md](MODDING.md) | 中文 + English | YAML mod 的格式：整局，以及旧版战斗模拟器 |
 | [DLL_MODS.md](DLL_MODS.md) | 中文 + English | 把已经写好的游戏 mod DLL 读成 YAML。DLL 不执行 |
 | [SAVE_FORMAT.md](SAVE_FORMAT.md) | 中文 + English | 对局记录的两种 JSON、批量摘要、种子预览 |
+| [CALIBRATION.md](CALIBRATION.md) | 中文 + English | 真对局对照同一条选牌路径上的模拟掉血：匹配规则、百分位、界面和 HTTP、MCP |
 | [MCP.md](MCP.md) | 中文 + English | MCP 对战，以及只读的 `import_save`、`import_history_batch`、`batch_run_summary`、`card_ab`、`explain_fight`、`calibrate` |
 | [PERFORMANCE.md](PERFORMANCE.md) | 中文 + English | `python tools/bench.py` 的样本、场/秒和内部战斗引擎改了什么 |
-| [DEVELOPER.md](DEVELOPER.md) | 中文 + English | 命令行、首次生成、spire-mentor、旧版战斗模拟器、目录、测试、Windows 打包 |
+| [COVERAGE.md](COVERAGE.md) | 中文 + English | 补测试那一次的语句覆盖率快照，以及当时修的五处边界 |
+| [CI.md](CI.md) | 中文 + English | GitHub Actions：Ubuntu / Windows、Python 3.11 与 3.12、pytest-cov 作业摘要、ruff 0.17.4 |
+| [DEVELOPER.md](DEVELOPER.md) | 中文 + English | 命令行、首次生成、spire-mentor、旧版战斗模拟器、目录、测试、Windows 打包。持续集成的说明在 [CI.md](CI.md) |
 | [patches/spire-mentor-v0111-cards.patch](patches/spire-mentor-v0111-cards.patch) | — | 打在你自己的 spire-mentor 克隆上的代码补丁。不含游戏文本或数据 |
 
 ## 仓库根和界面 / Root and the desktop app
@@ -31,4 +34,4 @@
 | [CONTRIBUTING.md](../CONTRIBUTING.md) | English + 中文 | 贡献须知。不接受任何游戏内容 |
 | [gui/README.md](../gui/README.md) | 中文 | 桌面界面的开发运行、结构和打包 |
 | [mods/claude_v35/README.md](../mods/claude_v35/README.md) | 中文 | 示例 mod Claude娘 v3.5 接到整局引擎时的说明 |
-| [tests/fixtures/dllmod/README.md](../tests/fixtures/dllmod/README.md) | English | DLL 导入夹具是合成的，不是游戏文件 |
+| [tests/fixtures/dllmod/README.md](../tests/fixtures/dllmod/README.md) | 中文 + English | DLL 导入夹具是合成的，不是游戏文件 |

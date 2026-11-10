@@ -167,11 +167,11 @@ python tools/calibrate.py tests/fixtures/calibrate/real.run tests/fixtures/calib
 python tools/calibrate.py path/to/history/123.run path/to/runs.jsonl --json -
 ```
 
-接口 `POST /api/calibrate`，正文 `{"real","sim"}`。`sim` 必须在允许的目录里（和 `batch_run_summary` 相同）；`real` 是一份对局文件。MCP 工具 `calibrate(real, sim)` 只读，`--import-only` 也提供。不新开模拟，不改存档。夹具里的 ID 是虚构的。
+接口 `POST /api/calibrate`，正文 `{"real","sim"}`。`sim` 必须在允许的目录里（和 `batch_run_summary` 相同）；`real` 是一份对局文件。MCP 工具 `calibrate(real, sim)` 只读，`--import-only` 也提供。不新开模拟，不改存档。夹具里的 ID 是虚构的。匹配规则、百分位和其余接口见 [docs/CALIBRATION.md](docs/CALIBRATION.md)。
 
 界面在侧栏 **「校准」**（`#/calibrate`）：选一份导入的真对局，再选允许目录里的 `runs.jsonl`，或上传一份。表上是每一层的房间、遭遇、真机掉血、模拟 mean / p10 / p90 和百分位；疑似缺口会标出。对不上的层是灰色，并写明原因。每场一条小条，画出模拟区间和真值。
 
-*Compare an imported real run with simulations that share its seed, character and card-pick path. Each fight reports real HP lost, the simulated mean, p10 and p90, and the percentile rank of the real value. A real value outside the simulated p5–p95 band is flagged as a likely sim-model gap. A floor matches a simulated fight only when the floor number, the combat room and the encounter id all agree; otherwise it is `unmatched`. The pick path is the ordered `was_picked` cards; the simulated `picked` list has to be that same sequence. CLI as above. `POST /api/calibrate` takes `{"real","sim"}`. MCP `calibrate` is read-only and is also on `--import-only`. It does not start a simulation and does not modify saves. The fixture ids are fictional. The **Calibration** page (`#/calibrate`) picks an imported real run and a `runs.jsonl` in an allowed folder, or an uploaded file, and shows the same table with a strip for the simulated band and the real value. Unmatched floors are grey, with the reason.*
+*Compare an imported real run with simulations that share its seed, character and card-pick path. Each fight reports real HP lost, the simulated mean, p10 and p90, and the percentile rank of the real value. A real value outside the simulated p5–p95 band is flagged as a likely sim-model gap. A floor matches a simulated fight only when the floor number, the combat room and the encounter id all agree; otherwise it is `unmatched`. The pick path is the ordered `was_picked` cards; the simulated `picked` list has to be that same sequence. CLI as above. `POST /api/calibrate` takes `{"real","sim"}`. MCP `calibrate` is read-only and is also on `--import-only`. It does not start a simulation and does not modify saves. The fixture ids are fictional. The **Calibration** page (`#/calibrate`) picks an imported real run and a `runs.jsonl` in an allowed folder, or an uploaded file, and shows the same table with a strip for the simulated band and the real value. Unmatched floors are grey, with the reason. Matching rules and the other endpoints: [docs/CALIBRATION.md](docs/CALIBRATION.md).*
 
 ## 先看种子再决定打不打 / Preview a seed
 
@@ -240,7 +240,7 @@ python tools/calibrate.py path/to/history/123.run path/to/runs.jsonl --json -
 
 ## 进阶 / Advanced
 
-- [docs/INDEX.md](docs/INDEX.md)：全部文档的目录（中英；mod 作者指南另有简体中文）。
+- [docs/INDEX.md](docs/INDEX.md)：全部文档的目录（中英；mod 作者指南另有简体中文）。校准见 [docs/CALIBRATION.md](docs/CALIBRATION.md)，持续集成见 [docs/CI.md](docs/CI.md)，覆盖率快照见 [docs/COVERAGE.md](docs/COVERAGE.md)。
 - [docs/DEVELOPER.md](docs/DEVELOPER.md)：命令行批量运行（全部参数）、首次生成的内部原理、可选的 spire-mentor AI、旧版战斗模拟器、目录结构、测试（含 Linux/macOS 命令）。
 - 可选的更强 AI：自己构建第三方 [spire-mentor](https://github.com/tfriedel/spire-mentor) 后，官方安装包里就可以选 `mentor-full` / `mentor-full-ev`（MCTS 打战斗，PPO 做局外决策，只支持 5 个原版角色），不用重编 DeckBench。spire-mentor 不随本项目分发；Windows 打包版要把 `mentor.local.json` 的 `python` 指到构建 `sts2_rs` 的解释器。它在 v0.111 的 19 张新牌（SIDESTEP 等）上有一个已知的读取问题，我们提供了一个很小的本地补丁。冒烟和打包注意见 [docs/DEVELOPER.md](docs/DEVELOPER.md#可选spire-mentor更强的-ai--optional-spire-mentor)。
   *Optional stronger AI: after you build spire-mentor yourself, the official package can run `mentor-full` / `mentor-full-ev` (vanilla characters only) without rebuilding DeckBench. It is not shipped here; the Windows package needs `mentor.local.json` `python` set to the interpreter that built `sts2_rs`. A known upstream loader bug for 19 v0.111 cards (SIDESTEP etc.) has a small local patch. Smoke steps and packaging rules: docs/DEVELOPER.md.*
