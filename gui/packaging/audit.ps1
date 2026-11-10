@@ -1,4 +1,4 @@
-# 发布前审计：确认打包目录 / zip 里没有任何游戏文件、游戏数据或生成的游戏代码，
+﻿# 发布前审计：确认打包目录 / zip 里没有任何游戏文件、游戏数据或生成的游戏代码，
 # 并且 0.1.5 要带上的工具都在（清单 gui\packaging\ship-manifest.txt）。
 #   powershell -ExecutionPolicy Bypass -File gui\packaging\audit.ps1 -Path <dist\DeckBench 或 .zip> [-GameDir <游戏安装目录>] [-Cache <本机生成缓存目录>...]
 # 还没编反编译器的本地目录可以加 -AllowMissingDecompiler。不编译 exe 的对照检查：python gui\packaging\dry_check.py

@@ -51,6 +51,18 @@ def test_stage_rules_keep_tools_and_skip_packaging_sources():
         assert not mod.would_stage(rel, prefixes, skips), rel
 
 
+def test_ps1_with_non_ascii_requires_utf8_bom():
+    mod = _load()
+    assert mod.powershell_encoding_problems(ROOT) == []
+    assert mod.ps1_encoding_problems(b"Write-Host 'ascii'\n", "ascii.ps1") == []
+    naked = "Write-Host '打包'\n".encode()
+    assert mod.ps1_encoding_problems(naked, "naked.ps1")
+    assert mod.ps1_encoding_problems(b"\xef\xbb\xbf" + naked, "bom.ps1") == []
+    for name in ("build.ps1", "audit.ps1", "win_api_test.ps1"):
+        data = open(os.path.join(ROOT, "gui", "packaging", name), "rb").read()
+        assert data.startswith(b"\xef\xbb\xbf"), name
+
+
 def test_packaging_project_xml_loads_and_rejects_double_hyphen():
     mod = _load()
     assert mod.packaging_project_xml_problems(ROOT) == []

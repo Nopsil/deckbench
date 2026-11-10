@@ -1,4 +1,4 @@
-# Windows 打包版 API 冒烟测试：先启动 DeckBench.exe --serve --port 18765
+﻿# Windows 打包版 API 冒烟测试：先启动 DeckBench.exe --serve --port 18765
 param([string]$Base = "http://127.0.0.1:18765", [string]$Zip = "")
 $ErrorActionPreference = "Stop"
 function Post($u, $o) { Invoke-RestMethod -Method Post -Uri "$Base$u" -Body ([Text.Encoding]::UTF8.GetBytes(($o | ConvertTo-Json -Depth 6))) -ContentType "application/json; charset=utf-8" }

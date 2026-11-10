@@ -171,8 +171,57 @@ def forbidden_folders(audit_text):
 
 
 def _read(path):
-    with open(path, encoding="utf-8") as f:
+    # utf-8-sig drops a leading BOM so a packaging script saved for
+    # Windows PowerShell 5.1 still matches the text checks below.
+    with open(path, encoding="utf-8-sig") as f:
         return f.read()
+
+
+UTF8_BOM = b"\xef\xbb\xbf"
+
+
+def ps1_encoding_problems(data, label):
+    """Windows PowerShell 5.1 reads a BOM-less script as the ANSI code page.
+
+    UTF-8 Chinese is three bytes. Decoded as a double-byte code page, the
+    leftover byte pairs with the next ASCII character and can swallow a
+    quote. A UTF-8 BOM makes 5.1 decode the file as UTF-8. Pure ASCII is
+    safe without a BOM.
+    """
+    if data.startswith((b"\xff\xfe", b"\xfe\xff")):
+        return [f"{label} is UTF-16; save it as UTF-8 with BOM or pure ASCII"]
+    bom = data.startswith(UTF8_BOM)
+    body = data[len(UTF8_BOM):] if bom else data
+    try:
+        text = body.decode("utf-8")
+    except UnicodeDecodeError as e:
+        return [f"{label} is not valid UTF-8: {e}"]
+    if any(ord(ch) > 127 for ch in text) and not bom:
+        return [(
+            f"{label} has non-ASCII text but no UTF-8 BOM; "
+            "Windows PowerShell 5.1 would read it as ANSI and can swallow a quote"
+        )]
+    return []
+
+
+def powershell_encoding_problems(root):
+    """Every .ps1 with non-ASCII text must be UTF-8 with a BOM."""
+    bad = []
+    found = False
+    skip = {".git", ".venv", "node_modules", "__pycache__"}
+    for dirpath, dirnames, files in os.walk(root):
+        dirnames[:] = [name for name in dirnames if name not in skip]
+        for name in files:
+            if not name.lower().endswith(".ps1"):
+                continue
+            found = True
+            path = os.path.join(dirpath, name)
+            rel = os.path.relpath(path, root).replace("\\", "/")
+            with open(path, "rb") as handle:
+                bad.extend(ps1_encoding_problems(handle.read(), rel))
+    if not found:
+        bad.append("no .ps1 files found")
+    return bad
 
 
 def _git_files(root):
@@ -331,6 +380,7 @@ def check(root=None):
 
     bad.extend(_version_problems(root, build_text))
     bad.extend(packaging_project_xml_problems(root))
+    bad.extend(powershell_encoding_problems(root))
     return bad
 
 
