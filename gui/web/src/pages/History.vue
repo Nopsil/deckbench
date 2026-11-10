@@ -10,6 +10,8 @@
         <n-input v-model:value="q" size="small" clearable :placeholder="t('hist.search')" style="width:240px"><template #prefix><n-icon :component="Search" /></template></n-input>
       </div>
       <div class="row">
+        <n-button size="small" secondary data-action="import-bundle" @click="pickBundle"><template #icon><n-icon :component="FileImport" /></template>{{ t('bundle.import') }}</n-button>
+        <input ref="bundleInput" hidden type="file" accept=".zip,application/zip" data-action="import-bundle-file" @change="onBundle" />
         <n-button size="small" secondary :disabled="checked.length !== 2" @click="compare"><template #icon><n-icon :component="Scale" /></template>{{ t('hist.compare') }}</n-button>
         <n-button size="small" secondary :disabled="checked.length !== 2" @click="compareCells">{{ t('hist.compareCells') }}</n-button>
         <span class="faint" style="font-size:12.5px">{{ t('hist.total', { n: rows.length }) }}</span>
@@ -30,7 +32,7 @@
 import { computed, h, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { NButton, NDataTable, NDropdown, NIcon, NInput, NModal, NRadioButton, NRadioGroup, NTag, useDialog, useMessage } from 'naive-ui'
-import { Search, Scale, Dots } from '@vicons/tabler'
+import { Search, Scale, Dots, FileImport } from '@vicons/tabler'
 import { api, store, fmt, runTitle, STATUS } from '../api'
 import { t } from '../i18n'
 
@@ -42,6 +44,7 @@ const q = ref('')
 const checked = ref([])
 const renaming = ref(false)
 const newTitle = ref('')
+const bundleInput = ref(null)
 let renameId = null
 
 const rows = computed(() => store.runs.filter((r) => (kind.value === 'all' || r.kind === kind.value) && (!q.value || runTitle(r).includes(q.value))))
@@ -56,7 +59,8 @@ const cols = [
   { type: 'selection', multiple: true, width: 44 },
   { title: () => t('hist.colTest'), key: 'title', render: (r) => h('div', { class: 'tt', onClick: () => open(r) }, [
     h('div', { class: 'tn' }, runTitle(r)),
-    h('div', { class: 'ts' }, [h('span', { class: 'k ' + r.kind }, r.kind === 'batch' ? t('kind.batch') : t('kind.combat')), ' ', fmt.time(r.created), r.secs ? ` · ${fmt.secs(r.secs)}` : '',
+    h('div', { class: 'ts' }, [h('span', { class: 'k ' + r.kind }, r.kind === 'batch' ? t('kind.batch') : r.kind === 'card_impact' ? t('kind.card_impact') : t('kind.combat')), ' ', fmt.time(r.created), r.secs ? ` · ${fmt.secs(r.secs)}` : '',
+      r.imported ? h(NTag, { size: 'small', bordered: false, style: 'margin-left:6px', 'data-imported': '1' }, { default: () => t('bundle.imported') }) : null,
       r.kind === 'batch' ? ` · ${t('chip.style', { style: store.styleName(r.params && r.params.style) })}` : ''])]) },
   { title: () => t('hist.colStatus'), key: 'status', width: 110, render: (r) => h(NTag, { size: 'small', bordered: false, type: STATUS[r.status]?.type }, { default: () => STATUS[r.status]?.text || r.status }) },
   { title: () => t('hist.colResult'), key: 'headline', width: 320, render: headline },
@@ -78,6 +82,23 @@ async function act(k, r) {
   } catch (e) { msg.error(e.message) }
 }
 async function doRename() { await api.patch('/api/runs/' + renameId, { title: newTitle.value }); renaming.value = false; store.loadRuns() }
+function pickBundle() { if (bundleInput.value) bundleInput.value.click() }
+async function onBundle(ev) {
+  const file = ev.target.files && ev.target.files[0]
+  ev.target.value = ''
+  if (!file) return
+  const form = new FormData()
+  form.append('file', file, file.name)
+  try {
+    const body = await api.upload('/api/bundles/import', form)
+    await store.loadRuns()
+    const runs = body.runs || []
+    let text = t('bundle.done', { n: runs.length })
+    const renamed = runs.filter((row) => row.renamed)
+    if (renamed.length === 1) text += ' ' + t('bundle.renamed', { id: renamed[0].id })
+    msg.success(text)
+  } catch (e) { msg.error(e.message) }
+}
 </script>
 
 <style scoped>

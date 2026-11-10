@@ -1268,5 +1268,21 @@
   "deck.err.card_impact": "카드 기여가 끝나지 않았습니다.",
   "nt.encounters": "조우",
   "nt.encHint": "선택 사항입니다. 고르면 위 방에서 무작위로 뽑지 않고 그 조우를 싸웁니다. 최대 턴은 각 전투에 적용됩니다. 판 수는 조우마다 정합니다.",
-  "nt.nEncounters": "조우 {n}개"
+  "nt.nEncounters": "조우 {n}개",
+  "bundle.import": "결과 묶음 가져오기",
+  "bundle.download": "결과 묶음 다운로드",
+  "bundle.imported": "가져옴",
+  "bundle.importedFrom": "DeckBench {version}에서 가져옴",
+  "bundle.done": "테스트 {n}개를 가져왔습니다.",
+  "bundle.renamed": "원래 번호가 이미 있어서 이 복사본은 {id}입니다.",
+  "bundle.err.schema": "이 묶음의 형식 버전은 {schema}입니다. 이 DeckBench는 버전 {supported}만 읽습니다.",
+  "bundle.err.schemaBad": "이 묶음의 형식 버전을 알 수 없습니다. 이 DeckBench는 버전 1만 읽습니다.",
+  "bundle.err.hash": "묶음 안의 파일이 목록의 SHA-256과 맞지 않습니다.",
+  "bundle.err.slip": "묶음에 안전하지 않은 경로가 있어 거부했습니다.",
+  "bundle.err.tooBig": "이 묶음은 너무 큽니다.",
+  "bundle.err.manifest": "묶음의 목록이 올바르지 않습니다.",
+  "bundle.err.kind": "DeckBench 결과 묶음이 아닙니다.",
+  "bundle.err.incomplete": "묶음에 필요한 파일이 없습니다.",
+  "bundle.err.extra": "묶음에 목록에 없는 파일이 있습니다.",
+  "bundle.err.need": "끝난 테스트 하나, 또는 끝난 전투 테스트 두 개를 지정하세요."
 }

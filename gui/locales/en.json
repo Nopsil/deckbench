@@ -1268,5 +1268,21 @@
   "deck.err.card_impact": "The card impact run failed.",
   "nt.encounters": "Encounters",
   "nt.encHint": "Optional. Tick encounters to run those fights instead of drawing at random from the rooms above. The max turns setting applies to each fight. Set the number of fights on each encounter.",
-  "nt.nEncounters": "{n} encounters"
+  "nt.nEncounters": "{n} encounters",
+  "bundle.import": "Import bundle",
+  "bundle.download": "Download bundle",
+  "bundle.imported": "Imported",
+  "bundle.importedFrom": "Imported from DeckBench {version}",
+  "bundle.done": "Imported {n} test(s).",
+  "bundle.renamed": "That id was already in use, so this copy is {id}.",
+  "bundle.err.schema": "This bundle uses schema {schema}. This DeckBench only reads schema {supported}.",
+  "bundle.err.schemaBad": "This bundle's schema version is not one this DeckBench can read. Only schema 1 is supported.",
+  "bundle.err.hash": "A file in this bundle does not match the SHA-256 in the manifest.",
+  "bundle.err.slip": "This bundle contains an unsafe path and was rejected.",
+  "bundle.err.tooBig": "This bundle is too large.",
+  "bundle.err.manifest": "This bundle's manifest is not valid.",
+  "bundle.err.kind": "This is not a DeckBench run bundle.",
+  "bundle.err.incomplete": "This bundle is missing a required file.",
+  "bundle.err.extra": "This bundle contains a file that is not listed in the manifest.",
+  "bundle.err.need": "Choose one finished test, or two finished combat tests."
 }

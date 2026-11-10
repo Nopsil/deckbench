@@ -17,6 +17,7 @@ from fastapi.responses import (
     FileResponse,
     HTMLResponse,
     JSONResponse,
+    Response,
     StreamingResponse,
 )
 from fastapi.staticfiles import StaticFiles
@@ -502,6 +503,27 @@ def _html_file(document, filename):
     )
 
 
+def _bundle_status(err):
+    """结果包的失败说明。不回显路径，也不带堆栈。"""
+    from sts2sim.bundle import message
+    code = getattr(err, "code", "")
+    status = 400
+    if code == "not_found" or code == "no_result":
+        status = 404
+    elif code == "not_done":
+        status = 409
+    return HTTPException(status, message(err))
+
+
+def _zip_file(data, filename):
+    from sts2sim.bundle import content_disposition
+    return Response(
+        content=data,
+        media_type="application/zip",
+        headers={"content-disposition": content_disposition(filename)},
+    )
+
+
 @app.get("/api/runs/compare/export.html")
 def runs_compare_export(request: Request):
     """两次已完成的战斗实验，写成一份离线 HTML。不新开模拟。
@@ -516,6 +538,28 @@ def runs_compare_export(request: Request):
     left = (body.get("a") or {}).get("id") or "a"
     right = (body.get("b") or {}).get("id") or "b"
     return _html_file(document, export_filename(a=str(left), b=str(right)))
+
+
+@app.get("/api/runs/compare/bundle")
+def runs_compare_bundle(request: Request):
+    """两次已完成的战斗实验，打成一个 .deckbench.zip。不新开模拟。
+
+    两边都是同一份对打（shared_plan）时，清单的 kind 是 head_to_head。
+    """
+    from sts2sim.bundle import BundleError, export_compare_bytes
+    _export_lang(request)
+    query_a = request.query_params.getlist("a")
+    query_b = request.query_params.getlist("b")
+    if len(query_a) != 1 or len(query_b) != 1:
+        field = "a" if len(query_a) != 1 else "b"
+        if not (query_a if field == "a" else query_b):
+            raise HTTPException(400, T("api.err.missing", field=field))
+        raise HTTPException(400, T("api.err.bad_type", field=field, expected=T("api.type.string")))
+    try:
+        data, filename = export_compare_bytes(query_a[0], query_b[0], lang=i18n.current())
+    except BundleError as err:
+        raise _bundle_status(err) from None
+    return _zip_file(data, filename)
 
 
 @app.post("/api/runs")
@@ -611,6 +655,36 @@ def run_export(rid: str, request: Request):
         lang=lang, run={"meta": meta, "summary": summary}, calibration=calibration, gap=gap,
     )
     return _html_file(document, export_filename(run_id=rid))
+
+
+@app.get("/api/runs/{rid}/bundle")
+def run_bundle(rid: str, request: Request):
+    """一次已完成的测试，打成一个 .deckbench.zip。单卡贡献把子测试一并装进去。
+
+    不新开模拟，不执行包里的文件。
+    """
+    from sts2sim.bundle import BundleError, export_run_bytes
+    _export_lang(request)
+    try:
+        data, filename = export_run_bytes(rid, lang=i18n.current())
+    except BundleError as err:
+        raise _bundle_status(err) from None
+    return _zip_file(data, filename)
+
+
+@app.post("/api/bundles/import")
+async def import_bundle(file: UploadFile = File(...)):
+    """上传一个 .deckbench.zip，校验清单和哈希后写成测试目录。
+
+    不执行包里的任何文件。schema 对不上、哈希不对、路径越界或超限都是 400。
+    编号冲突时换一个新编号。导进来的测试标记为 imported。
+    """
+    from sts2sim.bundle import MAX_UPLOAD, BundleError, import_zip_bytes
+    data = await _read_capped(file, MAX_UPLOAD, T("bundle.err.tooBig"))
+    try:
+        return import_zip_bytes(data, filename=file.filename or "")
+    except BundleError as err:
+        raise _bundle_status(err) from None
 
 
 @app.get("/api/runs/{rid}/report")

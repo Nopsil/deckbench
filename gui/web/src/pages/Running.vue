@@ -32,6 +32,7 @@
             <template v-else>
               <n-button secondary @click="rerun"><template #icon><n-icon :component="Refresh" /></template>{{ t('common.rerun') }}</n-button>
               <n-button v-if="settled" secondary tag="a" download data-action="export" :href="exportHref"><template #icon><n-icon :component="FileExport" /></template>{{ t('export.button') }}</n-button>
+              <n-button v-if="settled" secondary tag="a" download data-action="bundle" :href="bundleHref"><template #icon><n-icon :component="FileExport" /></template>{{ t('bundle.download') }}</n-button>
               <n-button v-if="settled" type="primary" @click="$router.push('/report/' + id)"><template #icon><n-icon :component="ChartBar" /></template>{{ t('run.viewReport') }}</n-button>
             </template>
           </div>
@@ -113,18 +114,28 @@ const exportHref = computed(() => {
   const q = new URLSearchParams({ lang: lang.value })
   return `/api/runs/${encodeURIComponent(id.value)}/export.html?` + q.toString()
 })
+const bundleHref = computed(() => {
+  if (!id.value || !settled.value) return undefined
+  const q = new URLSearchParams({ lang: lang.value })
+  return `/api/runs/${encodeURIComponent(id.value)}/bundle?` + q.toString()
+})
 const paramChips = computed(() => {
   const p = meta.value?.params || {}
+  let chips
   if (meta.value?.kind === 'card_impact') {
-    return [t('kind.card_impact'), p.deck ? t('chip.preset', { id: p.deck }) : '', t('chip.seed', { s: p.seed })].filter(Boolean)
+    chips = [t('kind.card_impact'), p.deck ? t('chip.preset', { id: p.deck }) : '', t('chip.seed', { s: p.seed })].filter(Boolean)
+  } else if (meta.value?.kind === 'batch') {
+    chips = [t('kind.batch'), store.charName(p.char), 'A' + p.asc, t('chip.nRuns', { n: p.n }), store.agentName('batch', p.agent), t('chip.parallel', { n: p.procs })]
+    chips.push(t('chip.style', { style: store.styleName(p.style) }))
+    if (p.variants?.length) chips.push(t('chip.variant', { v: p.variants.join('+') }))
+  } else {
+    chips = [t('kind.combat'), p.preset ? t('chip.preset', { id: p.preset }) : t('nt.nDecks', { n: (p.decks || []).length }), t('chip.perCell', { n: p.fights }), store.agentName('combat', p.agent), t('chip.seed', { s: p.seed }), t('chip.parallel', { n: p.workers || p.procs || 1 })]
   }
-  if (meta.value?.kind === 'batch') {
-    const x = [t('kind.batch'), store.charName(p.char), 'A' + p.asc, t('chip.nRuns', { n: p.n }), store.agentName('batch', p.agent), t('chip.parallel', { n: p.procs })]
-    x.push(t('chip.style', { style: store.styleName(p.style) }))
-    if (p.variants?.length) x.push(t('chip.variant', { v: p.variants.join('+') }))
-    return x
+  if (meta.value?.imported) {
+    const version = meta.value.origin && meta.value.origin.deckbench
+    chips.unshift(version ? t('bundle.importedFrom', { version }) : t('bundle.imported'))
   }
-  return [t('kind.combat'), p.preset ? t('chip.preset', { id: p.preset }) : t('nt.nDecks', { n: (p.decks || []).length }), t('chip.perCell', { n: p.fights }), store.agentName('combat', p.agent), t('chip.seed', { s: p.seed }), t('chip.parallel', { n: p.workers || p.procs || 1 })]
+  return chips
 })
 // 日志行按所有语言的「胜利/完成」「出错/失败」词着色（日志是开始运行时的语言，界面语言之后可能换过）
 const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

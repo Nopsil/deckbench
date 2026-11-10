@@ -18,6 +18,7 @@
 | [COMPARE.md](COMPARE.md) | 中文 + English | 两次已完成的战斗实验：格子胜率、超时、回合、掉血、每回合输出，以及单卡使用和效率。`GET /api/runs/compare`、MCP `compare_runs`、界面 `#/compare` |
 | [DECKS.md](DECKS.md) | 中文 + English | 组牌页：搜索模拟器牌池，勾选遭遇或一场连战（例如第 1 幕全部精英），保存成和 `experiments/*.yaml` 一样的用户预设。没选遭遇时仍是一场训练木桩。两份预设可以对打（同一份遭遇、同一颗种子）。一份预设可以做留一法，看每张牌对胜率、掉血和回合的影响，全体不超过 400 场。长测试有进度和取消，部分结果可以对比和导出。战斗批量可以设 `workers`（默认 1，上限 `min(cpu_count, 8)`）。`GET /api/cards`、`GET /api/encounters`、`POST /api/decks`、`POST /api/decks/head_to_head`、`POST /api/decks/<id>/card_impact`、`GET /api/runs/<id>/progress`、MCP `list_cards` / `list_encounters` / `save_deck` / `head_to_head` / `card_impact` / `run_progress` / `cancel_run`、界面 `#/decks` |
 | [EXPORT.md](EXPORT.md) | 中文 + English | 把已完成的测试、可选的战斗对比、可选的校准 / 缺口分诊写成一份离线 HTML。`GET /api/runs/<id>/export.html`、`GET /api/runs/compare/export.html`、MCP `export_report`、`python -m tools.export_report` |
+| [BUNDLES.md](BUNDLES.md) | 中文 + English | 把一次测试、两次战斗对比、组牌对打或单卡贡献打成一个 `.deckbench.zip`，校验 SHA-256 后再导入。`GET /api/runs/<id>/bundle`、`GET /api/runs/compare/bundle`、`POST /api/bundles/import`、MCP `export_bundle` / `import_bundle` |
 | [MCP.md](MCP.md) | 中文 + English | MCP 对战，以及 `import_save`、`import_history_batch`、`batch_run_summary`、`card_ab`、`compare_runs`、`explain_fight`、`calibrate`、`gap_triage`、`export_report`、`list_cards`、`list_encounters`、`save_deck`、`head_to_head`、`card_impact`、`run_progress`、`cancel_run`、可选的 `check_update` |
 | [PERFORMANCE.md](PERFORMANCE.md) | 中文 + English | `python tools/bench.py` 的样本、场/秒和内部战斗引擎改了什么 |
 | [COVERAGE.md](COVERAGE.md) | 中文 + English | 补测试那一次的语句覆盖率快照，以及当时修的五处边界 |
@@ -29,7 +30,7 @@
 
 | 文档 | 语言 | 内容 |
 | --- | --- | --- |
-| [CHANGELOG.md](../CHANGELOG.md) | 中文 + English | 更新日志。0.1.5 一节对齐 `main` 上的 #4 与 #6–#65，并记下侧栏的简体中文 / English 切换。界面「本版更新」（`#/whatsnew`，`GET /api/changelog`）读这一节 |
+| [CHANGELOG.md](../CHANGELOG.md) | 中文 + English | 更新日志。0.1.5 一节对齐 `main` 上的 #4 与 #6–#66，并记下可分享的结果包。界面「本版更新」（`#/whatsnew`，`GET /api/changelog`）读这一节 |
 | [README.md](../README.md) | 中文为主，段落附 English | 安装和使用 |
 | [README.en.md](../README.en.md) | English | 同一份说明的英文 |
 | [README.ja.md](../README.ja.md) | 日本語 | 同一份说明的日文 |

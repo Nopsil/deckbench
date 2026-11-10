@@ -560,6 +560,70 @@ def test_export_buttons_download_offline_html(gui):
     _assert_clean(gui, "export")
 
 
+def test_bundle_download_and_import(gui):
+    """运行页下载结果包，历史页再导入。编号冲突时换成新编号，并标成已导入。"""
+    base = _combat_rows(2, 10, 20, 8, 8, 1, "Monster") + _combat_rows(30, 0, 4, 3, 36, 1, "Elite")
+    _write_combat_run(gui.data, "bundle-a", "Bundle baseline", base)
+    (gui.data / "runs" / "bundle-a" / "out" / "cells.csv").write_text(
+        "卡组id,卡组,阶段,幕,房间,场数,胜率%,战败%,超时%,平均回合,平均掉血,每回合输出,循环报警场数\n"
+        "probe,Probe,,1,Monster,40,75.0,20.0,5.0,4.0,8.0,12.0,0\n",
+        encoding="utf-8",
+    )
+    page = gui.page
+    page.goto(gui.base + "/#/run/bundle-a", wait_until="domcontentloaded")
+    gui.expect(page.get_by_text("Done", exact=True).first).to_be_visible()
+    bundle = page.locator("[data-action='bundle']")
+    gui.expect(bundle).to_be_visible()
+    with page.expect_download() as caught:
+        bundle.click()
+    saved = gui.data / "bundle-run.deckbench.zip"
+    caught.value.save_as(str(saved))
+    assert saved.stat().st_size > 32
+    import zipfile
+    with zipfile.ZipFile(saved) as archive:
+        names = archive.namelist()
+        manifest = json.loads(archive.read("manifest.json"))
+    assert "manifest.json" in names and "report.html" in names
+    assert "runs/bundle-a/meta.json" in names and "runs/bundle-a/raw.jsonl" in names
+    assert manifest["schema"] == 1 and manifest["kind"] == "run"
+    assert manifest["deckbench"]
+    report = None
+    with zipfile.ZipFile(saved) as archive:
+        report = archive.read("report.html").decode("utf-8")
+    _offline(report)
+    assert "Bundle baseline" in report
+
+    page.goto(gui.base + "/#/history", wait_until="domcontentloaded")
+    gui.expect(page.locator("h1")).to_have_text("History")
+    gui.expect(page.get_by_role("button", name="Import bundle")).to_be_visible()
+    gui.expect(page.get_by_text("Bundle baseline", exact=True).first).to_be_visible()
+    page.locator("[data-action='import-bundle-file']").set_input_files(str(saved))
+    gui.expect(page.get_by_text("Imported 1 test(s).")).to_be_visible()
+    gui.expect(page.get_by_text("Imported", exact=True).first).to_be_visible()
+    listed = _get_json(gui.base + "/api/runs")
+    imported = [row for row in listed if row.get("imported") and row.get("origin", {}).get("original_id") == "bundle-a"]
+    assert len(imported) == 1
+    assert imported[0]["id"] != "bundle-a"
+    assert imported[0]["status"] == "done"
+    assert imported[0]["kind"] == "combat"
+    _save_shot(page, "bundle-imported.png")
+
+    changed = _combat_rows(30, 0, 4, 3, 36, 4, "Monster") + _combat_rows(2, 10, 20, 8, 8, 4, "Elite")
+    _write_combat_run(gui.data, "bundle-b", "Bundle changed", changed)
+    query = urlencode({"a": "bundle-a", "b": "bundle-b"})
+    page.goto(gui.base + "/#/compare?" + query, wait_until="domcontentloaded")
+    gui.expect(page.locator("[data-table='cells']")).to_be_visible(timeout=30_000)
+    with page.expect_download() as caught:
+        page.locator("[data-action='bundle']").click()
+    compared = gui.data / "bundle-compare.deckbench.zip"
+    caught.value.save_as(str(compared))
+    with zipfile.ZipFile(compared) as archive:
+        compare_manifest = json.loads(archive.read("manifest.json"))
+    assert compare_manifest["kind"] == "compare"
+    assert compare_manifest["runs"] == ["bundle-a", "bundle-b"]
+    _assert_clean(gui, "bundle")
+
+
 def test_deck_builder_saves_a_preset_and_starts_a_dummy_run(gui):
     """组一套小牌组，存成预设，再从新建测试用它打一场木桩。"""
     page = gui.page

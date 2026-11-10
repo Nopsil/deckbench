@@ -1268,5 +1268,21 @@
   "deck.err.card_impact": "カード寄与は完了しませんでした。",
   "nt.encounters": "遭遇",
   "nt.encHint": "任意です。チェックすると、上の部屋から無作為に引く代わりに、その遭遇を戦います。最大ターン数は各戦闘に使います。対戦数は遭遇ごとに指定します。",
-  "nt.nEncounters": "遭遇 {n}"
+  "nt.nEncounters": "遭遇 {n}",
+  "bundle.import": "結果バンドルを読み込む",
+  "bundle.download": "結果バンドルをダウンロード",
+  "bundle.imported": "読み込み済み",
+  "bundle.importedFrom": "DeckBench {version} から読み込み",
+  "bundle.done": "テストを {n} 件読み込みました。",
+  "bundle.renamed": "元の番号は使われているので、こちらは {id} になりました。",
+  "bundle.err.schema": "このバンドルの形式はバージョン {schema} です。この DeckBench が読めるのはバージョン {supported} だけです。",
+  "bundle.err.schemaBad": "このバンドルの形式バージョンを認識できません。この DeckBench が読めるのはバージョン 1 だけです。",
+  "bundle.err.hash": "バンドル内のファイルが、目録の SHA-256 と一致しません。",
+  "bundle.err.slip": "バンドルに安全でないパスが含まれているため、拒否しました。",
+  "bundle.err.tooBig": "このバンドルは大きすぎます。",
+  "bundle.err.manifest": "バンドルの目録が正しくありません。",
+  "bundle.err.kind": "これは DeckBench の結果バンドルではありません。",
+  "bundle.err.incomplete": "バンドルに必要なファイルがありません。",
+  "bundle.err.extra": "バンドルに、目録にないファイルがあります。",
+  "bundle.err.need": "完了したテストを 1 件、または完了した戦闘テストを 2 件指定してください。"
 }

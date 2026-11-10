@@ -773,6 +773,38 @@ def export_report(run: str = "", a: str = "", b: str = "", calibration: str = ""
     return export_report_json(run, a, b, calibration, out, lang)
 
 
+def export_bundle(run: str = "", a: str = "", b: str = "", out: str = "", lang: str = "") -> str:
+    """把一次已完成的测试，或两次战斗实验，打成一个 .deckbench.zip，并返回 path。不新开模拟，不执行包里的文件。
+
+    run：界面测试 id。单卡贡献会把每个变体的 meta.json 和 raw.jsonl 一并装进去。
+    a、b：和 compare_runs 一样，两次已完成的战斗实验打进同一个包。两边都是对打（shared_plan）时，清单 kind 是 head_to_head。
+    out：要写入的 .deckbench.zip。留空则写到界面数据目录的 exports/。目录外、存档树、.run / .save 会拒绝。
+    lang：离线 HTML 的语言，zhs / en / ja / ko，或 zh-CN / en-US / ja / ko。留空用当前界面语言。
+    包里有 manifest.json（DeckBench 版本 sts2sim.__version__、schema 版本、每个文件的 SHA-256）、
+    meta.json、raw.jsonl（整局是 runs.jsonl）、有牌组预设时的 preset.yaml，以及离线 HTML。
+    成功是 JSON：{"ok": true, "path": "...", "filename": "...", "bytes": N}。
+    失败也是 JSON（ok 为 false，error 为 schema / hash / zip_slip / too_big / not_found / not_done / path_not_allowed 等，
+    message 是一句说明），不抛异常。
+    """
+    from sts2sim.bundle import export_bundle_json
+    return export_bundle_json(run, a, b, out, lang)
+
+
+def import_bundle(path: str) -> str:
+    """读一个 .deckbench.zip，校验清单和 SHA-256 后写成界面测试。不执行包里的任何文件。
+
+    path 必须在允许的目录里（和 batch_run_summary 同一套）。绝对路径、``..``、反斜杠、超限的成员直接拒绝。
+    schema 不是本程序能读的版本时，message 会写明当前只读 schema 1。
+    编号已经存在时换一个新编号。导进来的测试带 imported 和 origin，状态仍是原来的 done 或 cancelled，
+    所以会出现在测试列表里，也能参与对比。
+    成功是 JSON：{"ok": true, "kind": "...", "schema": 1, "deckbench": "...", "runs": [{"id", "original_id", "kind", "renamed", "imported"}]}。
+    失败也是 JSON（ok 为 false，error 为 schema / hash / zip_slip / too_big / manifest / not_bundle / extra / incomplete 等，
+    message 是一句说明），不抛异常，也不留下半截目录。
+    """
+    from sts2sim.bundle import import_bundle_json
+    return import_bundle_json(path)
+
+
 def _fastmcp(name, instructions, host, port, host_check):
     from mcp.server.fastmcp import FastMCP
     kw = {}
@@ -803,6 +835,9 @@ def build(host="127.0.0.1", port=8765, host_check=True):
         "以及把 likely_sim_gap 按遭遇和敌人能力排成偏乐观（高于 p95）或偏悲观（低于 p5）。"
         "对不上的层是 unmatched，不改用别的层。不新开模拟，不写文件。"
         "export_report 是例外：它把这些已有结果写成一份离线 HTML，并返回 path。"
+        "export_bundle 把一次已完成的测试，或两次战斗实验（对打或单卡贡献），打成一个 .deckbench.zip，"
+        "清单里有 DeckBench 版本、schema 版本和每个文件的 SHA-256。import_bundle 校验清单和哈希后导入，"
+        "不执行包里的文件；schema 不对会说明当前只读哪一版；编号冲突时换一个新编号。"
         "list_cards 只读列出模拟器牌池，可按角色、类型、费用、稀有度和中英文名字搜索。"
         "list_encounters 只读列出模拟器会打的遭遇，可按幕和房间（normal/elite/boss）筛选，并给出连战（例如第 1 幕全部精英）。"
         "save_deck 把一套牌存成用户预设（和 experiments/*.yaml 相同的战斗预设）。"
@@ -986,6 +1021,8 @@ def build(host="127.0.0.1", port=8765, host_check=True):
     mcp.tool()(calibrate)
     mcp.tool()(gap_triage)
     mcp.tool()(export_report)
+    mcp.tool()(export_bundle)
+    mcp.tool()(import_bundle)
     mcp.tool()(list_cards)
     mcp.tool()(list_encounters)
     mcp.tool()(save_deck)
@@ -1020,6 +1057,9 @@ def build_import(host="127.0.0.1", port=8765, host_check=True):
         "把高于 p95 的场次排成模拟偏乐观、低于 p5 的排成模拟偏悲观，并指向源文件。不新开模拟，不写文件。"
         "export_report(run, a, b, calibration, out, lang) 把一次已完成的测试、可选的两次战斗对比、"
         "可选的校准或缺口分诊写成一份离线 HTML（内联 CSS 和 SVG，不访问网络），并返回文件路径。"
+        "export_bundle 把一次已完成的测试，或两次战斗实验，打成一个 .deckbench.zip（清单含版本和 SHA-256）。"
+        "import_bundle 校验清单和哈希后导入，不执行包里的文件。schema 不对时说明当前只读 schema 1。"
+        "编号冲突时换一个新编号。导进来的测试标记为 imported，并出现在列表和对比里。"
         "list_cards 只读列出模拟器牌池。list_encounters 只读列出模拟器会打的遭遇，可按幕和房间筛选，并给出连战。"
         "save_deck 把一套牌存成用户预设，可以指定遭遇或连战；都省略时仍是一场训练木桩。只写用户预设目录，不覆盖出厂预设。"
         "head_to_head(a, b) 是例外：它用已有的战斗测试开两场，打同一份遭遇、同一个回合上限和同一颗种子。"
@@ -1038,6 +1078,8 @@ def build_import(host="127.0.0.1", port=8765, host_check=True):
     mcp.tool()(calibrate)
     mcp.tool()(gap_triage)
     mcp.tool()(export_report)
+    mcp.tool()(export_bundle)
+    mcp.tool()(import_bundle)
     mcp.tool()(list_cards)
     mcp.tool()(list_encounters)
     mcp.tool()(save_deck)
@@ -1056,7 +1098,7 @@ def main(argv=None):
     ap.add_argument("--port", type=int, default=int(os.environ.get("DECKBENCH_MCP_PORT", "8765")))
     ap.add_argument("--no-host-check", action="store_true", help="关闭 Host 头校验（经隧道/反代给远程连接器用）")
     ap.add_argument("--import-only", action="store_true",
-                    help="提供 import_save、import_history_batch，以及 batch_run_summary / card_ab / compare_runs / explain_fight / calibrate / gap_triage（只读 JSON）、export_report（写出一份离线 HTML）、list_cards（只读牌池）、list_encounters（只读遭遇）、save_deck（只写用户预设，可指定遭遇）、head_to_head（用已有战斗测试把两份预设打同一份遭遇）、card_impact（留一法，用已有战斗测试看每张牌对胜率的影响）和可选的 check_update（只有调用时才查询 GitHub Releases）。"
+                    help="提供 import_save、import_history_batch，以及 batch_run_summary / card_ab / compare_runs / explain_fight / calibrate / gap_triage（只读 JSON）、export_report（写出一份离线 HTML）、export_bundle（写出一个 .deckbench.zip）、import_bundle（校验清单和哈希后导入，不执行包里的文件）、list_cards（只读牌池）、list_encounters（只读遭遇）、save_deck（只写用户预设，可指定遭遇）、head_to_head（用已有战斗测试把两份预设打同一份遭遇）、card_impact（留一法，用已有战斗测试看每张牌对胜率的影响）和可选的 check_update（只有调用时才查询 GitHub Releases）。"
                          "不检查本机游戏数据。除 head_to_head 和 card_impact 外不启动对局。check_update 启动时不联网。")
     a = ap.parse_args(argv)
     if a.import_only:

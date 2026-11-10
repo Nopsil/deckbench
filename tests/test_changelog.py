@@ -64,7 +64,7 @@ def test_latest_section_is_015_and_stops_before_014():
         for block in blocks
         if block.get("kind") == "h" and block.get("level") == 3
     ]
-    assert headings[0] == "本版更新"
+    assert headings[0] == "结果包"
     for title in ("中英切换", "战斗进程", "版本号和检查更新", "单卡贡献", "测试进度和取消", "组牌对打"):
         assert title in headings
     assert "界面多语言" not in text
