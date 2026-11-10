@@ -175,6 +175,38 @@ def test_normalize_and_game_lang_fallback():
     assert i18n.game_langs("zhs") == ["zhs", "eng"]
 
 
+def test_request_lang_matches_query_aliases():
+    """x-lang 和 ?lang= 共用 request_lang。别名收成界面语言；认不出是 None，不当成 en。"""
+    import inspect
+
+    from sts2sim.htmlreport import ExportError, parse_lang
+
+    aliases = {
+        "zh-CN": "zhs", "ZH-cn": "zhs", "zh-Hans": "zhs", "zh_Hans": "zhs", "zh": "zhs",
+        "en-US": "en", "EN-us": "en", "en": "en",
+        "ja-JP": "ja", "JA_jp": "ja",
+        "ko-KR": "ko", "Ko-kr": "ko",
+        "zhs": "zhs",
+    }
+    for raw, want in aliases.items():
+        assert i18n.request_lang(raw) == want
+        assert parse_lang(raw) == want
+    assert i18n.request_lang("de-DE") is None
+    assert i18n.request_lang("") is None
+    assert i18n.request_lang(None) is None
+    assert parse_lang("") is None
+    with pytest.raises(ExportError) as bad:
+        parse_lang("de-DE")
+    assert bad.value.code == "bad_lang"
+    assert "request_lang" in inspect.getsource(parse_lang)
+    assert "request_lang" in inspect.getsource(i18n.set_request_lang)
+    tok = i18n.set_request_lang("zh-Hans")
+    try:
+        assert i18n.current() == "zhs"
+    finally:
+        i18n._REQ_LANG.reset(tok)
+
+
 def test_t_format_and_fallback():
     assert i18n.t("chip.nRuns", "en", n=5) == "5 runs"
     assert i18n.t("chip.nRuns", "ko", n=5) == "5판"
@@ -278,3 +310,16 @@ def test_server_settings_and_errors(tmp_path, monkeypatch):
     assert r.status_code == 404 and r.json()["detail"] == "Test not found"
     r = c.get("/api/runs/nope", headers={"x-lang": "ko"})
     assert r.json()["detail"] == "이 테스트를 찾을 수 없습니다"
+    # 保存的是日语。别名走请求头；认不出的头不把语言改成英文。
+    headers = {
+        "zh-CN": "找不到这次测试",
+        "zh-Hans": "找不到这次测试",
+        "ZH": "找不到这次测试",
+        "en-US": "Test not found",
+        "ja-JP": "このテストが見つかりません",
+        "ko-KR": "이 테스트를 찾을 수 없습니다",
+        "de-DE": "このテストが見つかりません",
+    }
+    for raw, detail in headers.items():
+        got = c.get("/api/runs/nope", headers={"x-lang": raw})
+        assert got.status_code == 404 and got.json()["detail"] == detail, raw

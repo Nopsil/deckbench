@@ -41,6 +41,7 @@ import { useRouter } from 'vue-router'
 import { NButton, NDataTable, NDropdown, NIcon, NInput, NModal, NRadioButton, NRadioGroup, NTag, useDialog, useMessage } from 'naive-ui'
 import { Search, Scale, Dots, FileImport } from '@vicons/tabler'
 import { api, store, fmt, runTitle, STATUS } from '../api'
+import { historyResultMode } from '../historyResult'
 import { t } from '../i18n'
 
 const router = useRouter()
@@ -56,12 +57,30 @@ const loadingDemo = ref(false)
 let renameId = null
 
 const rows = computed(() => store.runs.filter((r) => (kind.value === 'all' || r.kind === kind.value) && (!q.value || runTitle(r).includes(q.value))))
-function headline(r) {
+function winNode(x) {
+  return h('span', null, [t('hist.win') + ' ', h('b', { 'data-win': '1' }, fmt.pct(x.win))])
+}
+function resultBody(r, mode) {
   const x = r.headline || {}
-  if (r.status !== 'done') return h('span', { class: 'faint' }, r.status === 'running' ? `${r.progress?.done ?? 0} / ${r.progress?.total ?? '—'}` : '—')
-  if (r.kind === 'batch') return h('div', { class: 'hl' }, [
-    h('span', null, [t('hist.floor') + ' ', h('b', null, fmt.num(x.avg_floor))]), h('span', null, [t('hist.boss') + ' ', h('b', null, fmt.pct(x.boss1))]), h('span', null, [t('hist.win') + ' ', h('b', null, fmt.pct(x.win))])])
-  return h('div', { class: 'hl' }, [h('span', null, [h('b', null, x.fights), ' ' + t('hist.fights')]), h('span', null, [t('hist.win') + ' ', h('b', null, fmt.pct(x.win))])])
+  const win = winNode(x)
+  if (r.kind === 'batch') {
+    const nodes = []
+    if (mode === 'full' || (x.avg_floor !== null && x.avg_floor !== undefined)) nodes.push(h('span', null, [t('hist.floor') + ' ', h('b', null, fmt.num(x.avg_floor))]))
+    if (mode === 'full' || (x.boss1 !== null && x.boss1 !== undefined)) nodes.push(h('span', null, [t('hist.boss') + ' ', h('b', null, fmt.pct(x.boss1))]))
+    if (mode === 'full' || typeof x.win === 'number') nodes.push(win)
+    return nodes
+  }
+  const nodes = [h('span', null, [h('b', null, x.fights), ' ' + t('hist.fights')])]
+  if (mode === 'full' || typeof x.win === 'number') nodes.push(win)
+  return nodes
+}
+function headline(r) {
+  const mode = historyResultMode(r)
+  if (mode === 'progress') return h('span', { class: 'faint', 'data-result': 'progress' }, `${r.progress?.done ?? 0} / ${r.progress?.total ?? '—'}`)
+  if (mode === 'dash') return h('span', { class: 'faint', 'data-result': 'dash' }, '—')
+  const nodes = resultBody(r, mode)
+  if (mode === 'partial') nodes.push(h(NTag, { size: 'small', bordered: false, 'data-partial': '1' }, { default: () => t('run.partial') }))
+  return h('div', { class: 'hl', 'data-result': mode }, nodes)
 }
 const cols = [
   { type: 'selection', multiple: true, width: 44 },

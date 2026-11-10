@@ -1037,3 +1037,40 @@ def test_about_shows_the_version_and_an_update_check(gui):
     assert not any("api.github.com" in url for url in seen)
     _save_shot(page, "about-version.png")
     _assert_clean(gui, "about")
+
+
+def _write_meta(data, rid, meta):
+    run = data / "runs" / rid
+    run.mkdir(parents=True, exist_ok=True)
+    (run / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
+
+
+def test_history_shows_partial_win_rate(gui):
+    """取消或导入、已经有场次的测试显示胜率并标 Partial。零场次仍是破折号。"""
+    _write_meta(gui.data, "partial-win", {
+        "id": "partial-win", "kind": "combat", "title": "Imported partial win",
+        "status": "cancelled", "partial": True, "imported": True,
+        "created": "2099-01-01T00:00:00+00:00", "params": {},
+        "headline": {"fights": 12, "win": 0.25, "cells": 1},
+    })
+    _write_meta(gui.data, "partial-empty", {
+        "id": "partial-empty", "kind": "combat", "title": "Cancelled with no fights",
+        "status": "cancelled", "partial": True,
+        "created": "2099-01-02T00:00:00+00:00", "params": {},
+        "headline": {"fights": 0, "win": 0},
+    })
+    page = gui.page
+    page.goto(gui.base + "/#/history", wait_until="domcontentloaded")
+    gui.expect(page.locator("h1")).to_have_text("History")
+    search = page.get_by_placeholder("Search titles")
+    search.fill("Imported partial win")
+    cell = page.locator("[data-result='partial']")
+    gui.expect(cell).to_be_visible()
+    gui.expect(cell).to_contain_text("25.0%")
+    gui.expect(cell.locator("[data-partial='1']")).to_have_text("Partial")
+    search.fill("Cancelled with no fights")
+    dash = page.locator("[data-result='dash']")
+    gui.expect(dash).to_be_visible()
+    gui.expect(dash).to_have_text("—")
+    gui.expect(page.locator("[data-result='partial']")).to_have_count(0)
+    _assert_clean(gui, "history-partial")

@@ -8,6 +8,10 @@
 
 ### 修复
 
+- **`x-lang` 接受 BCP-47 别名，和 `?lang=` 共用一个归一函数。** `zh-CN`、`zh-Hans`、`zh`、`en-US`、`ja-JP`、`ko-KR`（大小写不限，下划线也行）收成 zhs / en / ja / ko。认不出的头仍忽略，不把已保存的语言盖成英文。
+  *The `x-lang` header accepts BCP-47 aliases through the same normalizer as `?lang=`. `zh-CN`, `zh-Hans`, `zh`, `en-US`, `ja-JP` and `ko-KR` (any case; underscores too) map to zhs / en / ja / ko. An unrecognized header is still ignored, so a saved language is not replaced with English.*
+- **历史的结果列会显示未完成测试的胜率。** 状态不是完成时，以前一律是破折号，取消或导入的部分结果也一样。现在只要有打完的场次，就显示胜率，并标上已有的「部分结果」（en / zhs / ja / ko 的 `run.partial`）。一场都没打完才留破折号。
+  *History's result column shows the win rate for a run that is not done. It used to be an em dash for every status other than done, including a cancelled or imported partial run. Finished fights now show the win rate with the existing Partial tag (`run.partial` in en / zhs / ja / ko). The dash stays only when no fight has finished.*
 - **导进来的结果再导出时，牌组预设还在。** 导入把 `preset.yaml` 放在测试目录里，不写回预设目录。再导出时，如果本机已经没有这份牌，或者示例包的 meta 里没有 `preset` id，以前会把预设丢掉。现在用测试目录里的那一份。
   *Re-exporting an imported result keeps the deck preset. Import stores `preset.yaml` in the run folder and does not copy it back into the presets directory. A second export used to drop it when that preset file was already gone, and the sample bundle's meta has no `preset` id. The export now reads the copy in the run folder.*
 - **取消了的单卡贡献可以打成结果包。** `workers` 大于 1、全体场数仍在 400 以内时，取消会留下已经开打的变体；还没开始的变体没有 `raw.jsonl`。导出整包以前因此 404。没开打的变体现在以空的 `raw.jsonl` 进包，已经打完的场次仍在。
