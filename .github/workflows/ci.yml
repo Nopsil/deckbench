@@ -3,6 +3,8 @@
 # fastapi, httpx, and python-multipart are installed so the GUI tests run.
 # A local game install is not set up, so those tests stay skipped.
 # Coverage stays in the job summary (pytest-cov). Lint is ruff, via ruff.toml.
+# GUI browser smoke is a separate Ubuntu job (pytest-playwright, Chromium).
+# It is not part of the pytest matrix. Without Playwright or Chromium those tests skip.
 
 name: CI
 
@@ -59,3 +61,46 @@ jobs:
       - name: Coverage summary
         if: always()
         run: python .github/scripts/coverage_summary.py coverage.json
+
+  gui-browser:
+    name: playwright (ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: write
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+      DECKBENCH_BROWSER_REQUIRED: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-gui.txt
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "lts/*"
+          cache: npm
+          cache-dependency-path: gui/web/package-lock.json
+      - name: Install Python dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r requirements-gui.txt pytest-playwright==0.7.2
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+      - name: Build the web GUI
+        working-directory: gui/web
+        run: npm ci && npm run build
+      - name: Browser smoke
+        run: python -m pytest -q tests/test_gui_browser.py --browser chromium --screenshot only-on-failure --tracing retain-on-failure
+      - name: Upload screenshots and traces
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: gui-browser-smoke
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 14

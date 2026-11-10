@@ -1,0 +1,387 @@
+"""图形界面的无头浏览器冒烟。pytest-playwright + Chromium。
+
+没装 pytest-playwright，或没装 Chromium 时，整份跳过，所以
+``python -m pytest -q tests`` 不会因为缺浏览器失败。
+CI 的 Ubuntu 作业设置 ``DECKBENCH_BROWSER_REQUIRED=1``，缺了就失败而不是跳过。
+
+服务从源码起（``python -m gui.app --serve``），绑一个空闲端口。不需要本机游戏数据：
+卡牌目录用一份空缓存，战斗实验用和安装包冒烟相同的训练木桩
+（``claude_v34`` / ``probe_noengine`` / ``encounter: DUMMY`` / 1 回合）。
+预设写在 ``experiments/browser_smoke.yaml``，测完就删，不进仓库。
+
+*Headless browser smoke for the web GUI (pytest-playwright, Chromium).
+The module is skipped when pytest-playwright or Chromium is missing, so
+``python -m pytest -q tests`` still passes. The Ubuntu CI job sets
+``DECKBENCH_BROWSER_REQUIRED=1`` and fails instead of skipping.
+The server is ``python -m gui.app --serve`` on a free port. No local game
+data: an empty card cache, and the same training dummy as the package smoke
+(``claude_v34`` / ``probe_noengine`` / ``encounter: DUMMY`` / one turn).*
+"""
+import atexit
+import importlib
+import json
+import os
+import shutil
+import signal
+import socket
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+from types import SimpleNamespace
+from urllib.parse import urlencode
+
+import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
+DIST_INDEX = ROOT / "gui" / "web" / "dist" / "index.html"
+PRESET = ROOT / "experiments" / "browser_smoke.yaml"
+REAL_RUN = ROOT / "tests" / "fixtures" / "calibrate" / "real.run"
+SIMS = ROOT / "tests" / "fixtures" / "calibrate" / "sims.jsonl"
+PRESET_TEXT = """name: browser_smoke
+title: Browser dummy smoke
+mods: [claude_v34]
+seed: 1
+fights: 1
+max_turns: 1
+agent: heuristic
+decks: []
+extra:
+  - {deck: probe_noengine, encounter: DUMMY, fights: 1, max_turns: 1, room: probe}
+"""
+# 主页面：标题，以及这一页上始终有的一句（不依赖有没有跑过测试）。
+PAGES = (
+    ("/#/new", "New test", "Combat test"),
+    ("/#/run", "Running", "No test is running right now"),
+    ("/#/report", "Report", "Pick a finished test"),
+    ("/#/ab", "Single-card A/B", "Pick two tests to compare"),
+    ("/#/history", "History", "Nothing here yet"),
+    ("/#/import", "Import run", "Save path"),
+    ("/#/preview", "Seed preview", "Which opening rewards"),
+    ("/#/explain", "Decisions", "Explanation log"),
+    ("/#/calibrate", "Calibration", "No comparison yet"),
+    ("/#/mods", "Mod editor", "Open a mod or create a new one"),
+)
+
+
+def _required():
+    return os.environ.get("DECKBENCH_BROWSER_REQUIRED") == "1"
+
+
+def _load_playwright():
+    names = ("pytest_playwright", "playwright.sync_api")
+    if _required():
+        for name in names:
+            importlib.import_module(name)
+        return
+    for name in names:
+        pytest.importorskip(name)
+
+
+def _chromium_installed():
+    from playwright.sync_api import Error, sync_playwright
+    try:
+        with sync_playwright() as pw:
+            return Path(pw.chromium.executable_path).is_file()
+    except (OSError, Error):
+        return False
+
+
+def _remove_preset():
+    """删掉测试写的预设。只删这一份木桩，避免 test_i18n 把文件名当成翻译键。"""
+    if not PRESET.is_file():
+        return
+    try:
+        text = PRESET.read_text(encoding="utf-8")
+    except OSError:
+        return
+    if "name: browser_smoke" in text and "probe_noengine" in text:
+        PRESET.unlink(missing_ok=True)
+
+
+_load_playwright()
+_BROWSER_OK = _chromium_installed()
+if not _BROWSER_OK and not _required():
+    pytestmark = pytest.mark.skip(
+        reason="Playwright Chromium is not installed (python -m playwright install chromium)",
+    )
+
+atexit.register(_remove_preset)
+
+
+def _free_port():
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    port = sock.getsockname()[1]
+    sock.close()
+    return port
+
+
+def _server_env(data, tmp):
+    env = os.environ.copy()
+    for key in list(env):
+        if key.startswith(("DECKBENCH_GAME", "DECKBENCH_MENTOR_", "STS2SIM_MENTOR")) or key == "DECKBENCH_LANG":
+            env.pop(key, None)
+    env["STS2SIM_GUI_DATA"] = str(data)
+    env["DECKBENCH_CACHE"] = str(tmp / "deckbench-cache")
+    env["DECKBENCH_ANALYSIS_ROOTS"] = str(data)
+    env["DECKBENCH_MCP_RUNS"] = str(tmp / "no-mcp")
+    env["DECKBENCH_NO_DIALOG"] = "1"
+    env["DECKBENCH_MENTOR_NO_DEFAULTS"] = "1"
+    env["PYTHONUNBUFFERED"] = "1"
+    env["PYTHONUTF8"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
+    return env
+
+
+def _write_card_cache(data):
+    """空的卡牌缓存，版本和 mtime 让 catalog 不再去跑需要游戏数据的 cards 子进程。"""
+    cache = data / "cache" / "cards.json"
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    cache.write_text(json.dumps({
+        "version": 2,
+        "cards": [],
+        "variants": [],
+        "starters": {},
+        "characters": ["Ironclad", "Silent", "Defect", "Necrobinder", "Regent", "Claude"],
+    }), encoding="utf-8")
+    stamp = time.time() + 30
+    os.utime(cache, (stamp, stamp))
+
+
+def _stop(proc):
+    if proc is None or proc.poll() is not None:
+        return
+    try:
+        os.killpg(proc.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    try:
+        proc.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            return
+        proc.wait(timeout=5)
+
+
+def _read_log(path):
+    try:
+        return path.read_text(encoding="utf-8", errors="replace")[-4000:]
+    except OSError:
+        return ""
+
+
+def _get_json(url, timeout=5):
+    with urllib.request.urlopen(url, timeout=timeout) as res:
+        return json.load(res)
+
+
+def _wait_health(proc, base, log_path, timeout=40):
+    deadline = time.time() + timeout
+    last = ""
+    while time.time() < deadline:
+        if proc.poll() is not None:
+            raise RuntimeError(f"server exited {proc.returncode}\n{_read_log(log_path)}")
+        try:
+            body = _get_json(base + "/api/health", timeout=1)
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+            last = str(exc)
+            time.sleep(0.1)
+            continue
+        if body.get("ok"):
+            return body
+        last = str(body)
+        time.sleep(0.1)
+    raise RuntimeError(f"server did not become healthy ({last})\n{_read_log(log_path)}")
+
+
+@pytest.fixture(scope="module")
+def gui_server(tmp_path_factory):
+    if not _BROWSER_OK:
+        pytest.fail("Playwright Chromium is not installed (python -m playwright install chromium)")
+    if not DIST_INDEX.is_file():
+        pytest.fail("gui/web/dist is missing. From gui/web: npm ci && npm run build")
+    tmp = tmp_path_factory.mktemp("gui-browser")
+    data = tmp / "data"
+    data.mkdir()
+    _write_card_cache(data)
+    shutil.copyfile(SIMS, data / "sims.jsonl")
+    PRESET.write_text(PRESET_TEXT, encoding="utf-8")
+    log_path = tmp / "server.log"
+    log_fh = log_path.open("w", encoding="utf-8")
+    port = _free_port()
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "gui.app", "--serve", "--port", str(port)],
+        cwd=ROOT,
+        env=_server_env(data, tmp),
+        stdout=log_fh,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+    )
+    base = f"http://127.0.0.1:{port}"
+    try:
+        _wait_health(proc, base, log_path)
+        catalog = _get_json(base + "/api/catalog?lang=en", timeout=60)
+        ids = [item["id"] for item in catalog.get("experiments") or []]
+        if "browser_smoke" not in ids:
+            raise RuntimeError(f"catalog is missing browser_smoke: {ids}\n{_read_log(log_path)}")
+        yield SimpleNamespace(
+            base=base,
+            data=data,
+            real=str(REAL_RUN),
+            sim=str(data / "sims.jsonl"),
+            log_path=log_path,
+        )
+    finally:
+        _stop(proc)
+        log_fh.close()
+        _remove_preset()
+
+
+@pytest.fixture
+def gui(page, gui_server):
+    from playwright.sync_api import expect
+    page.set_viewport_size({"width": 1440, "height": 900})
+    page.add_init_script(
+        "try { if (!localStorage.getItem('ui.lang')) localStorage.setItem('ui.lang', 'en'); } catch (e) {}"
+    )
+    errors = []
+
+    def on_pageerror(exc):
+        errors.append(f"pageerror: {exc}")
+
+    def on_console(msg):
+        if msg.type != "error":
+            return
+        loc = msg.location or {}
+        errors.append(f"{msg.text} ({loc.get('url', '')}:{loc.get('lineNumber', '')})")
+
+    page.on("pageerror", on_pageerror)
+    page.on("console", on_console)
+    page.set_default_timeout(20_000)
+    return SimpleNamespace(page=page, errors=errors, expect=expect, **gui_server.__dict__)
+
+
+def _assert_clean(gui, where):
+    assert not gui.errors, f"{where}: {gui.errors}"
+
+
+def _save_shot(page, name):
+    targets = [ROOT / "test-results" / "gui-smoke" / name]
+    artifacts = Path("/opt/cursor/artifacts")
+    if artifacts.is_dir():
+        targets.append(artifacts / name)
+    for path in targets:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        page.screenshot(path=str(path), full_page=True)
+
+
+def _open(gui, route, heading, landmark):
+    gui.page.goto(gui.base + route, wait_until="domcontentloaded")
+    gui.expect(gui.page.locator("h1")).to_have_text(heading)
+    gui.expect(gui.page.get_by_text(landmark, exact=True).first).to_be_visible()
+    gui.page.wait_for_timeout(300)
+    _assert_clean(gui, route)
+
+
+def test_main_pages_load_without_console_errors(gui):
+    for route, heading, landmark in PAGES:
+        _open(gui, route, heading, landmark)
+        if route == "/#/calibrate":
+            assert gui.page.locator("[data-page='calibrate']").count() == 1
+    gui.page.goto(gui.base + "/#/explain", wait_until="domcontentloaded")
+    gui.expect(gui.page.locator("h1")).to_have_text("Decisions")
+    gui.expect(gui.page.get_by_text("No explanation log opened", exact=True)).to_be_visible()
+    _assert_clean(gui, "/#/explain")
+
+
+def test_language_toggle_persists_in_local_storage(gui):
+    page = gui.page
+    page.goto(gui.base + "/#/new", wait_until="domcontentloaded")
+    gui.expect(page.locator("h1")).to_have_text("New test")
+    gui.expect(page.locator("html")).to_have_attribute("lang", "en")
+    assert page.evaluate("localStorage.getItem('ui.lang')") == "en"
+
+    page.locator(".lang .n-select").click()
+    page.locator(".n-base-select-option").filter(has_text="简体中文").click()
+    gui.expect(page.locator("h1")).to_have_text("新建测试")
+    gui.expect(page.get_by_text("战斗实验", exact=True).first).to_be_visible()
+    gui.expect(page.locator("html")).to_have_attribute("lang", "zh-CN")
+    assert page.evaluate("localStorage.getItem('ui.lang')") == "zhs"
+    _save_shot(page, "gui-new-zh-CN.png")
+
+    page.reload(wait_until="domcontentloaded")
+    gui.expect(page.locator("h1")).to_have_text("新建测试")
+    assert page.evaluate("localStorage.getItem('ui.lang')") == "zhs"
+    gui.expect(page.locator("html")).to_have_attribute("lang", "zh-CN")
+
+    page.locator(".lang .n-select").click()
+    page.locator(".n-base-select-option").filter(has_text="English").click()
+    gui.expect(page.locator("h1")).to_have_text("New test")
+    gui.expect(page.get_by_text("Combat test", exact=True).first).to_be_visible()
+    assert page.evaluate("localStorage.getItem('ui.lang')") == "en"
+    gui.expect(page.locator("html")).to_have_attribute("lang", "en")
+
+    page.reload(wait_until="domcontentloaded")
+    gui.expect(page.locator("h1")).to_have_text("New test")
+    assert page.evaluate("localStorage.getItem('ui.lang')") == "en"
+    _assert_clean(gui, "language")
+
+
+def _run_log_tail(data):
+    logs = sorted((data / "runs").glob("*/run.log"))
+    if not logs:
+        return ""
+    try:
+        return logs[-1].read_text(encoding="utf-8", errors="replace")[-2000:]
+    except OSError:
+        return ""
+
+
+def test_dummy_combat_from_the_gui_reaches_done(gui):
+    page = gui.page
+    page.goto(gui.base + "/#/new", wait_until="domcontentloaded")
+    gui.expect(page.get_by_text("Combat test", exact=True).first).to_be_visible()
+    page.locator("button.mode").filter(has_text="Combat test").click()
+    gui.expect(page.get_by_text("Test source", exact=True)).to_be_visible()
+    page.locator(".form .n-select").filter(has_text="(quick)").click()
+    page.locator(".n-base-select-option").filter(has_text="browser_smoke").click()
+    gui.expect(page.locator(".form .n-select").filter(has_text="browser_smoke")).to_be_visible()
+    gui.expect(page.get_by_text("Browser dummy smoke", exact=True).first).to_be_visible()
+    page.get_by_role("button", name="Start", exact=True).click()
+    page.wait_for_url("**/#/run/*")
+    from playwright.sync_api import TimeoutError as PlaywrightTimeout
+    try:
+        page.get_by_role("button", name="View report").wait_for(timeout=120_000)
+    except PlaywrightTimeout as exc:
+        raise AssertionError(
+            "dummy combat did not reach done\n" + _run_log_tail(gui.data)
+        ) from exc
+    gui.expect(page.locator(".n-tag").filter(has_text="Done")).to_be_visible()
+    gui.expect(page.get_by_text("preset browser_smoke", exact=True)).to_be_visible()
+    _save_shot(page, "gui-combat-done.png")
+    _assert_clean(gui, "combat")
+
+
+def test_gap_triage_renders_sample_calibration(gui):
+    page = gui.page
+    query = urlencode({"real": gui.real, "sim": gui.sim})
+    page.goto(gui.base + "/#/calibrate?" + query, wait_until="domcontentloaded")
+    gui.expect(page.locator("h1")).to_have_text("Calibration")
+    triage = page.locator("#gap-triage")
+    gui.expect(triage).to_be_visible(timeout=30_000)
+    gui.expect(triage.get_by_role("heading", name="Gap triage")).to_be_visible()
+    gui.expect(triage.get_by_text(
+        "Read-only. It does not start a simulation and does not change seeds or AI.",
+        exact=True,
+    )).to_be_visible()
+    gui.expect(triage.locator("[data-gap-side='optimistic']").get_by_text("SAMPLE_ELITE")).to_be_visible()
+    gui.expect(triage.get_by_text("No likely gaps on this side.", exact=True)).to_be_visible()
+    gui.expect(triage.get_by_text("sts2sim/enemies.py")).to_be_visible()
+    triage.scroll_into_view_if_needed()
+    _save_shot(page, "gui-gap-triage.png")
+    _assert_clean(gui, "gap-triage")

@@ -14,6 +14,7 @@ build/
 dist/
 dist_win/
 gui-shots/
+test-results/
 
 # ---- 游戏派生内容：永远不进仓库 / game-derived content: NEVER commit ----
 # 种子预览缓存默认在用户缓存目录（DECKBENCH_CACHE/seed-preview）。若被写进工作区，不要提交。

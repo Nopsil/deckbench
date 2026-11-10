@@ -2,9 +2,14 @@
 
 ## 未发布（0.1.5） / Unreleased (0.1.5)
 
-这些功能已经在 `main`（PR #4，以及随后的 #6–#52）。#40 把这一节对齐到 #39。其后按合并顺序是 #41、#43、#42、#44、#45、#46、#47、#48、#49、#50、#51、#52。版本号是 `0.1.5`（`sts2sim.__version__`、界面 `package.json`、Windows 打包脚本的默认 `-Version`）。发布说明在 `docs/RELEASE_0.1.5.md`。文档目录在 `docs/INDEX.md`。下面先写 #41–#52，再写更早的 #4 与 #6–#40。原有条目都留着。#49 的命令行分诊和 #51 的页面 / HTTP / MCP 是同一份报告，合成一条，细节都在。
+这些功能已经在 `main`（PR #4，以及随后的 #6–#52）。#40 把这一节对齐到 #39。其后按合并顺序是 #41、#43、#42、#44、#45、#46、#47、#48、#49、#50、#51、#52。版本号是 `0.1.5`（`sts2sim.__version__`、界面 `package.json`、Windows 打包脚本的默认 `-Version`）。发布说明在 `docs/RELEASE_0.1.5.md`。文档目录在 `docs/INDEX.md`。下面先写界面浏览器冒烟，再写 #41–#52，然后是更早的 #4 与 #6–#40。原有条目都留着。#49 的命令行分诊和 #51 的页面 / HTTP / MCP 是同一份报告，合成一条，细节都在。
 
-*These features are on `main` (PR #4, then #6–#52). #40 aligned this section through #39. After that, in merge order: #41, #43, #42, #44, #45, #46, #47, #48, #49, #50, #51, #52. The version is `0.1.5` (`sts2sim.__version__`, the GUI `package.json`, and the default `-Version` in the Windows packager). Release notes: `docs/RELEASE_0.1.5.md`. Documentation index: `docs/INDEX.md`. #41–#52 are listed first, then the earlier #4 and #6–#40. The earlier entries stay. The command-line triage from #49 and the page / HTTP / MCP triage from #51 are one report, so they are one entry, with the details from both.*
+*These features are on `main` (PR #4, then #6–#52). #40 aligned this section through #39. After that, in merge order: #41, #43, #42, #44, #45, #46, #47, #48, #49, #50, #51, #52. The version is `0.1.5` (`sts2sim.__version__`, the GUI `package.json`, and the default `-Version` in the Windows packager). Release notes: `docs/RELEASE_0.1.5.md`. Documentation index: `docs/INDEX.md`. The GUI browser smoke is listed first, then #41–#52, then the earlier #4 and #6–#40. The earlier entries stay. The command-line triage from #49 and the page / HTTP / MCP triage from #51 are one report, so they are one entry, with the details from both.*
+
+### 界面浏览器冒烟
+
+- **图形界面在 Ubuntu 的持续集成里用无头浏览器冒烟。** 单独的作业（不进现有的 pytest 矩阵）用 pytest-playwright 的 Chromium 打开从源码起的 `python -m gui.app --serve`。没有本机游戏数据：测试写一份空的卡牌缓存，战斗实验用和安装包冒烟相同的训练木桩（`claude_v34` 的 `probe_noengine`，`encounter: DUMMY`，1 回合）。检查主页面（含 `#/calibrate` 和「决策说明」）没有控制台错误，简体中文 / English 切换会改可见文案并写进 `localStorage` 的 `ui.lang`，这场木桩能从界面点到完成，以及用校准夹具渲染缺口分诊。没装 Playwright 或 Chromium 时，`python -m pytest -q tests` 会跳过这些测试。失败时上传截图和 trace。不改模拟、种子和 AI。见 `docs/CI.md`。
+  *The GUI gets a headless browser smoke on Ubuntu CI. A separate job (not part of the existing pytest matrix) opens `python -m gui.app --serve` from source with pytest-playwright's Chromium. No local game data: the test writes an empty card cache, and the combat test uses the same training dummy as the package smoke (`claude_v34` deck `probe_noengine`, `encounter: DUMMY`, one turn). It checks that the main pages (including `#/calibrate` and Decisions) load with no console errors, that the 简体中文 / English switch changes the visible strings and stores the choice in `localStorage` `ui.lang`, that the dummy fight can be started from the GUI and reaches done, and that gap triage renders from the calibration fixture. `python -m pytest -q tests` skips these tests when Playwright or Chromium is missing. Screenshots and traces are uploaded on failure. Simulation, seeds and AI are unchanged. See `docs/CI.md`.*
 
 ### #41–#52
 
