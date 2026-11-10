@@ -1,0 +1,61 @@
+# DeckBench CI.
+# Ubuntu and Windows, Python 3.11 and 3.12.
+# fastapi, httpx, and python-multipart are installed so the GUI tests run.
+# A local game install is not set up, so those tests stay skipped.
+# Coverage stays in the job summary (pytest-cov). Lint is ruff, via ruff.toml.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ruff:
+    name: ruff
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install ruff
+        run: python -m pip install ruff==0.17.4
+      - name: Ruff
+        run: ruff check .
+
+  test:
+    name: pytest (${{ matrix.os }}, ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.11", "3.12"]
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install test dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -r requirements.txt fastapi httpx python-multipart pytest-cov
+      - name: Pytest
+        run: python -m pytest tests --cov=sts2sim --cov=gui --cov=tools --cov-report=term-missing --cov-report=json:coverage.json
+      - name: Coverage summary
+        if: always()
+        run: python .github/scripts/coverage_summary.py coverage.json
