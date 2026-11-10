@@ -1,0 +1,181 @@
+# Build the Windows zip, check it, and upload it as an Actions artifact.
+# Starts from the Actions tab, or when a tag named v* is pushed.
+# Does not create a GitHub Release and does not publish the zip anywhere else.
+# The runner has no game install. DeckBench.exe is not launched.
+
+name: Windows package
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: windows-package-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    name: windows package
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+      PACKAGE_VERSION: "0.1.5"
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-gui.txt
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "lts/*"
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+
+      - name: Install the packager venv
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          $Work = Join-Path $env:RUNNER_TEMP "deckbench-build"
+          New-Item -ItemType Directory -Force -Path $Work | Out-Null
+          $py = Join-Path $Work "buildenv\Scripts\python.exe"
+          python -m venv (Join-Path $Work "buildenv")
+          & $py -m pip install --upgrade pip
+          & $py -m pip install -r (Join-Path $env:GITHUB_WORKSPACE "requirements-gui.txt") pyinstaller
+
+      - name: Publish the decompiler host
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          $Work = Join-Path $env:RUNNER_TEMP "deckbench-build"
+          $toolRoot = Join-Path $Work "ilspy-tool"
+          dotnet tool install ilspycmd --version 9.1.0.7988 --tool-path $toolRoot
+          if ($LASTEXITCODE -ne 0) { throw "dotnet tool install ilspycmd failed ($LASTEXITCODE)" }
+          $dll = Get-ChildItem -Path $toolRoot -Recurse -Filter ilspycmd.dll |
+            Where-Object { $_.DirectoryName -match '[\\/]net8\.0[\\/]any$' } |
+            Select-Object -First 1
+          if (-not $dll) {
+            Get-ChildItem -Path $toolRoot -Recurse -Filter *.dll | ForEach-Object { $_.FullName }
+            throw "ilspycmd.dll under tools/net8.0/any was not found in $toolRoot"
+          }
+          $decompiler = Join-Path $Work "decompiler"
+          $csproj = Join-Path $env:GITHUB_WORKSPACE "gui\packaging\decompiler\ilspycmd-host.csproj"
+          dotnet publish $csproj -c Release -r win-x64 --self-contained -o $decompiler "-p:IlspyToolDir=$($dll.DirectoryName)"
+          if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed ($LASTEXITCODE)" }
+          if (-not (Test-Path (Join-Path $decompiler "ilspycmd-host.exe"))) {
+            throw "published decompiler is missing ilspycmd-host.exe"
+          }
+
+      - name: Build the Windows package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          $Work = Join-Path $env:RUNNER_TEMP "deckbench-build"
+          $py = Join-Path $Work "buildenv\Scripts\python.exe"
+          $decompiler = Join-Path $Work "decompiler"
+          & powershell.exe -ExecutionPolicy Bypass -File (Join-Path $env:GITHUB_WORKSPACE "gui\packaging\build.ps1") `
+            -Work $Work -Py $py -Decompiler $decompiler -Version $env:PACKAGE_VERSION
+          if ($LASTEXITCODE -ne 0) { throw "build.ps1 failed ($LASTEXITCODE)" }
+          $app = Join-Path $Work "dist\DeckBench"
+          $zip = Join-Path $Work "DeckBench-$($env:PACKAGE_VERSION)-win64.zip"
+          if (-not (Test-Path (Join-Path $app "DeckBench.exe"))) { throw "DeckBench.exe missing: $app" }
+          if (-not (Test-Path $zip)) { throw "zip missing: $zip" }
+
+      - name: dry_check and audit the package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          $Work = Join-Path $env:RUNNER_TEMP "deckbench-build"
+          $app = Join-Path $Work "dist\DeckBench"
+          $zip = Join-Path $Work "DeckBench-$($env:PACKAGE_VERSION)-win64.zip"
+          & python (Join-Path $env:GITHUB_WORKSPACE "gui\packaging\dry_check.py") --app $app
+          if ($LASTEXITCODE -ne 0) { throw "dry_check.py failed ($LASTEXITCODE)" }
+          & powershell.exe -ExecutionPolicy Bypass -File (Join-Path $env:GITHUB_WORKSPACE "gui\packaging\audit.ps1") -Path $zip
+          if ($LASTEXITCODE -ne 0) { throw "audit.ps1 failed ($LASTEXITCODE)" }
+
+      - name: Smoke the packaged CLI
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          $Work = Join-Path $env:RUNNER_TEMP "deckbench-build"
+          $py = Join-Path $Work "buildenv\Scripts\python.exe"
+          $zip = Join-Path $Work "DeckBench-$($env:PACKAGE_VERSION)-win64.zip"
+          $extract = Join-Path $Work "smoke-extract"
+          if (Test-Path $extract) { Remove-Item -Recurse -Force $extract }
+          Expand-Archive -LiteralPath $zip -DestinationPath $extract
+          $packed = Join-Path $extract "DeckBench"
+          $sim = Join-Path $packed "sim"
+          if (-not (Test-Path (Join-Path $packed "DeckBench.exe"))) { throw "zip is missing DeckBench.exe" }
+          if (-not (Test-Path (Join-Path $sim "sts2sim\__main__.py"))) { throw "zip is missing sim/sts2sim" }
+          Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue
+          Remove-Item Env:DECKBENCH_EXPLAIN -ErrorAction SilentlyContinue
+          Remove-Item Env:DECKBENCH_CODEX_DIR -ErrorAction SilentlyContinue
+          Remove-Item Env:STS2SIM_USER_MODS -ErrorAction SilentlyContinue
+          $env:PYTHONPATH = $sim
+          $env:DECKBENCH_SIM = $sim
+          Push-Location $sim
+          try {
+            & $py -c "import os, sys, sts2sim; loc = os.path.normcase(os.path.abspath(sts2sim.__file__)); root = os.path.normcase(os.path.abspath(os.environ['DECKBENCH_SIM'])); print(loc); sep = os.sep; ok = loc == root or loc.startswith(root + sep); sys.exit(0 if ok else 'sts2sim was not imported from the packaged sim')"
+            if ($LASTEXITCODE -ne 0) { throw "packaged import check failed ($LASTEXITCODE)" }
+            $helpFile = Join-Path $env:RUNNER_TEMP "sts2sim-help.txt"
+            & $py -m sts2sim --help > $helpFile
+            if ($LASTEXITCODE -ne 0) { throw "packaged CLI --help exited $LASTEXITCODE" }
+            $help = Get-Content -Raw -Path $helpFile
+            if ($help -notmatch '--fights') { throw "packaged CLI --help did not mention --fights" }
+            $sample = Join-Path $env:RUNNER_TEMP "package-smoke.yaml"
+            @(
+              "name: package_smoke"
+              "title: packaged sim smoke"
+              "mods: [claude_v34]"
+              "seed: 1"
+              "fights: 1"
+              "max_turns: 1"
+              "agent: heuristic"
+              "decks: []"
+              "extra:"
+              "  - {deck: probe_noengine, encounter: DUMMY, fights: 1, max_turns: 1, room: probe}"
+            ) | Set-Content -Encoding utf8NoBOM -Path $sample
+            $out = Join-Path $env:RUNNER_TEMP "package-smoke-out"
+            & $py -m sts2sim $sample --workers 1 --fights 1 --seed 1 --out $out
+            if ($LASTEXITCODE -ne 0) { throw "packaged CLI fight exited $LASTEXITCODE" }
+            $raw = Join-Path $out "raw.jsonl"
+            if (-not (Test-Path $raw)) { throw "smoke raw.jsonl missing" }
+            $line = Get-Content -Raw -Path $raw
+            Write-Host $line
+            if ($line -notmatch '"encounter": "DUMMY"') { throw "smoke fight was not the training dummy" }
+            if ($line -notmatch '"deck": "probe_noengine"') { throw "smoke fight did not use the packaged probe deck" }
+          }
+          finally {
+            Pop-Location
+          }
+
+      - name: Upload the Windows zip
+        uses: actions/upload-artifact@v7
+        with:
+          name: DeckBench-0.1.5-win64
+          path: ${{ runner.temp }}/deckbench-build/DeckBench-0.1.5-win64.zip
+          if-no-files-found: error
+          retention-days: 30
