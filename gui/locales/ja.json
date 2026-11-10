@@ -1148,6 +1148,7 @@
  "page.decks.title": "デッキ構築",
  "page.decks.sub": "カードプールを検索してデッキを組み、戦闘プリセットとして保存します",
  "deck.pool": "カードプール",
+ "deck.dummyName": "訓練用ダミー",
  "deck.searchPh": "中国語名、英語名、または id を検索",
  "deck.character": "キャラクター",
  "deck.type": "タイプ",

@@ -323,35 +323,72 @@ def test_main_pages_load_without_console_errors(gui):
     _assert_clean(gui, "/#/explain")
 
 
+def _switch_lang(gui, label):
+    page = gui.page
+    page.locator(".lang .n-select").click()
+    page.locator(".n-base-select-option").filter(has_text=label).click()
+
+
 def test_language_toggle_persists_in_local_storage(gui):
+    """切到简体中文后，新建测试、运行、对比、组牌、校准、关于和本版更新的文案都变，刷新仍是 zh-CN。"""
     page = gui.page
     page.goto(gui.base + "/#/new", wait_until="domcontentloaded")
     gui.expect(page.locator("h1")).to_have_text("New test")
     gui.expect(page.locator("html")).to_have_attribute("lang", "en")
     assert page.evaluate("localStorage.getItem('ui.lang')") == "en"
 
-    page.locator(".lang .n-select").click()
-    page.locator(".n-base-select-option").filter(has_text="简体中文").click()
+    _switch_lang(gui, "简体中文")
     gui.expect(page.locator("h1")).to_have_text("新建测试")
     gui.expect(page.get_by_text("战斗实验", exact=True).first).to_be_visible()
     gui.expect(page.locator("html")).to_have_attribute("lang", "zh-CN")
     assert page.evaluate("localStorage.getItem('ui.lang')") == "zhs"
+    gui.expect(page.get_by_test_id("whatsnew-footer")).to_have_text("本版更新")
+    gui.expect(page.get_by_test_id("whatsnew-dismiss")).to_have_text("关闭")
     _save_shot(page, "gui-new-zh-CN.png")
 
+    page.get_by_test_id("about-version").click()
+    gui.expect(page.get_by_test_id("about-dialog").get_by_text("检查更新", exact=True)).to_be_visible()
+    gui.expect(page.get_by_text("关于 DeckBench", exact=True)).to_be_visible()
+    page.keyboard.press("Escape")
+    gui.expect(page.get_by_test_id("about-dialog")).to_be_hidden()
+
+    zh_pages = (
+        ("/#/run", "运行中", "现在没有正在运行的测试"),
+        ("/#/compare", "对比两次", "选择两次已完成的战斗实验"),
+        ("/#/decks", "组牌", "牌池"),
+        ("/#/calibrate", "校准", "真对局"),
+    )
+    for route, heading, landmark in zh_pages:
+        page.goto(gui.base + route, wait_until="domcontentloaded")
+        gui.expect(page.locator("h1")).to_have_text(heading)
+        gui.expect(page.get_by_text(landmark, exact=True).first).to_be_visible()
+        gui.expect(page.locator("html")).to_have_attribute("lang", "zh-CN")
+        assert page.evaluate("localStorage.getItem('ui.lang')") == "zhs"
+        _assert_clean(gui, route)
+    gui.expect(page.get_by_text("对照", exact=True).first).to_be_visible()
+    _save_shot(page, "gui-calibrate-zh-CN.png")
+    page.goto(gui.base + "/#/decks", wait_until="domcontentloaded")
+    gui.expect(page.get_by_text("卡组 A 对卡组 B", exact=True)).to_be_visible()
+    gui.expect(page.get_by_text("单卡贡献", exact=True).first).to_be_visible()
+    gui.expect(page.get_by_text("对打", exact=True).first).to_be_visible()
+    _save_shot(page, "gui-decks-zh-CN.png")
+    page.goto(gui.base + "/#/compare", wait_until="domcontentloaded")
+    _save_shot(page, "gui-compare-zh-CN.png")
+
     page.reload(wait_until="domcontentloaded")
-    gui.expect(page.locator("h1")).to_have_text("新建测试")
+    gui.expect(page.locator("h1")).to_have_text("对比两次")
     assert page.evaluate("localStorage.getItem('ui.lang')") == "zhs"
     gui.expect(page.locator("html")).to_have_attribute("lang", "zh-CN")
+    gui.expect(page.get_by_text("选择两次已完成的战斗实验", exact=True).first).to_be_visible()
 
-    page.locator(".lang .n-select").click()
-    page.locator(".n-base-select-option").filter(has_text="English").click()
-    gui.expect(page.locator("h1")).to_have_text("New test")
-    gui.expect(page.get_by_text("Combat test", exact=True).first).to_be_visible()
+    _switch_lang(gui, "English")
+    gui.expect(page.locator("h1")).to_have_text("Compare runs")
+    gui.expect(page.get_by_text("Pick two finished combat tests", exact=True).first).to_be_visible()
     assert page.evaluate("localStorage.getItem('ui.lang')") == "en"
     gui.expect(page.locator("html")).to_have_attribute("lang", "en")
 
     page.reload(wait_until="domcontentloaded")
-    gui.expect(page.locator("h1")).to_have_text("New test")
+    gui.expect(page.locator("h1")).to_have_text("Compare runs")
     assert page.evaluate("localStorage.getItem('ui.lang')") == "en"
     _assert_clean(gui, "language")
 

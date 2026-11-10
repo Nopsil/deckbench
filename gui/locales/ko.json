@@ -1148,6 +1148,7 @@
  "page.decks.title": "덱 만들기",
  "page.decks.sub": "카드 풀을 검색해 덱을 만들고 전투 프리셋으로 저장합니다",
  "deck.pool": "카드 풀",
+ "deck.dummyName": "훈련용 더미",
  "deck.searchPh": "중국어 이름, 영어 이름 또는 id 검색",
  "deck.character": "캐릭터",
  "deck.type": "유형",

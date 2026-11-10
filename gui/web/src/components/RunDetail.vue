@@ -52,12 +52,12 @@
       <div>
         <h3>{{ t('imp.relics') }}</h3>
         <div v-if="!relics.length" class="hint">{{ t('imp.noRelics') }}</div>
-        <div v-for="(r, i) in relics" :key="i" class="line mono">{{ r.who }}{{ r.id }}<span v-if="r.floor != null" class="faint">{{ t('imp.floorAdded', { floor: r.floor }) }}</span></div>
+        <div v-for="(r, i) in relics" :key="i" class="line mono">{{ r.who }}{{ store.relicName(r.id) }}<span v-if="r.floor != null" class="faint">{{ t('imp.floorAdded', { floor: r.floor }) }}</span></div>
       </div>
       <div>
         <h3>{{ t('imp.deck') }}</h3>
         <div v-if="!deck.length" class="hint">{{ t('imp.noDeck') }}</div>
-        <div v-for="(c, i) in deck" :key="i" class="line mono">{{ c.who }}{{ c.id }}<span v-if="c.upgraded">+</span><span v-if="c.floor != null" class="faint">{{ t('imp.floorAdded', { floor: c.floor }) }}</span><span v-if="c.enchantment" class="faint"> {{ t('imp.enchant', { id: c.enchantment.id }) }}</span></div>
+        <div v-for="(c, i) in deck" :key="i" class="line mono">{{ c.who }}{{ store.cardName(c.id) }}<span v-if="c.upgraded">+</span><span v-if="c.floor != null" class="faint">{{ t('imp.floorAdded', { floor: c.floor }) }}</span><span v-if="c.enchantment" class="faint"> {{ t('imp.enchant', { id: c.enchantment.id }) }}</span></div>
       </div>
     </div>
   </div>
@@ -67,6 +67,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { NButton } from 'naive-ui'
+import { store } from '../api'
 import { t, has } from '../i18n'
 import MapGrid from './MapGrid.vue'
 
@@ -94,8 +95,8 @@ function rooms(f) {
 function picks(f) {
   const parts = []
   for (const g of f.picks || []) {
-    const picked = (g.cards || []).filter((c) => c.was_picked).map((c) => c.id)
-    const offered = (g.cards || []).map((c) => c.id)
+    const picked = (g.cards || []).filter((c) => c.was_picked).map((c) => store.cardName(c.id))
+    const offered = (g.cards || []).map((c) => store.cardName(c.id))
     if (!offered.length) continue
     parts.push(t('imp.picked') + ' ' + (picked.join(', ') || t('imp.skipped')) + ' / ' + t('imp.offered') + ' ' + offered.join(', '))
   }

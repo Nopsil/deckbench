@@ -247,6 +247,7 @@ const rarityOptions = computed(() => [any(), ...(facets.value.rarities || []).ma
 const costOptions = computed(() => [any(), ...(facets.value.costs || []).map((v) => ({ label: v === 'none' ? t('deck.unplayable') : v, value: v }))])
 
 function label(c) {
+  if (!c) return ''
   if (lang.value === 'zhs') return c.name_zh || c.name || c.id
   return c.name_en || c.name || c.id
 }

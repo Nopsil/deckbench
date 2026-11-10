@@ -1148,6 +1148,7 @@
  "page.decks.title": "Deck builder",
  "page.decks.sub": "Search the card pool, build a deck, and save it as a combat preset",
  "deck.pool": "Card pool",
+ "deck.dummyName": "Training dummy",
  "deck.searchPh": "Search Chinese name, English name, or id",
  "deck.character": "Character",
  "deck.type": "Type",

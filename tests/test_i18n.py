@@ -196,6 +196,8 @@ def fake_game(tmp_path, monkeypatch):
         "localization/eng/characters.json": j({"HERO.title": "The Hero"}),
         "localization/eng/encounters.json": j({"ENC_X.title": "Enc X"}),
         "localization/jpn/encounters.json": j({"ENC_X.title": "遭遇 X"}),
+        "localization/eng/relics.json": j({"RELIC_A.title": "Anchor", "RELIC_A.description": "Not a title"}),
+        "localization/zhs/relics.json": j({"RELIC_A.title": "锚"}),
     })
     monkeypatch.setenv("DECKBENCH_GAME_PCK", str(p))
     for lang in ("ENG", "ZHS", "JPN", "KOR"):
@@ -218,6 +220,22 @@ def test_game_names_follow_language(fake_game):
     assert backend.char_name("Hero", "ja") == "The Hero"            # 日文缺 → 英文
     assert backend.char_name("Nobody", "en") == "Nobody"            # 都没有 → ID
     assert backend.char_name("Claude", "en") == "Claude娘"          # 我们自己的 mod 角色走翻译表
+    assert backend.char_name("Ironclad", "zhs") == "Ironclad"       # 安装里没有标题，不编中文名
+    assert b.relic_names("zhs") == {"RELIC_A": "锚"}
+    assert b.relic_names("en") == {"RELIC_A": "Anchor"}
+    assert b.relic_names("ja") == {"RELIC_A": "Anchor"}             # 没有日文表 → 英文
+    assert b.relic_names("ko") == {"RELIC_A": "Anchor"}
+    assert "RELIC_MISSING" not in b.relic_names("en")
+
+
+def test_catalog_relics_follow_loaded_titles(fake_game, monkeypatch):
+    b = backend.LocalPythonBackend()
+    monkeypatch.setattr(b, "_cards", lambda refresh=False: {
+        "cards": [], "variants": [], "starters": {}, "characters": ["Ironclad"],
+    })
+    cat = b.catalog(lang="zhs")
+    assert cat["relics"] == {"RELIC_A": "锚"}
+    assert cat["characters"] == [{"id": "Ironclad", "name": "Ironclad"}]
 
 
 def test_agents_follow_language():

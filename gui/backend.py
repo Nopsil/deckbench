@@ -75,21 +75,18 @@ def agents_combat(lang=None):
     return [_agent("agentc", a, lang) for a in AGENTS_COMBAT]
 
 
-# 简体中文回退名（游戏文本读不到时用；其他语言回退到英文 ID）
-CHAR_ZH = {"Ironclad": "铁甲战士", "Silent": "静默猎手", "Defect": "故障机器人", "Necrobinder": "亡灵契约师",
-           "Regent": "储君", "Claude": "Claude娘"}
 ROOMS = ["普通", "精英", "首领", "弱怪"]   # 房间 ID（战斗实验 YAML 里就是这些字）；界面显示用 room.<ID> 翻译
 
 
 def char_name(cid, lang=None):
-    """角色名：我们自己的 mod 角色用翻译表；原版角色从你的游戏安装按所选语言读（characters 表），读不到再回退。"""
+    """角色名：我们自己的 mod 角色用翻译表。原版角色只在游戏安装的 characters 表里有标题时用那个标题，否则显示 id。"""
     lang = lang or i18n.current()
     if i18n.has(f"char.{cid}", lang):
         return i18n.t(f"char.{cid}", lang)
     v = i18n.game_text("characters", str(cid).upper(), lang)
     if v:
         return v
-    return CHAR_ZH.get(cid, cid) if lang == "zhs" else cid
+    return cid
 
 
 class SimBackend:
@@ -367,6 +364,26 @@ class LocalPythonBackend(SimBackend):
                     break
         return out
 
+    def relic_names(self, lang=None):
+        """遗物 ID → 标题。只收录游戏安装里已经有的 ``*.title``，按所选语言再回退 eng、zhs。没有的不编造。"""
+        lang = lang or i18n.current()
+        out = {}
+        try:
+            from sts2sim import gameloc
+            tables = [gameloc.table("relics", g) or {} for g in i18n.game_langs(lang)]
+        except Exception:  # noqa
+            return out
+        for tb in tables:
+            if not isinstance(tb, dict):
+                continue
+            for key, value in tb.items():
+                if not isinstance(key, str) or not key.endswith(".title"):
+                    continue
+                if not isinstance(value, str) or not value.strip():
+                    continue
+                out.setdefault(key[:-6], " ".join(value.split()))
+        return out
+
     def catalog(self, refresh=False, lang=None):
         from gui.fightworkers import worker_cap
         lang = lang if lang in i18n.LANGS else i18n.current()
@@ -393,7 +410,8 @@ class LocalPythonBackend(SimBackend):
                 "variants": variants, "cards": cards, "starters": c["starters"], "rooms": ROOMS,
                 "experiments": self.experiments(lang), "mods": self.mods(), "cpu": os.cpu_count() or 1,
                 "worker_cap": worker_cap(),
-                "encounters": self.encounter_names(lang)}
+                "encounters": self.encounter_names(lang),
+                "relics": self.relic_names(lang)}
 
     # ---------------- 运行
     def build_command(self, kind, params, run_dir):

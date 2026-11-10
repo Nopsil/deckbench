@@ -89,7 +89,7 @@
           <tbody>
             <tr v-for="row in cardRows" :key="row.key" :data-card="row.card" :data-sig="row.usage_significant === true ? '1' : '0'">
               <td>{{ row.deck }}</td>
-              <td>{{ row.card }}</td>
+              <td>{{ store.cardName(row.card) }}</td>
               <td class="mono">{{ fmtVal('usage', row.a_per_fight) }}</td>
               <td class="mono">{{ fmtVal('usage', row.b_per_fight) }}</td>
               <td class="mono delta" :class="tone('usage', row.usage_delta, row.usage_significant)">
