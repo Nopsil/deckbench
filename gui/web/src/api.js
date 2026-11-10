@@ -45,6 +45,13 @@ export const store = reactive({
     if (id === '_unrecorded') return t('room._unrecorded')
     return (this.catalog && this.catalog.encounters && this.catalog.encounters[id]) || id
   },
+  relicName(id) {
+    if (!id) return ''
+    const map = this.catalog && this.catalog.relics
+    const name = map && map[id]
+    if (typeof name === 'string' && name.trim()) return name.trim()
+    return id
+  },
   charName(id) {
     const c = this.catalog && this.catalog.characters.find((x) => x.id === id)
     return c ? c.name : id
@@ -111,4 +118,4 @@ const STATUS_TYPE = { running: 'warning', done: 'success', failed: 'error', canc
 /** STATUS[x].text 每次读取都按当前语言翻译 */
 export const STATUS = Object.fromEntries(Object.entries(STATUS_TYPE).map(([k, type]) => [k, { type, get text() { return t('status.' + k) } }]))
 
-for (const k of ['cardName', 'encName', 'charName', 'agentName', 'styleName', 'loadCatalog', 'loadRuns']) store[k] = store[k].bind(store)
+for (const k of ['cardName', 'encName', 'relicName', 'charName', 'agentName', 'styleName', 'loadCatalog', 'loadRuns']) store[k] = store[k].bind(store)

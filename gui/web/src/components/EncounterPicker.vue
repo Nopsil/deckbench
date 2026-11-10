@@ -107,7 +107,7 @@ const err = ref('')
 let timer
 
 const probe = computed(() => probeRow.value || {
-  id: 'DUMMY', name: 'DUMMY', name_zh: '', name_en: 'Training dummy', act: null, room: 'probe',
+  id: 'DUMMY', name: 'DUMMY', name_zh: '', name_en: '', act: null, room: 'probe',
 })
 const selected = computed(() => new Set((props.modelValue || []).map((row) => row.id)))
 const shown = computed(() => rows.value.filter((row) => row.id !== 'DUMMY'))
@@ -120,6 +120,7 @@ function roomName(value) {
 }
 function label(row) {
   if (!row) return ''
+  if (row.id === 'DUMMY') return t('deck.dummyName')
   if (lang.value === 'zhs') return row.name_zh || row.name || row.id
   return row.name_en || row.name || row.id
 }

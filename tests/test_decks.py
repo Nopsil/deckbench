@@ -76,7 +76,12 @@ def test_cards_are_filtered_in_both_languages(client):
     assert zh.status_code == 200
     assert any(card["id"] == "YIHESHI" and card["name_zh"] == "已核实" for card in zh.json()["cards"])
     en = client.get("/api/cards", headers=EN, params={"q": "Yiheshi", "limit": 50})
-    assert any(card["id"] == "YIHESHI" for card in en.json()["cards"])
+    yiheshi = next(card for card in en.json()["cards"] if card["id"] == "YIHESHI")
+    assert yiheshi["name_en"] in ("", yiheshi["name"])
+    assert yiheshi["name_en"] not in ("Yiheshi", "YI HESHI")
+    strike_row = client.get("/api/cards", params={"q": "CLAUDE_STRIKE", "limit": 20})
+    claude = next(card for card in strike_row.json()["cards"] if card["id"] == "CLAUDE_STRIKE")
+    assert claude["name_en"] not in ("Claude Strike", "CLAUDE STRIKE")
     strike = client.get("/api/cards", params={"q": "Strike", "limit": 50})
     assert any(card["id"] == "CLAUDE_STRIKE" and "打击" in (card["name_zh"] or card["name"]) for card in strike.json()["cards"])
     chinese = client.get("/api/cards", params={"q": "打击", "limit": 50})

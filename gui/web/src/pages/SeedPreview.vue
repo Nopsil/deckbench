@@ -93,12 +93,12 @@
           <div class="label">{{ t('prev.rewardFor', { index: idx }) }}</div>
           <div v-if="block.error" class="hint warn">{{ block.error }}</div>
           <template v-else>
-            <div class="hint">{{ t('prev.encounter') }} <span class="mono">{{ block.encounter }}</span></div>
+            <div class="hint">{{ t('prev.encounter') }} <span class="mono">{{ store.encName(block.encounter) }}</span></div>
             <div v-for="(rw, i) in block.rewards || []" :key="i" class="line mono">
-              <template v-if="rw.cards">{{ t('prev.cards') }} {{ rw.cards.join(' / ') }}</template>
+              <template v-if="rw.cards">{{ t('prev.cards') }} {{ namedCards(rw.cards) }}</template>
               <template v-else-if="rw.gold != null">{{ t('prev.gold') }} {{ rw.gold }}</template>
               <template v-else-if="rw.potion">{{ t('prev.potion') }} {{ rw.potion }}</template>
-              <template v-else-if="rw.relic">{{ t('prev.relic') }} {{ rw.relic }}</template>
+              <template v-else-if="rw.relic">{{ t('prev.relic') }} {{ store.relicName(rw.relic) }}</template>
             </div>
           </template>
         </div>
@@ -106,11 +106,11 @@
 
       <div class="panel">
         <h3>{{ t('prev.startingRelics') }}</h3>
-        <div class="mono">{{ (res.relics && res.relics.starting || []).join(', ') || t('common.none') }}</div>
+        <div class="mono">{{ namedRelics(res.relics && res.relics.starting, 'common.none') }}</div>
         <h3 style="margin-top:14px">{{ t('prev.sharedQueue') }}</h3>
-        <div class="mono">{{ (res.relics && res.relics.shared_queue || []).join(', ') || t('prev.noQueue') }}</div>
+        <div class="mono">{{ namedRelics(res.relics && res.relics.shared_queue, 'prev.noQueue') }}</div>
         <h3 style="margin-top:14px">{{ t('prev.characterQueue') }}</h3>
-        <div class="mono">{{ (res.relics && res.relics.character_queue || []).join(', ') || t('prev.noQueue') }}</div>
+        <div class="mono">{{ namedRelics(res.relics && res.relics.character_queue, 'prev.noQueue') }}</div>
         <div class="hint">{{ t('prev.relicNote') }}</div>
       </div>
 
@@ -173,6 +173,13 @@ const chars = computed(() => {
   const list = fromCat.length ? fromCat : BASE.map((id) => ({ id, name: id }))
   return list.map((c) => ({ label: c.name, value: c.id }))
 })
+function namedCards(ids) {
+  return (ids || []).map((id) => store.cardName(id)).join(' / ')
+}
+function namedRelics(ids, emptyKey) {
+  if (!ids || !ids.length) return t(emptyKey)
+  return ids.map((id) => store.relicName(id)).join(', ')
+}
 const neowIsIndex = computed(() => /^\d+$/.test(String(neow.value)))
 const neowHintText = computed(() => {
   if (neow.value === 'all') return t('prev.neowHint.all')

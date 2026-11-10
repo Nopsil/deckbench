@@ -1148,6 +1148,7 @@
  "page.decks.title": "组牌",
  "page.decks.sub": "搜索牌池、组成一套牌，并存成可以马上开打的战斗预设",
  "deck.pool": "牌池",
+ "deck.dummyName": "木桩",
  "deck.searchPh": "搜索中文名、英文名或 id",
  "deck.character": "角色",
  "deck.type": "类型",

@@ -298,7 +298,8 @@ def test_card_impact_endpoint_and_mcp_match_on_a_dummy(client, allowed, monkeypa
     assert child.status_code == 400 and "card-impact" in _detail(child).lower()
     exported = client.get(f"/api/runs/{body['id']}/export.html", headers=EN)
     assert exported.status_code == 200, exported.text
-    assert "YIHESHI" in exported.text and "Too small" in exported.text
+    assert "已核实" in exported.text and "Too small" in exported.text
+    assert "Yiheshi" not in exported.text and "CLAUDE STRIKE" not in exported.text
     assert "Traceback" not in exported.text
     assert _bytes(QUICK) == before
 

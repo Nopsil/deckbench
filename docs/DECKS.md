@@ -8,13 +8,13 @@
 
 ## 牌池 / Card pool
 
-牌来自模拟器启动时就会加载的 YAML：`sts2sim/builtin_cards.yaml`，以及 `mods/<名字>/cards.yaml`（还有界面用户 mod 目录里的同名文件）。不读取、也不分发游戏安装里的卡牌文本。一张牌带有 id、中文名、英文名、角色、类型、费用、稀有度和升级后费用。
+牌来自模拟器启动时就会加载的 YAML：`sts2sim/builtin_cards.yaml`，以及 `mods/<名字>/cards.yaml`（还有界面用户 mod 目录里的同名文件）。不读取进仓库、也不分发游戏安装里的卡牌文本。一张牌带有 id、名字、角色、类型、费用、稀有度和升级后费用。中文名和英文名有就带上，没有就空着。
 
-英文名优先用卡面上的英文（`name` 本身是英文，或 `name_en`）。没有单独英文名时，用 id 拆开的词，例如 `CLAUDE_STRIKE` 显示成 `Claude Strike`，搜索 `Strike` 或中文名 `打击` 都能找到。官方本地化如果在本机游戏里读得到，会补上缺的中文或英文标题，只在内存里用。
+英文名只用卡面上已经写的英文（`name` 本身不是中文，或 `name_en`），以及本机游戏安装里读到的官方标题。没有这些就留空。界面先显示当前语言的标题，没有就用卡面上的 `name`，再没有就显示 id。不把 id 拆成英文词。搜索仍同时匹配中文名、英文名、显示名和 id，所以 `CLAUDE_STRIKE` 用 `Strike` 或中文名 `打击` 都能找到。官方标题只在内存里用。
 
-*Cards come from the YAML the simulator already loads: `sts2sim/builtin_cards.yaml` and `mods/<name>/cards.yaml` (and the same files under the GUI's user-mod folder). Game-install card text is not read into the repository and is not shipped. Each card has an id, a Chinese name, an English name, a character, a type, a cost, a rarity and an upgraded cost.*
+*Cards come from the YAML the simulator already loads: `sts2sim/builtin_cards.yaml` and `mods/<name>/cards.yaml` (and the same files under the GUI's user-mod folder). Game-install card text is not read into the repository and is not shipped. Each card has an id, a name, a character, a type, a cost, a rarity and an upgraded cost. A Chinese name and an English name are included when they already exist, and left empty otherwise.*
 
-*The English name is the card's own English (`name` when it is English, or `name_en`). When there is no separate English name, the words in the id are used, so `CLAUDE_STRIKE` shows as `Claude Strike` and a search for `Strike` or the Chinese name `打击` both find it. Official localization fills a missing Chinese or English title when a local game install can be read. That text stays in memory.*
+*The English name is the card's own English (`name` when it is not Chinese, or `name_en`) or an official title read from the local install. Otherwise it stays empty. The page shows the title for the current language, then the card's `name`, then the id. Ids are not split into English words. Search still matches the Chinese name, the English name, the display name and the id, so `CLAUDE_STRIKE` is found by `Strike` or the Chinese name `打击`. Official titles stay in memory.*
 
 `GET /api/cards` 只读，分页。
 

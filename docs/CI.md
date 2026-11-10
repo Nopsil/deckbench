@@ -69,7 +69,7 @@ python -m pytest -q tests/test_gui_browser.py --browser chromium --screenshot on
 
 服务是源码里的 `python -m gui.app --serve`，绑一个空闲端口，不需要本机游戏。测试写一份空的卡牌缓存，这样目录接口不用去跑需要游戏数据的卡牌子进程。战斗实验的预设和 Windows 安装包冒烟一样：`claude_v34`、卡组 `probe_noengine`、`encounter: DUMMY`、1 回合。预设只在测试期间写到 `experiments/browser_smoke.yaml`，结束就删。
 
-`tests/test_gui_browser.py` 检查这些：主页面能打开且没有控制台错误（含 `#/calibrate` 和「决策说明」`#/explain`）；侧栏的简体中文（zh-CN）/ English 会换掉可见文案，选择写在 `localStorage` 的 `ui.lang`（`zhs` / `en`），刷新后还在；从界面点一场木桩，状态到完成；用 `tests/fixtures/calibrate/` 的样例对局和 `runs.jsonl` 打开校准页，缺口分诊一节能画出 `SAMPLE_ELITE`。
+`tests/test_gui_browser.py` 检查这些：主页面能打开且没有控制台错误（含 `#/calibrate` 和「决策说明」`#/explain`）；侧栏切到简体中文（zh-CN）后，新建测试、运行、对比、组牌（对打和单卡贡献）、校准、关于里的「检查更新」和本版更新面板上的文案都会换，选择写在 `localStorage` 的 `ui.lang`（`zhs`），刷新后还在；切回 English 同样记住。从界面点一场木桩，状态到完成；用 `tests/fixtures/calibrate/` 的样例对局和 `runs.jsonl` 打开校准页，缺口分诊一节能画出 `SAMPLE_ELITE`。
 
 没装 pytest-playwright 或 Chromium 时，这份测试在收集阶段就跳过。矩阵作业不装它们，所以那里的 `python -m pytest tests` 不会因为缺浏览器失败。
 
@@ -81,7 +81,7 @@ python -m pytest -q tests/test_gui_browser.py --browser chromium --screenshot on
 
 *The server is `python -m gui.app --serve` from source, on a free port, with no local game. The test writes an empty card cache so the catalog does not launch the card subprocess that needs game data. The combat preset matches the Windows package smoke: `claude_v34`, deck `probe_noengine`, `encounter: DUMMY`, one turn. The preset file `experiments/browser_smoke.yaml` exists only while the test runs.*
 
-*`tests/test_gui_browser.py` checks that the main pages open with no console errors (including `#/calibrate` and Decisions, `#/explain`); the sidebar 简体中文 (zh-CN) / English switch changes the visible strings and stores the choice in `localStorage` `ui.lang` (`zhs` / `en`) across a reload; a dummy fight started from the GUI reaches done; and the calibration page opened on `tests/fixtures/calibrate/` renders gap triage with `SAMPLE_ELITE`.*
+*`tests/test_gui_browser.py` checks that the main pages open with no console errors (including `#/calibrate` and Decisions, `#/explain`); after the sidebar switches to 简体中文 (zh-CN), labels change on New test, Running, Compare, Deck builder (head-to-head and card impact), Calibration, Check for updates in About, and the What's new panel. The choice is stored in `localStorage` `ui.lang` (`zhs`) and stays after a reload. Switching back to English is remembered the same way. A dummy fight started from the GUI reaches done, and the calibration page opened on `tests/fixtures/calibrate/` renders gap triage with `SAMPLE_ELITE`.*
 
 *Without pytest-playwright or Chromium the module is skipped at collection. The matrix job does not install them, so `python -m pytest tests` there does not fail for a missing browser.*
 

@@ -38,7 +38,6 @@ _ID = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,31}$")
 _MOD = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,40}$")
 _CARD_ID = re.compile(r"^[A-Za-z0-9_]{1,80}$")
 _CJK = re.compile(r"[\u3040-\u30ff\u4e00-\u9fff\uac00-\ud7af]")
-_WORDS = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|[0-9]+")
 _TYPE = {
     "攻击": "Attack", "Attack": "Attack", "attack": "Attack",
     "技能": "Skill", "Skill": "Skill", "skill": "Skill",
@@ -158,14 +157,6 @@ def _cost_key(cost):
     return str(cost)
 
 
-def _id_words(cid):
-    words = []
-    for part in re.split(r"[_\-]+", cid):
-        bits = _WORDS.findall(part)
-        words.extend(bits or [part])
-    return " ".join(words)[:80]
-
-
 def _loc_title(table, cid):
     if not isinstance(table, dict):
         return ""
@@ -199,8 +190,7 @@ def _names(raw, cid, eng, zhs):
         en = en or name
     zh = zh or _loc_title(zhs, cid)
     en = en or _loc_title(eng, cid)
-    if not en and cid.isascii():
-        en = _id_words(cid)
+    # 不把 id 拆成英文。没有卡面上的英文、也没有游戏安装里的标题时，英文名留空，界面回退到 name 或 id。
     return name, zh, en
 
 
@@ -420,7 +410,7 @@ def _check_filter(value, field, limit=40):
 
 
 def list_cards(q="", character="", type_id="", cost="", rarity="", mod="", offset=0, limit=40):
-    """分页、可筛选。q 同时匹配中文名、英文名（没有英文名时用 id 拆出的词）和 id。"""
+    """分页、可筛选。q 同时匹配中文名、英文名（只含卡面或游戏安装里已有的标题）和 id。"""
     q = _check_filter(q, "q", 80)
     character = _check_filter(character, "character")
     type_id = _check_filter(type_id, "type")
