@@ -1326,3 +1326,111 @@ def open_for_run(preset_id, run_dir):
     exp = _read_mapping(path, folder)
     parent = materialize_run_mod(exp, run_dir)
     return exp, parent
+
+
+def _load_user_preset(preset_id):
+    path = existing_user_preset(preset_id)
+    if path is None:
+        raise DeckPresetError("preset")
+    exp = _read_mapping(path, os.path.dirname(path))
+    if not isinstance(exp.get("user_deck"), dict):
+        raise DeckPresetError("preset")
+    return exp
+
+
+def _stored_encounters(exp):
+    extra = exp.get("extra")
+    if not isinstance(extra, list) or not extra:
+        raise DeckPresetError("no_encounter")
+    items = []
+    for row in extra:
+        if not isinstance(row, dict):
+            raise DeckPresetError("preset")
+        eid = row.get("encounter")
+        if not isinstance(eid, str) or not eid.strip():
+            raise DeckPresetError("preset")
+        _reject_path(eid)
+        fights = row.get("fights", 1)
+        items.append({"id": eid.strip(), "fights": fights})
+    chosen = resolve_encounters({"encounters": items}, allow_default=False)
+    if not chosen:
+        raise DeckPresetError("no_encounter")
+    return chosen
+
+
+def _stored_turns(exp, chosen):
+    turns = exp.get("max_turns")
+    if isinstance(turns, bool) or not isinstance(turns, int):
+        return preset_turns({}, chosen)
+    return _checked_turns(turns)
+
+
+def _stored_seed(exp):
+    seed = exp.get("seed")
+    if isinstance(seed, bool) or not isinstance(seed, int):
+        return 1
+    return _optional_seed({"seed": seed})
+
+
+def _stored_agent(exp):
+    agent = exp.get("agent")
+    if agent in ("heuristic", "beam"):
+        return agent
+    return "heuristic"
+
+
+def _encounter_override(payload):
+    if "encounters" in payload and payload["encounters"] is not None:
+        return True
+    gauntlet = payload.get("gauntlet")
+    return gauntlet not in (None, "")
+
+
+def head_to_head_plan(payload):
+    """两份用户预设对打时共用的遭遇、回合上限和种子。
+
+    没写 encounters / gauntlet 时用第一份预设自己的遭遇。
+    没写 max_turns / seed 时也用第一份。两份都打这一份名单，合计不超过 400 场。
+    不写文件，也不开跑。
+    """
+    if not isinstance(payload, dict):
+        raise DeckPresetError("bad_type", field="body", expected="object")
+    if any(key in payload for key in _BANNED_FIELDS):
+        raise DeckPresetError("path")
+    left = _require_str(payload, "a")
+    right = _require_str(payload, "b")
+    if not _ID.match(left) or not _ID.match(right):
+        raise DeckPresetError("bad_id")
+    if left == right:
+        raise DeckPresetError("same_deck")
+    exp_a = _load_user_preset(left)
+    exp_b = _load_user_preset(right)
+    if _encounter_override(payload):
+        chosen = resolve_encounters(payload, allow_default=False)
+        if not chosen:
+            raise DeckPresetError("no_encounter")
+    else:
+        chosen = _stored_encounters(exp_a)
+    if "max_turns" in payload and payload["max_turns"] is not None:
+        turns = _checked_turns(payload["max_turns"])
+    else:
+        turns = _stored_turns(exp_a, chosen)
+    if "seed" in payload and payload["seed"] is not None:
+        seed = _optional_seed({"seed": payload["seed"]})
+    else:
+        seed = _stored_seed(exp_a)
+    if "agent" in payload and payload["agent"] not in (None, ""):
+        agent = _optional_agent(payload)
+    else:
+        agent = _stored_agent(exp_a)
+    return {
+        "a": left,
+        "b": right,
+        "title_a": _clean_name(exp_a.get("title")) or left,
+        "title_b": _clean_name(exp_b.get("title")) or right,
+        "encounters": [{"id": enc["id"], "fights": enc["fights"]} for enc in chosen],
+        "fights": sum(enc["fights"] for enc in chosen),
+        "max_turns": turns,
+        "seed": seed,
+        "agent": agent,
+    }

@@ -1,6 +1,8 @@
 """两次已经跑完的战斗实验：按格子和按卡算差值。不新开模拟，不写文件。
 
-格子对齐键是（卡组 id，幕，房间）。差值一律是 B − A。
+格子对齐键是（卡组 id，幕，房间）。两边没有同一个卡组 id 时，
+同一幕、同一房间、且这一侧只有一套牌，才按幕和房间配对（两套不同的牌对打）。
+差值一律是 B − A。
 胜率和超时是比例：两比例 z 检验，并附上 Wilson 区间以及两个区间是否重叠。
 平均回合、掉血、每回合输出，在两侧都有逐场记录时用 Welch t 检验。
 只有 cells.csv 里的平均数时，差值照给，显著性为 null（没有方差，不能做 Welch）。
@@ -409,8 +411,13 @@ def _continuous(name, left, right, list_key, mean_key):
     return _means_metric(name, a, b, n_a, n_b)
 
 
-def _cell_row(key, left, right, names):
+def _cell_row(key, left, right, names, other=None):
     deck, act, room = key
+    label = names.get(deck) or deck
+    deck_id = deck
+    if other is not None and other != deck:
+        label = f"{label} / {names.get(other) or other}"
+        deck_id = f"{deck}/{other}"
     metrics = {
         "win": _proportion_metric("win", left.get("wins"), left.get("n"), right.get("wins"), right.get("n")),
         "timeout": _proportion_metric(
@@ -421,8 +428,8 @@ def _cell_row(key, left, right, names):
         "dpt": _continuous("dpt", left, right, "dpt", "dpt_mean"),
     }
     return {
-        "deck_id": deck,
-        "deck": names.get(deck) or deck,
+        "deck_id": deck_id,
+        "deck": label,
         "act": act,
         "room": room,
         "n_a": int(left.get("n") or 0),
@@ -442,8 +449,13 @@ def _missing_card(fights, samples):
     }
 
 
-def _card_row(key, left, right, names):
+def _card_row(key, left, right, names, other=None):
     deck, card = key
+    label = names.get(deck) or deck
+    deck_id = deck
+    if other is not None and other != deck:
+        label = f"{label} / {names.get(other) or other}"
+        deck_id = f"{deck}/{other}"
     use_samples = isinstance(left.get("samples"), list) and isinstance(right.get("samples"), list)
     if use_samples:
         usage = _welch_metric("usage", left["samples"], right["samples"])
@@ -465,8 +477,8 @@ def _card_row(key, left, right, names):
     a_eff = left.get("efficiency")
     b_eff = right.get("efficiency")
     return {
-        "deck_id": deck,
-        "deck": names.get(deck) or deck,
+        "deck_id": deck_id,
+        "deck": label,
         "card": card,
         "n_a": n_a,
         "n_b": n_b,
@@ -491,14 +503,36 @@ def _sort_key(key):
     return (deck, act_key, room)
 
 
-def compare_dirs(dir_a, dir_b):
-    """比较两个战斗输出目录（含 raw.jsonl，或 cells.csv / cards.csv）。"""
-    left = _load_side(dir_a)
-    right = _load_side(dir_b)
-    names = dict(left["names"])
-    names.update({deck: name for deck, name in right["names"].items() if name})
-    shared = sorted(set(left["cells"]) & set(right["cells"]), key=_sort_key)
-    cells = [_cell_row(key, left["cells"][key], right["cells"][key], names) for key in shared]
+def _place_key(place):
+    act, room = place
+    act_key = (0, act) if isinstance(act, int) else (1, str(act))
+    return (act_key, str(room))
+
+
+def _group_places(cells):
+    grouped = {}
+    for (deck, act, room), cell in cells.items():
+        grouped.setdefault((act, room), []).append((deck, cell))
+    return grouped
+
+
+def _place_pairs(left, right):
+    """卡组 id 对不上时，按幕和房间配。这一侧有不止一套牌就跳过，不猜哪套对哪套。"""
+    grouped_a = _group_places(left["cells"])
+    grouped_b = _group_places(right["cells"])
+    pairs = []
+    for place in sorted(set(grouped_a) & set(grouped_b), key=_place_key):
+        side_a = grouped_a[place]
+        side_b = grouped_b[place]
+        if len(side_a) != 1 or len(side_b) != 1:
+            continue
+        deck_a, cell_a = side_a[0]
+        deck_b, cell_b = side_b[0]
+        pairs.append(((deck_a, place[0], place[1]), (deck_b, place[0], place[1]), cell_a, cell_b))
+    return pairs
+
+
+def _shared_cards(shared, left, right, names):
     decks = {deck for deck, _act_value, _room in shared}
     decks |= {deck for deck, _card in left["cards"]} & {deck for deck, _card in right["cards"]}
     fights_a = {deck: len(rows) for deck, rows in left.get("fights", {}).items()}
@@ -517,6 +551,51 @@ def compare_dirs(dir_a, dir_b):
         if not (side_a.get("plays") or side_b.get("plays")):
             continue
         cards.append(_card_row(key, side_a, side_b, names))
+    return cards
+
+
+def _cross_cards(pairs, left, right, names):
+    if not pairs:
+        return []
+    deck_a = pairs[0][0][0]
+    deck_b = pairs[0][1][0]
+    if any(key_a[0] != deck_a or key_b[0] != deck_b for key_a, key_b, _cell_a, _cell_b in pairs):
+        return []
+    fights_a = len(left.get("fights", {}).get(deck_a, []))
+    fights_b = len(right.get("fights", {}).get(deck_b, []))
+    names_a = {card for deck, card in left["cards"] if deck == deck_a}
+    names_b = {card for deck, card in right["cards"] if deck == deck_b}
+    cards = []
+    for card in sorted(names_a | names_b):
+        key_a = (deck_a, card)
+        key_b = (deck_b, card)
+        sample_a = isinstance(left["cards"].get(key_a, {}).get("samples"), list) or left["source"] == "raw"
+        sample_b = isinstance(right["cards"].get(key_b, {}).get("samples"), list) or right["source"] == "raw"
+        side_a = left["cards"].get(key_a) or _missing_card(fights_a, sample_a and sample_b)
+        side_b = right["cards"].get(key_b) or _missing_card(fights_b, sample_a and sample_b)
+        if not (side_a.get("plays") or side_b.get("plays")):
+            continue
+        cards.append(_card_row(key_a, side_a, side_b, names, other=deck_b))
+    return cards
+
+
+def compare_dirs(dir_a, dir_b):
+    """比较两个战斗输出目录（含 raw.jsonl，或 cells.csv / cards.csv）。"""
+    left = _load_side(dir_a)
+    right = _load_side(dir_b)
+    names = dict(left["names"])
+    names.update({deck: name for deck, name in right["names"].items() if name})
+    shared = sorted(set(left["cells"]) & set(right["cells"]), key=_sort_key)
+    if shared:
+        cells = [_cell_row(key, left["cells"][key], right["cells"][key], names) for key in shared]
+        cards = _shared_cards(shared, left, right, names)
+    else:
+        pairs = _place_pairs(left, right)
+        cells = [
+            _cell_row(key_a, cell_a, cell_b, names, other=key_b[0])
+            for key_a, key_b, cell_a, cell_b in pairs
+        ]
+        cards = _cross_cards(pairs, left, right, names)
     return _finite({
         "sources": {"a": left["source"], "b": right["source"]},
         "cells": cells,

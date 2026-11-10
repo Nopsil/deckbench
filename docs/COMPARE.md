@@ -40,6 +40,10 @@
 
 *The numbers come from `sts2sim/stats.py` (Wilson, the two-proportion z-test, Welch) and `sts2sim/runcompare.py`. Cards played only in a probe room are left out, matching the combat report.*
 
+两套牌的 id 不一样时，同一个（卡组，幕，房间）对不上。这时如果这一幕、这一房间在每一侧都只有一套牌，就按幕和房间配对，格子上写成「A 的卡组 / B 的卡组」。这一侧有不止一套牌就不配，避免猜错。组牌对打走的就是这条，见 [DECKS.md](DECKS.md)。同一套牌的对比仍按卡组 id 对齐，数字不变。
+
+*When the deck ids differ, no (deck, act, room) key is shared. If that act and room has one deck on each side, the cells line up by act and room and the deck column reads "A's deck / B's deck". A side with more than one deck in that cell is left unpaired, so nothing is guessed. Deck head-to-head uses this path. See [DECKS.md](DECKS.md). A comparison of the same deck id still lines up by deck id, and those numbers stay the same.*
+
 ## MCP
 
 `compare_runs(a, b)` 返回同一份 `cells` 和 `cards`。`a`、`b` 可以是界面测试 id，或结果目录，或其中的 `raw.jsonl` / `cells.csv`。路径规则和 `batch_run_summary` 相同。`--import-only` 也提供这个工具。失败是 JSON：`{"ok": false, "read_only": true, "error": "..."}`，例如 `same_run`、`bad_type`、`not_found`、`not_done`、`not_combat`、`no_data`、`not_json`。
