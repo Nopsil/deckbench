@@ -328,7 +328,10 @@ def test_server_registers_analysis_tools_on_play_and_import_only():
     mcp = _load_mcp()
     play = mcp.build()
     names = [t.name for t in play._tool_manager.list_tools()]
-    assert names[-7:] == ["batch_run_summary", "card_ab", "compare_runs", "explain_fight", "calibrate", "gap_triage", "export_report"]
+    assert names[-10:] == [
+        "batch_run_summary", "card_ab", "compare_runs", "explain_fight", "calibrate", "gap_triage",
+        "export_report", "list_cards", "list_encounters", "save_deck",
+    ]
     tools = {t.name: t for t in play._tool_manager.list_tools()}
     assert tools["batch_run_summary"].parameters["required"] == ["path"]
     assert "sample_warning" in tools["batch_run_summary"].description
@@ -361,5 +364,6 @@ def test_server_registers_analysis_tools_on_play_and_import_only():
     assert only_names == [
         "import_save", "import_history_batch", "batch_run_summary", "card_ab", "compare_runs",
         "explain_fight", "calibrate", "gap_triage", "export_report",
+        "list_cards", "list_encounters", "save_deck",
     ]
     assert "seed_preview" not in only_names and "new_run" not in only_names

@@ -105,7 +105,8 @@
                 <span class="chip">{{ t('nt.nDecks', { n: preset.decks.length }) }}</span>
                 <span class="chip">{{ t('nt.roomsChip') }}{{ joinList(preset.rooms.map((r) => tr('room.', r))) }}</span>
                 <span class="chip">{{ t('nt.modChip', { mods: joinList(preset.mods) }) }}</span>
-                <span v-if="preset.n_extra" class="chip">{{ t('nt.loopProbe', { n: preset.n_extra }) }}</span>
+                <span v-if="preset.encounters && preset.encounters.length" class="chip">{{ t('nt.nEncounters', { n: preset.encounters.length }) }}</span>
+                <span v-else-if="preset.n_extra" class="chip">{{ t('nt.loopProbe', { n: preset.n_extra }) }}</span>
                 <span class="chip">{{ t('nt.defaultFights', { n: preset.fights }) }}</span>
               </div>
             </div>
@@ -138,6 +139,7 @@
                 <n-checkbox-group v-model:value="c.rooms"><div class="row"><n-checkbox v-for="r in cat.rooms" :key="r" :value="r" :label="tr('room.', r)" /></div></n-checkbox-group></div>
               <div><div class="label">{{ t('nt.maxTurns') }}</div><n-input-number v-model:value="c.max_turns" :min="1" :max="200" /></div>
             </div>
+            <encounter-picker v-model="c.encounters" scope="nt" />
           </div>
 
           <div class="panel">
@@ -187,6 +189,7 @@
               <div><span>{{ t('nt.mode') }}</span><b>{{ t('kind.combat') }}</b></div>
               <div><span>{{ t('nt.sourceShort') }}</span><b>{{ c.source === 'preset' ? (preset && preset.title) : t('nt.custom') }}</b></div>
               <div v-if="c.source === 'custom'"><span>{{ t('nt.decks') }}</span><b>{{ c.decks.length }}</b></div>
+              <div v-if="c.source === 'custom' && c.encounters.length"><span>{{ t('nt.encounters') }}</span><b>{{ c.encounters.length }}</b></div>
               <div><span>{{ t('nt.perCell') }}</span><b>{{ t('nt.nFights', { n: c.fights }) }}</b></div>
               <div><span>{{ t('nt.ai') }}</span><b>{{ store.agentName('combat', c.agent) }}</b></div>
               <div v-if="c.source === 'custom'"><span>{{ t('nt.totalFights') }}</span><b>{{ combatTotal }}</b></div>
@@ -208,6 +211,7 @@ import { useRouter } from 'vue-router'
 import { NButton, NCheckbox, NCheckboxGroup, NIcon, NInput, NInputNumber, NPopconfirm, NRadioButton, NRadioGroup, NSelect, NSlider, NSpin, NTag, NUpload, useMessage } from 'naive-ui'
 import { Route, Bolt as Swords, PlayerPlay, Package } from '@vicons/tabler'
 import CardPicker from '../components/CardPicker.vue'
+import EncounterPicker from '../components/EncounterPicker.vue'
 import { api, store, runTitle } from '../api'
 import { t, tr, joinList } from '../i18n'
 
@@ -221,7 +225,8 @@ const starting = ref(false)
 const uploading = ref(false)
 const saved = JSON.parse(localStorage.getItem('nt.form') || '{}')
 const b = reactive({ char: 'Ironclad', asc: 0, n: 100, start: 0, procs: 4, agent: 'heuristic', style: 'standard', variants: [], force: [], replace: [], gameSeed: '', ...(saved.b || {}) })
-const c = reactive({ source: 'preset', preset: 'quick', mods: ['vanilla'], decks: [], rooms: ['普通', '精英', '首领'], max_turns: 30, fights: 20, seed: 1, agent: 'heuristic', procs: 4, ...(saved.c || {}) })
+const c = reactive({ source: 'preset', preset: 'quick', mods: ['vanilla'], decks: [], rooms: ['普通', '精英', '首领'], max_turns: 30, fights: 20, seed: 1, agent: 'heuristic', procs: 4, encounters: [], ...(saved.c || {}) })
+if (!Array.isArray(c.encounters)) c.encounters = []
 watch([b, c, kind], () => {
   localStorage.setItem('nt.form', JSON.stringify({ b, c }))
   localStorage.setItem('nt.kind', kind.value)
@@ -269,6 +274,10 @@ function selDecks(g, how) {
   c.decks = rest
 }
 const combatTotal = computed(() => {
+  if (c.encounters.length) {
+    const fights = c.encounters.reduce((sum, row) => sum + (Number(row.fights) || 0), 0)
+    return c.decks.length * fights
+  }
   let n = 0
   for (const g of deckGroups.value) for (const d of g.decks) if (c.decks.includes(d.id)) n += (d.acts || [1]).length * c.rooms.length * c.fights
   return n
@@ -283,7 +292,7 @@ const styleBad = computed(() => {
   const st = ((cat.value && cat.value.styles) || []).find((x) => x.id === b.style)
   return st && !styleOk(st, b.agent) ? joinList(st.agents) : ''
 })
-const canStart = computed(() => kind.value === 'batch' ? b.n > 0 && !styleBad.value : (c.source === 'preset' ? !!c.preset : c.decks.length > 0 && c.rooms.length > 0))
+const canStart = computed(() => kind.value === 'batch' ? b.n > 0 && !styleBad.value : (c.source === 'preset' ? !!c.preset : c.decks.length > 0 && (c.encounters.length > 0 || c.rooms.length > 0)))
 
 async function start() {
   starting.value = true
@@ -291,7 +300,10 @@ async function start() {
     let params
     if (kind.value === 'batch') params = { char: b.char, asc: b.asc, n: gameSeedCanon.value ? 1 : b.n, start: b.start, procs: b.procs, agent: b.agent, style: b.style || 'standard', variants: b.char === 'Claude' ? b.variants : [], force: b.force, replace: b.replace, ...(gameSeedCanon.value ? { game_seed: gameSeedCanon.value } : {}) }
     else if (c.source === 'preset') params = { preset: c.preset, fights: c.fights, seed: c.seed, agent: c.agent, procs: c.procs }
-    else params = { mods: c.mods, decks: c.decks, rooms: c.rooms, max_turns: c.max_turns, fights: c.fights, seed: c.seed, agent: c.agent, procs: c.procs }
+    else {
+      params = { mods: c.mods, decks: c.decks, rooms: c.rooms, max_turns: c.max_turns, fights: c.fights, seed: c.seed, agent: c.agent, procs: c.procs }
+      if (c.encounters.length) params.encounters = c.encounters.map((row) => ({ id: row.id, fights: Number(row.fights) || 1 }))
+    }
     const m = await api.post('/api/runs', { kind: kind.value, params, title: title.value || autoTitle.value })
     store.loadRuns()
     router.push('/run/' + m.id)

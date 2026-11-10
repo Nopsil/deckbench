@@ -183,7 +183,10 @@ def _deck_http(err):
         return T("deck.err.too_big", n=params.get("n") or 0)
     key = "deck.err." + code
     if i18n.has(key):
-        return T(key)
+        kw = {}
+        if "n" in params:
+            kw["n"] = params["n"]
+        return T(key, **kw)
     return T("deck.err.cards")
 
 
@@ -202,6 +205,16 @@ def cards(
     from sts2sim.deckpresets import DeckPresetError, list_cards
     try:
         return list_cards(q, character, card_type, cost, rarity, mod, offset, limit)
+    except DeckPresetError as err:
+        raise HTTPException(400, _deck_http(err)) from err
+
+
+@app.get("/api/encounters")
+def encounters(q: str = "", act: str = "", room: str = "", offset: int = 0, limit: int = 40):
+    """只读遭遇名单。分页，可按幕和房间（normal / elite / boss）筛选。中文名和英文名都返回。"""
+    from sts2sim.deckpresets import DeckPresetError, list_encounters
+    try:
+        return list_encounters(q, act, room, offset, limit)
     except DeckPresetError as err:
         raise HTTPException(400, _deck_http(err)) from err
 

@@ -77,10 +77,16 @@
             <button type="button" data-upgrade :class="{ on: row.upgrade }" :title="t('deck.upgrade')" @click="row.upgrade = !row.upgrade">+</button>
             <button type="button" data-remove :title="t('deck.remove')" @click="remove(row)">×</button>
           </div>
+          <encounter-picker v-model="encounters" scope="deck" />
           <div class="field" data-deck="id"><div class="label">{{ t('deck.id') }}</div>
             <n-input v-model:value="deckId" maxlength="32" /></div>
           <div class="field" data-deck="name"><div class="label">{{ t('deck.name') }}</div>
             <n-input v-model:value="deckName" maxlength="80" /></div>
+          <div class="field">
+            <div class="label">{{ t('deck.maxTurns') }}</div>
+            <input data-deck="turns" type="number" :min="1" :max="turnLimit" :value="maxTurns" @input="onTurns" />
+            <div class="hint">{{ t('deck.maxTurnsHint') }}</div>
+          </div>
           <div data-deck="save">
             <n-button type="primary" block :loading="saving" :disabled="!canSave" @click="save">{{ t('deck.save') }}</n-button>
           </div>
@@ -94,8 +100,9 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { NButton, NInput, NSelect, useMessage } from 'naive-ui'
+import EncounterPicker from '../components/EncounterPicker.vue'
 import { api, store } from '../api'
 import { t, tr, lang } from '../i18n'
 
@@ -117,9 +124,38 @@ const rows = ref([])
 const deckMod = ref('')
 const deckId = ref('')
 const deckName = ref('')
+const encounters = ref([{ id: 'DUMMY', fights: 1 }])
+const maxTurns = ref(1)
+const fullTurns = ref(0)
+const turnLimit = ref(200)
+const turnsTouched = ref(false)
+const turnsReady = ref(false)
 const saving = ref(false)
 const savedId = ref('')
 let timer
+function onlyDummy(list) {
+  return (list || []).length > 0 && list.every((row) => row.id === 'DUMMY')
+}
+function applyTurnDefault() {
+  if (turnsTouched.value || !fullTurns.value) return
+  maxTurns.value = onlyDummy(encounters.value) ? 1 : fullTurns.value
+}
+watch(encounters, () => { savedId.value = ''; applyTurnDefault() }, { deep: true })
+function onTurns(event) {
+  turnsTouched.value = true
+  savedId.value = ''
+  const n = Number.parseInt(event.target.value, 10)
+  if (Number.isFinite(n)) maxTurns.value = n
+}
+async function loadTurnCap() {
+  try {
+    const data = await api.get('/api/encounters?limit=1')
+    if (data.full_turns) fullTurns.value = data.full_turns
+    if (data.turn_limit) turnLimit.value = data.turn_limit
+    applyTurnDefault()
+  } catch (e) { /* omitted max_turns still uses the server default */ }
+  finally { turnsReady.value = true }
+}
 
 const any = () => ({ label: t('deck.any'), value: '' })
 function opt(list) { return [any(), ...(list || []).map((v) => ({ label: v, value: v }))] }
@@ -243,7 +279,7 @@ const splitSegs = computed(() => {
     return seg
   }).filter((seg) => seg.w > 0)
 })
-const canSave = computed(() => /^[A-Za-z][A-Za-z0-9_]{0,31}$/.test(deckId.value.trim()) && deckName.value.trim() && rows.value.length > 0 && !!deckMod.value && !saving.value)
+const canSave = computed(() => /^[A-Za-z][A-Za-z0-9_]{0,31}$/.test(deckId.value.trim()) && deckName.value.trim() && rows.value.length > 0 && !!deckMod.value && encounters.value.length > 0 && !saving.value)
 
 async function save() {
   if (!canSave.value) return
@@ -255,7 +291,9 @@ async function save() {
       name: deckName.value.trim(),
       mod: deckMod.value,
       cards: rows.value.map((row) => ({ id: row.id, count: row.count, upgrade: !!row.upgrade })),
+      encounters: encounters.value.map((row) => ({ id: row.id, fights: Number(row.fights) || 1 })),
     }
+    if (turnsTouched.value || (turnsReady.value && fullTurns.value)) body.max_turns = maxTurns.value
     const saved = await api.post('/api/decks', body)
     savedId.value = saved.id
     await store.loadCatalog()
@@ -265,7 +303,7 @@ async function save() {
     saving.value = false
   }
 }
-onMounted(load)
+onMounted(() => { load(); loadTurnCap() })
 </script>
 
 <style scoped>
@@ -292,6 +330,7 @@ svg { width: 100%; height: auto; display: block; margin: 4px 0 10px; }
 .drow [data-upgrade].on { background: rgba(217,119,87,.3); color: #F0A486; }
 .up { color: #F0A486; margin-left: 4px; }
 .field { margin: 10px 0; }
+.field input[type="number"] { width: 100%; box-sizing: border-box; background: #1A1A1E; color: #EDE9E3; border: 1px solid #2E2E34; border-radius: 8px; padding: 6px 8px; font: inherit; }
 .hint.warn { color: #E0A86C; }
 .hint.ok { color: #8FBF8F; }
 @media (max-width: 980px) {

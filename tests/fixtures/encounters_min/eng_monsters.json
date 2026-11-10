@@ -1,0 +1,18 @@
+[
+  {
+    "id": "NIB",
+    "name": "Nib",
+    "min_hp": 12,
+    "max_hp": 12,
+    "moves": [
+      {"id": "IDLE", "name": "Idle", "intent": "Unknown"}
+    ],
+    "attack_pattern": {
+      "type": "cycle",
+      "initial_move": "IDLE",
+      "states": [
+        {"id": "IDLE_MOVE", "type": "move", "move_id": "IDLE", "next": "IDLE_MOVE"}
+      ]
+    }
+  }
+]

@@ -5,7 +5,7 @@
 CI 的 Ubuntu 作业设置 ``DECKBENCH_BROWSER_REQUIRED=1``，缺了就失败而不是跳过。
 
 服务从源码起（``python -m gui.app --serve``），绑一个空闲端口。不需要本机游戏数据：
-卡牌目录用一份空缓存，战斗实验用和安装包冒烟相同的训练木桩
+卡牌目录用一份空缓存，遭遇名单用合成夹具（不是游戏文件），战斗实验用和安装包冒烟相同的训练木桩
 （``claude_v34`` / ``probe_noengine`` / ``encounter: DUMMY`` / 1 回合）。
 预设写在 ``experiments/browser_smoke.yaml``，测完就删，不进仓库。
 
@@ -14,7 +14,8 @@ The module is skipped when pytest-playwright or Chromium is missing, so
 ``python -m pytest -q tests`` still passes. The Ubuntu CI job sets
 ``DECKBENCH_BROWSER_REQUIRED=1`` and fails instead of skipping.
 The server is ``python -m gui.app --serve`` on a free port. No local game
-data: an empty card cache, and the same training dummy as the package smoke
+data: an empty card cache, a synthetic encounter fixture (not game files),
+and the same training dummy as the package smoke
 (``claude_v34`` / ``probe_noengine`` / ``encounter: DUMMY`` / one turn).*
 """
 import atexit
@@ -38,6 +39,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 DIST_INDEX = ROOT / "gui" / "web" / "dist" / "index.html"
 PRESET = ROOT / "experiments" / "browser_smoke.yaml"
+ENCOUNTERS = ROOT / "tests" / "fixtures" / "encounters_min"
 REAL_RUN = ROOT / "tests" / "fixtures" / "calibrate" / "real.run"
 SIMS = ROOT / "tests" / "fixtures" / "calibrate" / "sims.jsonl"
 PRESET_TEXT = """name: browser_smoke
@@ -130,6 +132,7 @@ def _server_env(data, tmp):
     env["DECKBENCH_CACHE"] = str(tmp / "deckbench-cache")
     env["DECKBENCH_ANALYSIS_ROOTS"] = str(data)
     env["DECKBENCH_MCP_RUNS"] = str(tmp / "no-mcp")
+    env["DECKBENCH_CODEX_DIR"] = str(ENCOUNTERS)
     env["DECKBENCH_NO_DIALOG"] = "1"
     env["DECKBENCH_MENTOR_NO_DEFAULTS"] = "1"
     env["PYTHONUNBUFFERED"] = "1"
@@ -555,3 +558,65 @@ def test_deck_builder_saves_a_preset_and_starts_a_dummy_run(gui):
     gui.expect(page.locator(".n-tag").filter(has_text="Done")).to_be_visible()
     gui.expect(page.get_by_text("preset browserdeck", exact=True)).to_be_visible()
     _assert_clean(gui, "deck-run")
+
+
+def test_deck_builder_saves_two_encounters_and_runs_them(gui):
+    """勾选两场遭遇（第 1 幕精英连战），存成预设，再从新建测试打完。"""
+    page = gui.page
+    page.goto(gui.base + "/#/decks", wait_until="domcontentloaded")
+    gui.expect(page.locator("[data-page='decks']")).to_be_visible()
+    gui.expect(page.locator("[data-gauntlet='act1_elite']")).to_be_visible()
+    page.locator("[data-gauntlet='act1_elite']").click()
+    gui.expect(page.locator("[data-selected='NIB_ELITE_A']")).to_be_visible()
+    gui.expect(page.locator("[data-selected='NIB_ELITE_B']")).to_be_visible()
+    gui.expect(page.locator("[data-selected='DUMMY']")).to_have_count(0)
+
+    search = page.locator("[data-deck='search'] input")
+    search.fill("YIHESHI")
+    first = page.locator("[data-card='claude_v34:YIHESHI']")
+    gui.expect(first).to_be_visible()
+    first.locator("[data-add]").click()
+    search.fill("XIAOBENBEN")
+    second = page.locator("[data-card='claude_v34:XIAOBENBEN']")
+    gui.expect(second).to_be_visible()
+    second.locator("[data-add]").click()
+
+    page.locator("[data-deck='id'] input").fill("twoenc")
+    page.locator("[data-deck='name'] input").fill("Two encounters")
+    page.locator("[data-deck='save'] button").click()
+    gui.expect(page.locator("[data-deck='saved']")).to_have_text("Saved preset twoenc")
+    saved = (gui.data / "presets" / "twoenc.yaml").read_text(encoding="utf-8")
+    from sts2sim.deckpresets import full_fight_turns
+    cap = full_fight_turns()
+    assert cap > 1
+    gui.expect(page.locator("[data-deck='turns']")).to_have_value(str(cap))
+    assert "NIB_ELITE_A" in saved and "NIB_ELITE_B" in saved
+    assert "DUMMY" not in saved
+    assert f"max_turns: {cap}" in saved
+    _save_shot(page, "deck-encounters.png")
+    _assert_clean(gui, "two-encounters")
+
+    page.goto(gui.base + "/#/new", wait_until="domcontentloaded")
+    gui.expect(page.get_by_text("Combat test", exact=True).first).to_be_visible()
+    page.locator("button.mode").filter(has_text="Combat test").click()
+    page.locator(".form .n-select").filter(has_text="(quick)").click()
+    page.locator(".n-base-select-option").filter(has_text="twoenc").click()
+    gui.expect(page.get_by_text("Two encounters", exact=True).first).to_be_visible()
+    page.get_by_role("button", name="Start", exact=True).click()
+    page.wait_for_url("**/#/run/*")
+    from playwright.sync_api import TimeoutError as PlaywrightTimeout
+    try:
+        page.get_by_role("button", name="View report").wait_for(timeout=120_000)
+    except PlaywrightTimeout as exc:
+        raise AssertionError(
+            "two-encounter deck did not reach done\n" + _run_log_tail(gui.data)
+        ) from exc
+    gui.expect(page.locator(".n-tag").filter(has_text="Done")).to_be_visible()
+    rid = page.url.rstrip("/").split("/run/")[-1]
+    raw_path = gui.data / "runs" / rid / "out" / "raw.jsonl"
+    fights = [json.loads(line) for line in raw_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert [row["encounter"] for row in fights] == ["NIB_ELITE_A", "NIB_ELITE_B"]
+    assert fights[0]["enc_name"] == "小钉精英甲"
+    decided = [row for row in fights if row["result"] in ("win", "loss")]
+    assert decided and len(decided) * 2 >= len(fights)
+    _assert_clean(gui, "two-encounter-run")

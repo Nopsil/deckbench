@@ -131,6 +131,56 @@ def worker_argv(*args, agent=""):
     return [sys.executable, "-m", "gui.worker", *args]
 
 
+def _deck_run_error(err):
+    """把组牌校验失败收成一句界面上的话。不带用户输入，也不带堆栈。"""
+    code = getattr(err, "code", "")
+    params = getattr(err, "params", None) or {}
+    if code == "missing":
+        return ValueError(i18n.t("api.err.missing", field=params.get("field") or "request"))
+    if code == "bad_type":
+        expected = i18n.t("api.type." + str(params.get("expected") or "string"))
+        return ValueError(i18n.t("api.err.bad_type", field=params.get("field") or "request", expected=expected))
+    key = "deck.err." + str(code)
+    kw = {}
+    if "n" in params:
+        kw["n"] = params["n"]
+    if i18n.has(key):
+        return ValueError(i18n.t(key, **kw))
+    return ValueError(i18n.t("deck.err.preset"))
+
+
+def _apply_run_encounters(exp, params):
+    """自定义战斗如果点了遭遇，就写成 extra，不再从房间里抽。出厂预设不受影响。"""
+    if not isinstance(params, dict) or params.get("preset"):
+        return
+    if not params.get("encounters") and not params.get("gauntlet"):
+        return
+    from sts2sim.deckpresets import (
+        MAX_FIGHTS_TOTAL,
+        DeckPresetError,
+        fight_rows,
+        preset_turns,
+        resolve_encounters,
+    )
+    try:
+        chosen = resolve_encounters(params, allow_default=False)
+    except DeckPresetError as err:
+        raise _deck_run_error(err) from err
+    if not chosen:
+        return
+    decks = [deck for deck in (exp.get("decks") or []) if isinstance(deck, str) and deck]
+    total = len(decks) * sum(item["fights"] for item in chosen)
+    if not decks or total < 1 or total > MAX_FIGHTS_TOTAL:
+        raise _deck_run_error(DeckPresetError("too_many_fights", n=MAX_FIGHTS_TOTAL))
+    try:
+        turns = preset_turns(params, chosen)
+    except DeckPresetError as err:
+        raise _deck_run_error(err) from err
+    exp["max_turns"] = turns
+    exp["extra"] = fight_rows(decks, chosen, turns)
+    exp["rooms"] = []
+
+
 def worker_env(agent=""):
     env = dict(os.environ)
     gui_parent = os.path.dirname(paths.APP_DIR) if not paths.FROZEN else ""
@@ -242,7 +292,8 @@ class LocalPythonBackend(SimBackend):
             out.append({"id": e["id"], "name": e.get("name"), "title": e.get("title") or e.get("name"),
                         "mods": e.get("mods", []), "decks": e.get("decks", []), "rooms": e.get("rooms", []),
                         "fights": e.get("fights", 1), "max_turns": e.get("max_turns", 1), "agent": e.get("agent", "heuristic"),
-                        "seed": e.get("seed", 1), "n_extra": e.get("n_extra", 0), "user": True})
+                        "seed": e.get("seed", 1), "n_extra": e.get("n_extra", 0),
+                        "encounters": e.get("encounters") or [], "user": True})
         return out
 
     def encounter_names(self, lang=None):
@@ -354,6 +405,7 @@ class LocalPythonBackend(SimBackend):
             exp["fights"] = int(p.get("fights", exp.get("fights", 50)))
             exp["agent"] = p.get("agent") or exp.get("agent", "heuristic")
             exp.pop("user_deck", None)
+            _apply_run_encounters(exp, p)
             ef = os.path.join(run_dir, "experiment.yaml")
             yaml.safe_dump(exp, open(ef, "w", encoding="utf-8"), allow_unicode=True, sort_keys=False)
             argv = worker_argv("combat", ef, "--jobs", str(int(p.get("procs") or os.cpu_count() or 1)),
