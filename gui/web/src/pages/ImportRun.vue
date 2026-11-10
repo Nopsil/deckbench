@@ -38,6 +38,47 @@
         <div v-if="badCount && !okCount" class="hint warn">{{ t('imp.allUnreadable') }}</div>
         <div v-else-if="badCount" class="hint warn">{{ t('imp.someUnreadable', { bad: badCount, ok: okCount }) }}</div>
         <div v-else class="hint">{{ t('imp.pickRun') }}</div>
+        <div v-if="batch || batchError" class="batch-block">
+          <div class="label">{{ t('imp.batch') }}</div>
+          <div v-if="batchError" class="hint warn">{{ batchError }}</div>
+          <template v-else>
+            <div class="batch-totals">{{ t('imp.batch.totals', batchTotals) }}</div>
+            <div v-if="batchTotals.ok" class="hint">{{ t('imp.batch.results', batchTotals) }}</div>
+            <div v-if="!batchRows.length" class="hint">{{ t('imp.batchEmpty') }}</div>
+            <table v-else class="runs">
+              <thead>
+                <tr>
+                  <th>{{ t('imp.file') }}</th>
+                  <th>{{ t('imp.status') }}</th>
+                  <th>{{ t('imp.seed') }}</th>
+                  <th>{{ t('imp.character') }}</th>
+                  <th>{{ t('imp.ascension') }}</th>
+                  <th>{{ t('imp.floors') }}</th>
+                  <th>{{ t('imp.result') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(item, i) in batchRows" :key="item.status + ':' + item.file + ':' + i"
+                    :data-status="item.status"
+                    :class="{ on: batchOn(item), bad: item.status === 'error', skip: item.status === 'skipped' }"
+                    @click="pickBatch(item)">
+                  <td class="mono">{{ item.file || t('common.none') }}</td>
+                  <td><span :class="'st st-' + item.status">{{ statusText(item.status) }}</span></td>
+                  <template v-if="item.status === 'ok'">
+                    <td class="mono">{{ item.row.seed || t('common.none') }}</td>
+                    <td>{{ item.row.character || t('common.none') }}</td>
+                    <td>A{{ item.row.ascension }}</td>
+                    <td>{{ item.row.floors }}</td>
+                    <td>{{ item.row.result ? t('imp.result.' + item.row.result) : t('imp.noResult') }}</td>
+                  </template>
+                  <template v-else>
+                    <td colspan="5" :class="item.status === 'error' ? 'bad-cell' : ''">{{ reasonText(item) }}</td>
+                  </template>
+                </tr>
+              </tbody>
+            </table>
+          </template>
+        </div>
         <table class="runs">
           <thead>
             <tr>
@@ -99,6 +140,8 @@ const doc = ref(null)
 const error = ref('')
 const discoverError = ref('')
 const selected = ref(null)
+const batch = ref(null)
+const batchError = ref('')
 
 const run = computed(() => {
   if (!doc.value) return null
@@ -107,6 +150,34 @@ const run = computed(() => {
 })
 const badCount = computed(() => ((doc.value && doc.value.entries) || []).filter((e) => !e.run).length)
 const okCount = computed(() => ((doc.value && doc.value.entries) || []).filter((e) => e.run).length)
+const batchRows = computed(() => {
+  const rows = Array.isArray(batch.value) ? batch.value : []
+  const out = []
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue
+    if (row.error === 'truncated' && !row.file) continue
+    if (row.error) out.push({ file: row.file || '', status: 'error', row })
+    else out.push({ file: row.file || '', status: 'ok', row })
+  }
+  const entries = (doc.value && doc.value.entries) || []
+  for (const entry of entries) {
+    if (entry && (entry.role === 'current' || entry.role === 'current_mp')) {
+      out.push({ file: entry.file || '', status: 'skipped', entry })
+    }
+  }
+  return out
+})
+const batchTotals = computed(() => {
+  const tot = { ok: 0, skipped: 0, error: 0, won: 0, lost: 0, abandoned: 0, open: 0 }
+  for (const item of batchRows.value) {
+    tot[item.status] += 1
+    if (item.status !== 'ok') continue
+    const result = item.row && item.row.result
+    if (result === 'won' || result === 'lost' || result === 'abandoned') tot[result] += 1
+    else tot.open += 1
+  }
+  return tot
+})
 
 function qstr(v) {
   if (Array.isArray(v)) v = v[0]
@@ -131,25 +202,63 @@ function who(r) {
 function pick(e) {
   if (e && e.run) selected.value = e
 }
+function statusText(status) {
+  if (status === 'ok') return t('imp.status.ok')
+  if (status === 'skipped') return t('imp.status.skipped')
+  return t('imp.status.error')
+}
+function reasonText(item) {
+  if (item && item.status === 'error') return errText({ code: item.row && item.row.error })
+  return t('imp.batch.skipReason')
+}
+function batchOn(item) {
+  if (!item || item.status === 'error' || !item.file || !selected.value) return false
+  if (selected.value.file !== item.file) return false
+  if (item.status === 'skipped') return selected.value.role === 'current' || selected.value.role === 'current_mp'
+  return true
+}
+function pickBatch(item) {
+  if (!item || item.status === 'error' || !doc.value || !item.file) return
+  const hit = (doc.value.entries || []).find((e) => e.file === item.file && e.run && (
+    item.status !== 'skipped' || e.role === 'current' || e.role === 'current_mp'
+  ))
+  if (hit) selected.value = hit
+}
+function clearBatch() {
+  batch.value = null
+  batchError.value = ''
+}
 async function loadPath() {
   if (!path.value.trim()) {
     doc.value = null
     selected.value = null
+    clearBatch()
     error.value = t('imp.needPath')
     return
   }
   loading.value = true
   error.value = ''
   selected.value = null
+  clearBatch()
   try {
-    doc.value = await api.post('/api/import', { path: path.value.trim() })
-    if (doc.value.kind === 'folder') selected.value = (doc.value.entries || []).find((e) => e.run) || null
-  } catch (e) { doc.value = null; error.value = e.message; msg.error(e.message) }
+    const p = path.value.trim()
+    doc.value = await api.post('/api/import', { path: p })
+    if (doc.value.kind === 'folder') {
+      selected.value = (doc.value.entries || []).find((e) => e.run) || null
+      try {
+        batch.value = await api.post('/api/import/batch', { path: p })
+      } catch (e) {
+        batch.value = null
+        batchError.value = e.message
+      }
+    }
+  } catch (e) { doc.value = null; clearBatch(); error.value = e.message; msg.error(e.message) }
   finally { loading.value = false }
 }
 async function upload({ file, onFinish, onError }) {
   loading.value = true
   error.value = ''
+  clearBatch()
   const fd = new FormData()
   fd.append('file', file.file)
   const name = (file && file.name) || ''
@@ -190,12 +299,19 @@ watch(() => route.query.path, (v, prev) => { if (qstr(v) && qstr(v) !== qstr(pre
 .roots { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .root { text-align: left; background: #26262B; border: 1px solid #2E2E34; color: inherit; border-radius: 10px; padding: 8px 12px; cursor: pointer; display: flex; justify-content: space-between; gap: 12px; }
 .root:hover { border-color: #D97757; }
+.batch-block { margin-top: 14px; }
+.batch-totals { color: #CFCAC2; font-size: 13px; margin-top: 6px; }
+.st { font-weight: 650; }
+.st-ok { color: #8FCB9B; }
+.st-skipped { color: #B9B4AC; }
+.st-error { color: #E0A86C; }
 .runs { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
 .runs th { text-align: left; color: #9C978F; font-weight: 600; padding: 6px 8px; }
 .runs td { padding: 8px; border-top: 1px solid #2A2A30; }
 .runs tr.on td { background: rgba(217,119,87,.12); }
 .runs tbody tr { cursor: pointer; }
 .runs tbody tr.bad { cursor: default; }
+.runs tr.skip td { background: rgba(156, 151, 143, .06); }
 .runs tr.bad td { background: rgba(224, 108, 108, .06); }
 .bad-cell { color: #E0A86C; }
 .state { text-align: center; }

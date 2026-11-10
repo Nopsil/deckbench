@@ -334,3 +334,129 @@ def test_seed_preview_stub_json_matches_the_page(client, monkeypatch):
     assert skipped["character"] == "Silent" and skipped["ascension"] == 10
     assert skipped["after_neow"] == {}
     assert skipped["seed"] == "ABCDEFGHJKLM"
+
+
+_PAGE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "gui", "web", "src", "pages", "ImportRun.vue")
+_BATCH_KEYS = (
+    "imp.batch", "imp.batchEmpty", "imp.batch.totals", "imp.batch.results", "imp.batch.skipReason",
+    "imp.status", "imp.status.ok", "imp.status.skipped", "imp.status.error", "imp.floors", "imp.noResult",
+)
+
+
+def _page_batch_rows(batch_rows, entries):
+    """导入页把 POST /api/import/batch 的行和目录条目收成 ok / skipped / error。
+
+    没有 file 的 truncated 行不计入。history 里读不开的是 error。
+    role 为 current / current_mp 的条目是 skipped（批量摘要本来就不收它们）。
+    """
+    out = []
+    for row in batch_rows:
+        if not isinstance(row, dict):
+            continue
+        if row.get("error") == "truncated" and not row.get("file"):
+            continue
+        if row.get("error"):
+            out.append({"file": row.get("file") or "", "status": "error", "reason": row.get("error")})
+        else:
+            item = {
+                "file": row.get("file") or "",
+                "status": "ok",
+                "seed": row.get("seed"),
+                "character": row.get("character"),
+                "floors": row.get("floors"),
+            }
+            if "result" in row:
+                item["result"] = row["result"]
+            out.append(item)
+    for entry in entries:
+        if isinstance(entry, dict) and entry.get("role") in ("current", "current_mp"):
+            out.append({"file": entry.get("file") or "", "status": "skipped", "reason": "not_history"})
+    totals = {name: sum(1 for row in out if row["status"] == name) for name in ("ok", "skipped", "error")}
+    won = sum(1 for row in out if row["status"] == "ok" and row.get("result") == "won")
+    lost = sum(1 for row in out if row["status"] == "ok" and row.get("result") == "lost")
+    abandoned = sum(1 for row in out if row["status"] == "ok" and row.get("result") == "abandoned")
+    open_n = sum(1 for row in out if row["status"] == "ok" and "result" not in row)
+    totals.update(won=won, lost=lost, abandoned=abandoned, open=open_n)
+    return out, totals
+
+
+def test_import_page_batch_summary_statuses(client, tmp_path):
+    """目录导入用现成的 /api/import/batch：ok / skipped / error 和合计。单文件仍是 kind=run。"""
+    pytest.importorskip("python_multipart")
+    page = open(_PAGE, encoding="utf-8").read()
+    assert page.count("/api/import/batch") == 1
+    assert "/api/import/batch-summary" not in page
+    folder_at = page.find("doc.value.kind === 'folder'")
+    batch_at = page.find("/api/import/batch")
+    upload_at = page.find("async function upload")
+    assert 0 <= folder_at < batch_at < upload_at
+    assert "row.error === 'truncated'" in page
+    assert "entry.role === 'current'" in page and "entry.role === 'current_mp'" in page
+    assert "status: 'ok'" in page and "status: 'error'" in page and "status: 'skipped'" in page
+    for key in _BATCH_KEYS:
+        assert key in page
+    assert "api.upload('/api/import/upload'" in page[upload_at:]
+
+    saves = tmp_path / "saves"
+    hist = saves / "history"
+    hist.mkdir(parents=True)
+    shutil.copyfile(HIST, hist / "sample_history.run")
+    shutil.copyfile(HIST, hist / "2.run")
+    shutil.copyfile(LIVE, hist / "2.run.backup")
+    (hist / "bad.run").write_bytes(b"\x00nope")
+    (hist / "notes.txt").write_text("ignore", encoding="utf-8")
+    shutil.copyfile(LIVE, saves / "current_run.save")
+    shutil.copyfile(LIVE, saves / "current_run_mp.save")
+    (saves / "progress.save").write_text("{}", encoding="utf-8")
+    before = _snapshot(saves)
+    fixtures = _snapshot(FIX)
+
+    batch = _post_batch(client, str(saves))
+    assert batch.status_code == 200, batch.text
+    folder = _post_import(client, str(saves))
+    assert folder.status_code == 200, folder.text
+    assert folder.json()["kind"] == "folder"
+    rows, totals = _page_batch_rows(batch.json(), folder.json()["entries"])
+    assert [row["status"] for row in rows] == ["ok", "error", "ok", "skipped", "skipped"]
+    assert [row["file"] for row in rows] == [
+        "2.run", "bad.run", "sample_history.run", "current_run.save", "current_run_mp.save",
+    ]
+    assert rows[1]["reason"] == "not_json"
+    assert rows[0]["result"] == "lost" and rows[2]["seed"] == "SAMPLESEED01"
+    assert totals == {"ok": 2, "skipped": 2, "error": 1, "won": 0, "lost": 2, "abandoned": 0, "open": 0}
+    assert all(row.get("file") != "2.run.backup" for row in batch.json())
+    assert all(row.get("file") != "current_run.save" for row in batch.json())
+    assert all(entry.get("file") != "2.run.backup" for entry in folder.json()["entries"])
+    assert _snapshot(saves) == before
+
+    one = _post_import(client, HIST)
+    assert one.status_code == 200, one.text
+    assert one.json()["kind"] == "run" and one.json()["run"]["seed"] == "SAMPLESEED01"
+    assert "highlights" not in one.json()["run"]
+    uploaded = _upload(client, HIST)
+    assert uploaded.status_code == 200, uploaded.text
+    assert uploaded.json()["kind"] == "run" and uploaded.json()["run"]["filename"] == "sample_history.run"
+    assert _snapshot(FIX) == fixtures
+
+    only = tmp_path / "only-current"
+    only.mkdir()
+    shutil.copyfile(LIVE, only / "current_run.save")
+    only_before = _snapshot(only)
+    empty_batch = _post_batch(client, str(only))
+    only_folder = _post_import(client, str(only))
+    assert empty_batch.status_code == 200 and empty_batch.json() == []
+    skipped_rows, skipped_totals = _page_batch_rows(empty_batch.json(), only_folder.json()["entries"])
+    assert skipped_rows == [{"file": "current_run.save", "status": "skipped", "reason": "not_history"}]
+    assert skipped_totals["ok"] == 0 and skipped_totals["skipped"] == 1 and skipped_totals["error"] == 0
+    assert _snapshot(only) == only_before
+
+    synthetic, synthetic_totals = _page_batch_rows(
+        [{"file": "a.run", "seed": "AAA", "ascension": 0, "character": "Ironclad", "floors": 1},
+         {"error": "truncated", "n": 1}],
+        [],
+    )
+    assert synthetic == [{
+        "file": "a.run", "status": "ok", "seed": "AAA", "character": "Ironclad", "floors": 1,
+    }]
+    assert "result" not in synthetic[0]
+    assert synthetic_totals == {"ok": 1, "skipped": 0, "error": 0, "won": 0, "lost": 0, "abandoned": 0, "open": 1}

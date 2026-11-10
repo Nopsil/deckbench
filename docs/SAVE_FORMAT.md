@@ -105,7 +105,10 @@ python tools/import_run.py path/to/saves/history --batch-summary --lines
 
 *`--batch-summary` prints one JSON array for every readable history run. Keys are `file`, `seed`, `ascension`, `character`, `floors`, plus `result` (`won`, `lost`, `abandoned`) when the file records an ending. Unreadable history files stay in the array with a `SaveImportError` code and do not stop the scan. `current_run.save` is left out of a folder batch. `--lines` prints one JSON object per line. The command does not modify saves.*
 
-图形界面左侧 **导入对局**：贴路径、选文件，或点「查找本机存档」。地址 `#/import?path=` 后面也可以直接带文件路径。只读，不会改你的存档。
+图形界面左侧 **导入对局**：贴路径、选文件，或点「查找本机存档」。地址 `#/import?path=` 后面也可以直接带文件路径。打开存档目录或 `history` 时，这一页用下面的 `POST /api/import/batch` 列出每个文件是 ok、skipped（进行中的 `current_run.save` / `current_run_mp.save`）还是 error（带原因），并给出合计。单个文件和上传仍只显示这一局。只读，不会改你的存档。
+
+*On **Import run**, a save folder or `history` folder lists each file as ok, skipped (in-progress `current_run.save` / `current_run_mp.save`), or error with a reason, plus totals, from `POST /api/import/batch`. A single file or an upload still shows that one run. Read-only.*
+
 接口（只监听本机）：
 
 - `POST /api/import`，正文 `{"path": "..."}` 
