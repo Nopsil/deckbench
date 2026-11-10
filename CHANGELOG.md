@@ -2,9 +2,9 @@
 
 ## 未发布（0.1.5） / Unreleased (0.1.5)
 
-这些功能已经在 `main`（PR #4，以及随后的 #6–#52）。#40 把这一节对齐到 #39。其后按合并顺序是 #41、#43、#42、#44、#45、#46、#47、#48、#49、#50、#51、#52。版本号是 `0.1.5`（`sts2sim.__version__`、界面 `package.json`、Windows 打包脚本的默认 `-Version`）。发布说明在 `docs/RELEASE_0.1.5.md`。文档目录在 `docs/INDEX.md`。下面先写界面浏览器冒烟，再写 #41–#52，然后是更早的 #4 与 #6–#40。原有条目都留着。#49 的命令行分诊和 #51 的页面 / HTTP / MCP 是同一份报告，合成一条，细节都在。
+这些功能已经在 `main`（PR #4，以及随后的 #6–#58）。#40 把这一节对齐到 #39。#53 对齐到 #52，合并顺序是 #41、#43、#42、#44、#45、#46、#47、#48、#49、#50、#51、#52。其后按合并顺序是 #54、#55、#56、#57、#58。版本号是 `0.1.5`（`sts2sim.__version__`、界面 `package.json`、Windows 打包脚本的默认 `-Version`）。发布说明在 `docs/RELEASE_0.1.5.md`。文档目录在 `docs/INDEX.md`。下面先写 #54–#58（组牌和遭遇选择、离线 HTML、两次战斗对比、界面浏览器冒烟；新的在前），再写 #41–#52，然后是更早的 #4 与 #6–#40。原有条目都留着。#49 的命令行分诊和 #51 的页面 / HTTP / MCP 是同一份报告，合成一条，细节都在。
 
-*These features are on `main` (PR #4, then #6–#52). #40 aligned this section through #39. After that, in merge order: #41, #43, #42, #44, #45, #46, #47, #48, #49, #50, #51, #52. The version is `0.1.5` (`sts2sim.__version__`, the GUI `package.json`, and the default `-Version` in the Windows packager). Release notes: `docs/RELEASE_0.1.5.md`. Documentation index: `docs/INDEX.md`. The GUI browser smoke is listed first, then #41–#52, then the earlier #4 and #6–#40. The earlier entries stay. The command-line triage from #49 and the page / HTTP / MCP triage from #51 are one report, so they are one entry, with the details from both.*
+*These features are on `main` (PR #4, then #6–#58). #40 aligned this section through #39. #53 aligned it through #52, in merge order #41, #43, #42, #44, #45, #46, #47, #48, #49, #50, #51, #52. After that, in merge order: #54, #55, #56, #57, #58. The version is `0.1.5` (`sts2sim.__version__`, the GUI `package.json`, and the default `-Version` in the Windows packager). Release notes: `docs/RELEASE_0.1.5.md`. Documentation index: `docs/INDEX.md`. #54–#58 are listed first (deck builder and encounter choice, offline HTML, run compare, GUI browser smoke; newest first), then #41–#52, then the earlier #4 and #6–#40. The earlier entries stay. The command-line triage from #49 and the page / HTTP / MCP triage from #51 are one report, so they are one entry, with the details from both.*
 
 ### 组牌
 
