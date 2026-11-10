@@ -82,7 +82,7 @@ PYTHONPATH=. .venv/bin/python tools/batch.py --char Claude --asc 10 --n 100 --ag
 | `--char` | `Ironclad` | 角色（原版 5 角色的类名，或 `Claude` = 示例 mod Claude娘 v3.5） |
 | `--asc` | `10` | 进阶等级 |
 | `--n` / `--start` | `20` / `0` | 跑多少局 / 从第几号种子开始（种子 `R<start>`…） |
-| `--procs` | CPU 核数 | 并行进程数 |
+| `--procs` / `--workers` | CPU 核数 | 并行进程数。`--workers` 与 `--procs` 相同，两个都给时以 `--workers` 为准。每局只用自己的种子，进程数不改变结果。 |
 | `--out` | 无 | 每局结果写成 JSONL |
 | `--agent` | `heuristic` | `heuristic`（快）、`modai`（推荐，通用 AI，模组角色也能用）、`modai-boss`（+ 首领战推演，仅 Linux/macOS）、`learned`、`learned-search`、`learned-boss`、`strong`、`strong-nosearch`、`planner`、`planner-search`、`search`、`imitation`、`mentor-mcts`、`mentor-boss`、`mentor-full`、`mentor-full-ev`（需外部 spire-mentor） |
 | `--sims` | 1000 | `mentor-*` 每个决策的 MCTS 模拟次数 |
@@ -246,7 +246,7 @@ spire-mentor 已经实现了这些牌，但 `state_from_dict` 查牌 id 时只�
 .venv\Scripts\python -m sts2sim experiments\quick.yaml
 ```
 
-参数：`--fights`（每格场数）、`--jobs`（并行进程）、`--seed`、`--agent`（`heuristic` / `beam`）、`--out`（输出目录，默认 `reports/<实验名>/`）、`--explain`（出牌 / 目标 / 药水的候选分数，写到该目录的 `explain.jsonl`；实验 YAML 也可以写 `explain: true`，或设 `DECKBENCH_EXPLAIN=1`。关闭时不组装候选。同一颗种子，开和关的战斗结果相同）。
+参数：`--fights`（每格场数）、`--jobs` / `--workers`（并行进程；两个都给时以 `--workers` 为准。每场战斗的随机数只由实验种子、卡组、幕、房间和场次决定，进程数不改变结果）、`--seed`、`--agent`（`heuristic` / `beam`）、`--out`（输出目录，默认 `reports/<实验名>/`）、`--explain`（出牌 / 目标 / 药水的候选分数，写到该目录的 `explain.jsonl`；实验 YAML 也可以写 `explain: true`，或设 `DECKBENCH_EXPLAIN=1`。关闭时不组装候选。同一颗种子，开和关的战斗结果相同）。
 输出：`report.md`（中文报告）、`cells.csv`、`cards.csv`、`encounters.csv`、`coverage_*.csv`、`raw.jsonl`、`meta.json`，打开说明日志时还有 `explain.jsonl`。一场战斗的 Markdown：`python tools/explain_fight.py <目录>/explain.jsonl --fight 0`。
 *`--explain` (or `explain: true`, or `DECKBENCH_EXPLAIN=1`) writes `explain.jsonl` next to `raw.jsonl`. It stays off unless you ask, and a fixed seed matches with the flag on or off. `python tools/explain_fight.py <dir>/explain.jsonl --fight 0` renders one fight.*
 同一个种子、同样的参数 → 完全相同的结果（与并行数无关）。

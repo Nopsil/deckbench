@@ -23,7 +23,7 @@ from multiprocessing import Pool
 import yaml
 
 from .modloader import ModSet
-from .core import Combat
+from .core import Card, Combat
 from . import enemies as EN
 from .ai import AGENTS
 
@@ -75,6 +75,9 @@ def run_fight(mod_names, deck_id, act, room, idx, seed, agent_name="heuristic", 
 
 def _run_fight(mod_names, deck_id, act, room, idx, seed, agent_name="heuristic", max_turns=30,
                encounter_id=None, log=False, agent_kw=None, potions=None):
+    # 牌的 uid 只在本场递增。否则同一进程里前面的场次会把计数器留到下一场，
+    # 换 --workers / --jobs 就会改 uid 序列。
+    Card._uid[0] = 0
     M = get_modset(mod_names)
     rng = random.Random(_seed(seed, deck_id, act, room, idx, encounter_id))
     P, relics, dk = M.build_player(deck_id)
@@ -138,7 +141,14 @@ def plan(exp, M, fights=None):
     return tasks
 
 
-def run_experiment(path, fights=None, jobs=None, seed=None, agent=None, out_dir=None, explain=None):
+def worker_count(jobs=None, workers=None):
+    """--workers 优先于 --jobs。每场战斗自己播种，进程数不改变结果。"""
+    n = workers if workers is not None else jobs
+    n = n or os.cpu_count() or 1
+    return max(1, int(n))
+
+
+def run_experiment(path, fights=None, jobs=None, seed=None, agent=None, out_dir=None, explain=None, workers=None):
     from . import explain as EX
     exp = yaml.safe_load(open(path, encoding="utf-8"))
     if seed is not None:
@@ -157,7 +167,7 @@ def run_experiment(path, fights=None, jobs=None, seed=None, agent=None, out_dir=
     if explain:
         for t in tasks:
             t[1]["explain"] = True
-    jobs = jobs or os.cpu_count() or 1
+    jobs = worker_count(jobs, workers)
     t0 = time.time()
     if jobs > 1:
         with Pool(jobs) as pool:
@@ -202,13 +212,16 @@ def main():
     ap.add_argument("experiment")
     ap.add_argument("--fights", type=int)
     ap.add_argument("--jobs", type=int)
+    ap.add_argument("--workers", type=int, default=None,
+                    help="并行进程数。与 --jobs 相同；两个都给时以 --workers 为准。"
+                         "每场战斗的随机数只由实验种子、卡组、幕、房间和场次决定，进程数不改变结果。")
     ap.add_argument("--seed", type=int)
     ap.add_argument("--agent")
     ap.add_argument("--out")
     ap.add_argument("--explain", action="store_true",
                     help="把每步出牌、目标和药水的候选分数写到输出目录的 explain.jsonl（也认 DECKBENCH_EXPLAIN=1，或实验 YAML 的 explain: true）")
     a = ap.parse_args()
-    out, wall, n = run_experiment(a.experiment, a.fights, a.jobs, a.seed, a.agent, a.out, explain=a.explain)
+    out, wall, n = run_experiment(a.experiment, a.fights, a.jobs, a.seed, a.agent, a.out, explain=a.explain, workers=a.workers)
     print(f"完成 {n} 场，用时 {wall:.1f} 秒，报告在 {out}")
     if a.explain or os.environ.get("DECKBENCH_EXPLAIN", "").strip().lower() in ("1", "true", "yes", "on"):
         print(f"说明日志 / explanation: {os.path.join(out, 'explain.jsonl')}")

@@ -61,6 +61,7 @@ def main():
     ap.add_argument("--variant", default=None, help="B 组的变体")
     ap.add_argument("--base-variant", default=None)
     ap.add_argument("--procs", type=int, default=mp.cpu_count())
+    ap.add_argument("--workers", type=int, default=None, help="并行进程数。与 --procs 相同；两个都给时以 --workers 为准。每局种子固定，进程数不改变结果。")
     ap.add_argument("--out", default=None, help="把两组原始结果写到 <out>_A.jsonl / <out>_B.jsonl")
     ap.add_argument("--format", choices=("text", "markdown", "json"), default="text",
                     help="胜率报告格式。text 在原来的对照后面多打 Wilson 区间、两比例 p 值和样本警告；"
@@ -75,8 +76,9 @@ def main():
     if mods:
         batch._check_mods(mods, a.char, a.variant)
     t = time.time()
-    A = run(a.char, a.asc, seeds, a.agent, sp(a.base_force), [], a.base_variant, a.procs, mods, a.style)
-    B = run(a.char, a.asc, seeds, a.agent, sp(a.force), sp(a.replace), a.variant, a.procs, mods, a.style)
+    procs = max(1, int(a.workers if a.workers is not None else a.procs))
+    A = run(a.char, a.asc, seeds, a.agent, sp(a.base_force), [], a.base_variant, procs, mods, a.style)
+    B = run(a.char, a.asc, seeds, a.agent, sp(a.force), sp(a.replace), a.variant, procs, mods, a.style)
     if a.out:
         for tag, res in (("A", A), ("B", B)):
             with open(f"{a.out}_{tag}.jsonl", "w") as f:

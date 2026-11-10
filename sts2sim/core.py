@@ -26,9 +26,8 @@
   modify_cost(card, cost)              可改 ev.cost
   before_block_clear(creature, keep)   玩家回合开始清空格挡前，可改 ev.keep
 """
-import copy
 import random
-from types import SimpleNamespace
+from types import FunctionType, SimpleNamespace
 
 ACTION_CAP_DEFAULT = 200
 
@@ -61,7 +60,9 @@ class Power:
         self.data = dict(params)
 
     def clone(self, owner):
-        p = copy.copy(self)
+        # 浅拷贝实例字段，再换掉 owner 和 data。和 copy.copy 一样，data 里的嵌套容器仍共享。
+        p = object.__new__(type(self))
+        p.__dict__.update(self.__dict__)
         p.owner = owner
         p.data = dict(self.data)
         return p
@@ -117,13 +118,14 @@ class Player(Creature):
         self.potions = []        # 药水 ID 列表（见 potions.py）
 
     def clone(self):
-        new = copy.copy(self)
+        new = object.__new__(type(self))
+        new.__dict__.update(self.__dict__)
         self._clone_base(new)
         new.potions = list(self.potions)
-        new.hand = [copy.copy(c) for c in self.hand]
-        new.draw_pile = [copy.copy(c) for c in self.draw_pile]
-        new.discard = [copy.copy(c) for c in self.discard]
-        new.exhaust_pile = [copy.copy(c) for c in self.exhaust_pile]
+        new.hand = [_copy_card(c) for c in self.hand]
+        new.draw_pile = [_copy_card(c) for c in self.draw_pile]
+        new.discard = [_copy_card(c) for c in self.discard]
+        new.exhaust_pile = [_copy_card(c) for c in self.exhaust_pile]
         return new
 
     def intent_is_attack(self):
@@ -177,8 +179,26 @@ class Card:
     def printed_cost(self):
         return self.d.cost_up if self.upgraded else self.d.cost
 
+    def __copy__(self):
+        return _copy_card(self)
+
     def __repr__(self):
         return self.name
+
+
+def _copy_card(c):
+    """卡牌实例的浅拷贝。前瞻每步都要复制整副牌，走 copy.copy 会经过 __reduce_ex__。"""
+    n = object.__new__(Card)
+    n.d = c.d
+    n.upgraded = c.upgraded
+    n.uid = c.uid
+    n.cost_turn = c.cost_turn
+    n.cost_delta = c.cost_delta
+    n.cost_set = c.cost_set
+    n.free_turn = c.free_turn
+    n.played_turn = c.played_turn
+    n.tmp = c.tmp
+    return n
 
 
 # ---------------------------------------------------------------- 战斗统计
@@ -195,6 +215,42 @@ class Stats:
         r[1] += dmg
         r[2] += blk
         r[3] += energy
+
+
+def _wrap_special(name):
+    def call(obj, combat, ev):
+        f = getattr(obj, name, None)
+        if f is not None:
+            f(combat, ev)
+    return call
+
+
+def _build_onmap(cls):
+    """类上的 on_* → 未绑定函数。每个类只建一次。"""
+    m = {}
+    for c in reversed(cls.__mro__):
+        for k, v in c.__dict__.items():
+            if not k.startswith("on_"):
+                continue
+            m[k] = v if isinstance(v, FunctionType) else _wrap_special(k)
+    cls._onmap = m
+    return m
+
+
+def _build_modmap(mod):
+    m = {k: v for k, v in mod.__dict__.items() if k.startswith("on_") and isinstance(v, FunctionType)}
+    mod._onmap = m
+    return m
+
+
+def _fire(obj, meth, combat, ev):
+    cls = type(obj)
+    mp = cls.__dict__.get("_onmap")
+    if mp is None:
+        mp = _build_onmap(cls)
+    fn = mp.get(meth)
+    if fn is not None:
+        fn(obj, combat, ev)
 
 
 # ---------------------------------------------------------------- 战斗
@@ -226,14 +282,10 @@ class Combat:
 
     # ---------- 复制（AI 前瞻用）
     def clone(self):
-        new = copy.copy(self)
+        new = object.__new__(type(self))
+        new.__dict__.update(self.__dict__)
         new.player = self.player.clone()
-        emap = {}
-        new.enemies = []
-        for e in self.enemies:
-            ne = e.clone()
-            emap[id(e)] = ne
-            new.enemies.append(ne)
+        new.enemies = [e.clone() for e in self.enemies]
         new.relics = [r.clone() for r in self.relics]
         new.data = {k: (v.copy() if hasattr(v, "copy") else v) for k, v in self.data.items()}
         self._clone_n += 1
@@ -280,13 +332,27 @@ class Combat:
     def emit(self, name, **kw):
         ev = SimpleNamespace(**kw)
         meth = "on_" + name
-        for obj in self.listeners():
-            f = getattr(obj, meth, None)
-            if f is not None:
-                if obj.__class__.__name__ == "module":
-                    f(self, ev)
-                else:
-                    f(self, ev)
+        fire = _fire
+        for r in self.relics:
+            fire(r, meth, self, ev)
+        powers = self.player.powers
+        if powers:
+            for p in list(powers.values()):
+                fire(p, meth, self, ev)
+        for e in self.enemies:
+            if e.alive and e.powers:
+                for p in list(e.powers.values()):
+                    fire(p, meth, self, ev)
+        for m in self.mod.listeners:
+            if type(m).__name__ == "module":
+                mp = m.__dict__.get("_onmap")
+                if mp is None:
+                    mp = _build_modmap(m)
+                fn = mp.get(meth)
+                if fn is not None:
+                    fn(self, ev)
+            else:
+                fire(m, meth, self, ev)
         return ev
 
     # ---------- 归因
@@ -597,34 +663,44 @@ class Combat:
         return max(0, ev.cost)
 
     def can_play(self, card):
+        return self._play_gate(card)[0]
+
+    def _play_gate(self, card):
+        """(can_play 的原返回值, card_cost)。打不出时费用是 None。费用只算一次。"""
         if card.has_kw("unplayable") or card.printed_cost() is None:
-            return False
+            return False, None
         cost = self.card_cost(card)
         if cost is None:
-            return False
-        if card.d.cost_x:
-            cost = 0
-        if cost > self.player.energy:
-            return False
+            return False, None
+        if (0 if card.d.cost_x else cost) > self.player.energy:
+            return False, None
         if card.d.can_play is not None:
             if not self.mod.call(card.d.can_play, self, card):
-                return False
+                return False, None
         ev = self.emit("can_play", card=card, ok=True)
-        return ev.ok
+        if not ev.ok:
+            return ev.ok, None
+        return ev.ok, cost
 
     def needs_target(self, card):
         return card.d.target in ("enemy",)
 
     def legal_actions(self):
         acts = []
-        for i, c in enumerate(self.player.hand):
-            if not self.can_play(c):
+        costs = {}
+        hand = self.player.hand
+        for i, c in enumerate(hand):
+            ok, cost = self._play_gate(c)
+            if not ok:
                 continue
+            costs[i] = cost or 0
             if self.needs_target(c):
                 for e in self.alive_enemies():
                     acts.append((i, e))
             else:
                 acts.append((i, None))
+        # 紧接着的 AI 用这份费用，避免对同一张牌再发一次 modify_cost。
+        self._legal_paid = costs
         return acts
 
     def use_potion(self, idx, target=None):

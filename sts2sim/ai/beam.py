@@ -14,17 +14,25 @@ class BeamAgent(Agent):
         self.depth = depth
 
     def _expand(self, C):
+        acts = C.legal_actions()
         out = []
-        for i, t in C.legal_actions():
+        hand = C.player.hand
+        enemies = C.enemies
+        paid_of = C._legal_paid
+        plays = C.data.get("_plays", 0) + 1
+        paid0 = C.data.get("_paid", 0)
+        bonus0 = C.data.get("_bonus", 0)
+        for i, t in acts:
+            card = hand[i]
             sim = C.clone()
-            sim.data["_plays"] = C.data.get("_plays", 0) + 1
-            sim.data["_paid"] = C.data.get("_paid", 0) + (C.card_cost(C.player.hand[i]) or 0)
-            ti = None if t is None else C.enemies.index(t)
+            sim.data["_plays"] = plays
+            sim.data["_paid"] = paid0 + paid_of[i]
+            ti = None if t is None else enemies.index(t)
             try:
                 sim.play(i, None if ti is None else sim.enemies[ti])
             except LoopAlarm:
                 sim.data["_loopish"] = True
-            sim.data["_bonus"] = C.data.get("_bonus", 0) + C.player.hand[i].d.ai.get("bonus", 0)
+            sim.data["_bonus"] = bonus0 + card.d.ai.get("bonus", 0)
             out.append(((i, t), sim))
         return out
 

@@ -186,8 +186,8 @@ class Enemy(Creature):
         self.performed_cur = False
 
     def clone(self):
-        import copy
-        new = copy.copy(self)
+        new = object.__new__(type(self))
+        new.__dict__.update(self.__dict__)
         self._clone_base(new)
         new.used_once = set(self.used_once)
         new.data = dict(self.data)
