@@ -110,6 +110,105 @@
         </div>
         <div class="hint">{{ t('cal.legend') }}</div>
       </div>
+
+      <div id="gap-triage" class="panel triage" data-section="gap-triage">
+        <div class="between head">
+          <div>
+            <h3>{{ t('cal.triageTitle') }}</h3>
+            <div class="hint">{{ t('cal.triageSub') }}</div>
+          </div>
+        </div>
+        <div class="hint">{{ t('cal.triageReadOnly') }}</div>
+        <div v-if="triageError" class="hint warn">{{ triageError }}</div>
+        <div v-else-if="!triage" class="hint">{{ t('cal.triageLoading') }}</div>
+        <template v-else>
+          <div class="hint">{{ t('cal.triageCounts', triageCounts) }}</div>
+          <h4>{{ t('cal.triageOptimistic') }}</h4>
+          <div v-if="!optimisticRows.length" class="hint">{{ t('cal.triageEmpty') }}</div>
+          <div v-else class="table-wrap">
+            <table class="fights" data-gap-side="optimistic">
+              <thead>
+                <tr>
+                  <th>{{ t('cal.triageEncounter') }}</th>
+                  <th>{{ t('cal.triageOptimisticCol') }}</th>
+                  <th>{{ t('cal.triagePessimisticCol') }}</th>
+                  <th>{{ t('cal.triageCompared') }}</th>
+                  <th>{{ t('cal.triageSide') }}</th>
+                  <th>{{ t('cal.triageCode') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in optimisticRows" :key="'opt-' + row.id" class="gap" :data-id="row.id">
+                  <td class="mono enc">{{ row.encounter || row.id }}</td>
+                  <td class="mono">{{ row.optimistic }}</td>
+                  <td class="mono">{{ row.pessimistic }}</td>
+                  <td class="mono">{{ row.compared }}</td>
+                  <td class="mono">{{ ratio(row.optimistic, row.compared) }}</td>
+                  <td class="code">{{ codeText(row.code) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <h4>{{ t('cal.triagePessimistic') }}</h4>
+          <div v-if="!pessimisticRows.length" class="hint">{{ t('cal.triageEmpty') }}</div>
+          <div v-else class="table-wrap">
+            <table class="fights" data-gap-side="pessimistic">
+              <thead>
+                <tr>
+                  <th>{{ t('cal.triageEncounter') }}</th>
+                  <th>{{ t('cal.triageOptimisticCol') }}</th>
+                  <th>{{ t('cal.triagePessimisticCol') }}</th>
+                  <th>{{ t('cal.triageCompared') }}</th>
+                  <th>{{ t('cal.triageSide') }}</th>
+                  <th>{{ t('cal.triageCode') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in pessimisticRows" :key="'pes-' + row.id" class="pessimistic" :data-id="row.id">
+                  <td class="mono enc">{{ row.encounter || row.id }}</td>
+                  <td class="mono">{{ row.optimistic }}</td>
+                  <td class="mono">{{ row.pessimistic }}</td>
+                  <td class="mono">{{ row.compared }}</td>
+                  <td class="mono">{{ ratio(row.pessimistic, row.compared) }}</td>
+                  <td class="code">{{ codeText(row.code) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <h4>{{ t('cal.triageByPower') }}</h4>
+          <div v-if="!powerRows.length" class="hint">{{ t('cal.triageNoPower') }}</div>
+          <div v-else class="table-wrap">
+            <table class="fights" data-gap-side="power">
+              <thead>
+                <tr>
+                  <th>{{ t('cal.triageKind') }}</th>
+                  <th>{{ t('cal.triagePower') }}</th>
+                  <th>{{ t('cal.triageName') }}</th>
+                  <th>{{ t('cal.triageLean') }}</th>
+                  <th>{{ t('cal.triageRate') }}</th>
+                  <th>{{ t('cal.triageEncounters') }}</th>
+                  <th>{{ t('cal.triageCode') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in powerRows" :key="row.kind + '-' + row.id" :data-id="row.id" :data-kind="row.kind">
+                  <td>{{ kindText(row.kind) }}</td>
+                  <td class="mono enc">{{ row.id }}</td>
+                  <td>{{ labelOf(row) }}</td>
+                  <td>{{ leanText(row.lean) }}</td>
+                  <td class="mono">{{ powerRatio(row) }}</td>
+                  <td class="mono enc">{{ encounterList(row) }}</td>
+                  <td class="code">{{ codeText(row.code) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-if="triageNotes.length" class="hint notes">
+            <div class="label">{{ t('cal.triageNotes') }}</div>
+            <div v-for="(note, i) in triageNotes" :key="'note-' + i">{{ note }}</div>
+          </div>
+        </template>
+      </div>
     </template>
 
     <div v-else class="panel state">
@@ -124,7 +223,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { NButton, NInput, NSpin, NUpload, useMessage } from 'naive-ui'
 import { api } from '../api'
-import { t, has } from '../i18n'
+import { t, has, lang, joinList } from '../i18n'
 
 const STRIP_W = 120
 const route = useRoute()
@@ -149,6 +248,8 @@ const realError = ref('')
 const simError = ref('')
 const error = ref('')
 const report = ref(null)
+const triage = ref(null)
+const triageError = ref('')
 const loading = ref(false)
 const findingReals = ref(false)
 const findingSims = ref(false)
@@ -168,6 +269,24 @@ const deckText = computed(() => {
   const path = (report.value && report.value.deck_path) || []
   return path.length ? path.join(t('sep.list')) : ''
 })
+const optimisticRows = computed(() => (triage.value && triage.value.encounters && triage.value.encounters.optimistic) || [])
+const pessimisticRows = computed(() => (triage.value && triage.value.encounters && triage.value.encounters.pessimistic) || [])
+const powerRows = computed(() => {
+  const body = triage.value
+  if (!body) return []
+  const min = body.min_compared || 1
+  return (body.by_power || []).filter((row) => row.compared >= min && (row.optimistic || row.pessimistic))
+})
+const triageCounts = computed(() => {
+  const counts = (triage.value && triage.value.counts) || {}
+  return {
+    compared: counts.compared || 0,
+    gaps: counts.gaps || 0,
+    optimistic: counts.optimistic || 0,
+    pessimistic: counts.pessimistic || 0,
+  }
+})
+const triageNotes = computed(() => (triage.value && triage.value.notes) || [])
 const excludedText = computed(() => {
   const ex = (report.value && report.value.excluded) || {}
   const bits = Object.keys(ex).map((k) => {
@@ -236,6 +355,51 @@ function makeStrip(f) {
 function stripLabel(f) {
   return t('cal.bandLabel', { real: num(f.real_hp_lost), p10: num(f.p10), p90: num(f.p90) })
 }
+function ratio(count, total) {
+  const n = Number(count) || 0
+  const d = Number(total) || 0
+  if (d <= 0) return t('common.none')
+  const pct = (100 * n) / d
+  const shown = Math.abs(pct - Math.round(pct)) < 1e-9 ? String(Math.round(pct)) : String(Math.round(pct * 10) / 10)
+  return t('cal.triageRatio', { count: n, total: d, pct: shown })
+}
+function labelOf(row) {
+  if (!row) return ''
+  const text = lang.value === 'zhs' ? (row.label_zh || row.label_en) : (row.label_en || row.label_zh)
+  return text || row.id || ''
+}
+function kindText(kind) {
+  const key = 'cal.triageKind.' + kind
+  return has(key) ? t(key) : String(kind || '')
+}
+function leanText(lean) {
+  const key = 'cal.triageLean.' + lean
+  return has(key) ? t(key) : String(lean || '')
+}
+function noteText(note) {
+  if (note === 'unimplemented; stacks only') return t('cal.triageNote.unimplemented')
+  if (note === 'optional; off unless mechanic_aware') return t('cal.triageNote.optional')
+  return note || ''
+}
+function codeText(code) {
+  if (!code || !code.length) return t('common.none')
+  return code.map((item) => {
+    let bit = item.file || ''
+    if (item.line) bit += ':' + item.line
+    if (item.symbol) bit += ' ' + item.symbol
+    const note = noteText(item.note)
+    if (note) bit += ' (' + note + ')'
+    return bit
+  }).join(', ')
+}
+function powerRatio(row) {
+  const side = row.lean === 'pessimistic' ? row.pessimistic : row.optimistic
+  return ratio(side, row.compared)
+}
+function encounterList(row) {
+  const ids = (row && row.encounters) || []
+  return ids.length ? joinList(ids) : t('common.none')
+}
 
 function clearUpload() {
   uploadName.value = ''
@@ -302,29 +466,43 @@ async function compare() {
   const realPath = real.value.trim()
   if (!realPath) {
     report.value = null
+    triage.value = null
+    triageError.value = ''
     error.value = t('cal.err.need_real')
     msg.warning(error.value)
     return
   }
   if (!staged.value && !sim.value.trim()) {
     report.value = null
+    triage.value = null
+    triageError.value = ''
     error.value = t('cal.err.need_sim')
     msg.warning(error.value)
     return
   }
   loading.value = true
   error.value = ''
+  triage.value = null
+  triageError.value = ''
   try {
+    let next
     if (staged.value) {
       const form = new FormData()
       form.append('real', realPath)
       form.append('file', staged.value, uploadName.value || 'runs.jsonl')
-      report.value = await api.upload('/api/calibrate/upload', form)
+      next = await api.upload('/api/calibrate/upload', form)
     } else {
-      report.value = await api.post('/api/calibrate', { real: realPath, sim: sim.value.trim() })
+      next = await api.post('/api/calibrate', { real: realPath, sim: sim.value.trim() })
+    }
+    report.value = next
+    try {
+      triage.value = await api.post('/api/gap_triage', { reports: next })
+    } catch (e) {
+      triageError.value = e.message
     }
   } catch (e) {
     report.value = null
+    triage.value = null
     error.value = e.message
     msg.error(e.message)
   } finally {
@@ -377,6 +555,10 @@ onMounted(() => { if (real.value.trim() && sim.value.trim()) compare() })
 .state .big { font-size: 15px; color: #B9B4AC; margin-bottom: 8px; }
 .state .detail { color: #CFCAC2; font-size: 13.5px; line-height: 1.55; text-align: left; }
 .hint.warn { color: #E0A86C; }
+.triage h4 { margin: 16px 0 8px; font-size: 14px; font-weight: 650; }
+.code { max-width: 420px; overflow-wrap: anywhere; font-size: 12px; }
+.fights tr.pessimistic td { background: rgba(126, 164, 196, .12); }
+.notes { margin-top: 12px; }
 .page > .panel { margin-top: 16px; }
 .page > .panel:first-child { margin-top: 0; }
 </style>

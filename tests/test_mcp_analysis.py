@@ -328,7 +328,7 @@ def test_server_registers_analysis_tools_on_play_and_import_only():
     mcp = _load_mcp()
     play = mcp.build()
     names = [t.name for t in play._tool_manager.list_tools()]
-    assert names[-4:] == ["batch_run_summary", "card_ab", "explain_fight", "calibrate"]
+    assert names[-5:] == ["batch_run_summary", "card_ab", "explain_fight", "calibrate", "gap_triage"]
     tools = {t.name: t for t in play._tool_manager.list_tools()}
     assert tools["batch_run_summary"].parameters["required"] == ["path"]
     assert "sample_warning" in tools["batch_run_summary"].description
@@ -343,12 +343,16 @@ def test_server_registers_analysis_tools_on_play_and_import_only():
     assert "p10" in tools["calibrate"].description and "unmatched" in tools["calibrate"].description
     assert "likely_sim_gap" in tools["calibrate"].description
     assert tools["calibrate"].parameters["required"] == ["real", "sim"]
+    gap = tools["gap_triage"].parameters
+    assert "reports" in gap["properties"] and "paths" in gap["properties"]
+    assert "optimistic" in tools["gap_triage"].description
+    assert "p95" in tools["gap_triage"].description and "likely_sim_gap" in tools["gap_triage"].description
     assert "new_run" in names and "seed_preview" in names
 
     only = mcp.build_import()
     only_names = [t.name for t in only._tool_manager.list_tools()]
     assert only_names == [
         "import_save", "import_history_batch", "batch_run_summary", "card_ab", "explain_fight",
-        "calibrate",
+        "calibrate", "gap_triage",
     ]
     assert "seed_preview" not in only_names and "new_run" not in only_names
