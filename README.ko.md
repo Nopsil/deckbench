@@ -155,7 +155,7 @@ python tools/import_dll_mod.py "/path/to/Slay the Spire 2/mods/MyMod" --out mods
 ## AI 비서에게 한 수씩 플레이시키기 (MCP)
 
 Claude나 Cursor처럼 MCP를 지원하는 AI 비서를 쓰고 있다면, 시뮬레이터 안에서 직접 한 판을 플레이하게 할 수 있습니다. 상황을 보고, 선택지를 고르고, 이유를 적고, 되돌려서 다시 할 수도 있습니다. 마지막에는 조작 목록을 내보낼 수 있어서, 같은 시드로 실제 게임에서 그대로 따라 할 수 있습니다.
-지금은 소스에서 실행할 때만 됩니다: `pip install -r requirements-mcp.txt` 다음에 `python tools/mcp_server.py`. 카드 이름은 실행할 때 여러분이 설치한 게임에서 읽어 옵니다. 자세한 내용은 [docs/MCP.md](docs/MCP.md)를 참고하세요.
+지금은 소스에서 실행할 때만 됩니다: `pip install -r requirements-mcp.txt` 다음에 `python tools/mcp_server.py`. 카드 이름은 실행할 때 여러분이 설치한 게임에서 읽어 옵니다. 같은 서버는 GUI 없이 이미 끝난 결과도 읽습니다. `batch_run_summary`(승률, Wilson 구간, `sample_warning`), `card_ab`(이미 끝난 두 결과의 `p_value`. 새 시뮬레이션은 시작하지 않습니다), `explain_fight`(`--explain` 로그의 한 전투를 페이지로 읽기). 경로는 허용된 디렉터리 안이어야 합니다. 자세한 내용은 [docs/MCP.md](docs/MCP.md)를 참고하세요.
 
 ## 결과 보는 법
 

@@ -31,8 +31,11 @@ python tools/mcp_server.py --http --port 8765   # streamable-HTTP → http://127
 | `import_save(path)` | 只读导入一个 `.run` / `current_run.save` / 存档目录，返回 JSON 摘要（`seed`、`character`、`ascension`、`floor_reached`、`highlights.cards`、`highlights.relics`；目录是 `kind: folder`）。不开始模拟，不写存档。失败也是 JSON（`ok: false`） |
 | `import_history_batch(path, lines=false)` | 只读扫描存档目录或单个记录，返回和 `python tools/import_run.py <目录> --batch-summary` 相同的稳定 JSON。默认一个数组；`lines` 为 true 时每局一行（`--lines`）。键顺序：`file`、`seed`、`ascension`、`character`、`floors`，有胜负或放弃才有 `result`（`won` / `lost` / `abandoned`）。读不开的 history 文件带 `error` 码，不中断。目录里的 `current_run.save` 不进结果。不写存档。失败也是 JSON（`ok: false`） |
 | `seed_preview(seed, character, ascension, neow, cache, cache_dir)` | 不打一局。返回和 `tools/seed_preview.py --json -` 相同的稳定 v1 JSON。`neow`：`first`（默认，第一个没锁的）/ `all` / `none` / 序号文本（如 `"2"`），是选择器本身。`cache` 可选，把同一份 JSON 留在本机（目录不能在仓库里）。参数不合法或没有本机游戏逻辑时返回 `{"ok": false, "error": ...}`，不编地图 |
+| `batch_run_summary(path)` | 只读一份已经跑完的整局结果。`path` 是 `runs.jsonl`，或含有它的运行目录。返回和报告页 / `GET /api/runs/{id}/summary` 相同的摘要：胜率、Wilson 95% 区间（`win_ci_low` / `win_ci_high`）、`sample_warning`。数字来自 `sts2sim/stats.py`。有效局数少于 30 时 `sample_warning` 为 true，数字仍给出。不新开模拟，不写文件 |
+| `card_ab(a, b="")` | 只读比较两组已经跑完的整局结果（单卡 A/B）。`a`、`b` 各是一份 jsonl 或含 `runs.jsonl` 的目录。`b` 留空时，`a` 必须是目录，且里面恰好一对 `*_A.jsonl` 与 `*_B.jsonl`（或 `A.jsonl` 与 `B.jsonl`）。顶层 `p_value` 和 `win_ab` 来自 `sts2sim/stats.py`（和 `ab_card.py --format json` 同一份胜率对照）。`result` 和 `GET /api/ab` 相同，配对差还在。不新开模拟，不写文件 |
+| `explain_fight(path, fight=0, seed="", offset=0, limit=20)` | 只读 `--explain` 写的 JSONL（`explain.jsonl`、`*.explain.jsonl`，或只含其中一份的目录）。`fight` 是按 `seed` 过滤后的第几场，从 0 开始。每一条决策带 `chosen` 和按分数从高到低的候选（最多 5 条，选中的那条即使分低也会留下）；同一层的奖励和商店接在这场战斗后面。`offset` / `limit` 分页，`limit` 最大 100。不新开模拟，不写文件 |
 
-`import_save` 和 `python tools/import_run.py <path> --summary` 是同一份摘要（`sts2sim/saveimport.py` 的 `summarize`；命令行多缩进，对象相同）。没有本机游戏数据时，对战服务仍会退出；改跑 `python tools/mcp_server.py --import-only`（`import_save` 和 `import_history_batch`，没有对战工具，也没有 `seed_preview`）或上面的命令行。
+`import_save` 和 `python tools/import_run.py <path> --summary` 是同一份摘要（`sts2sim/saveimport.py` 的 `summarize`；命令行多缩进，对象相同）。没有本机游戏数据时，对战服务仍会退出；改跑 `python tools/mcp_server.py --import-only`（`import_save`、`import_history_batch`，以及下面三条只读分析；没有对战工具，也没有 `seed_preview`）或上面的命令行。
 
 `import_history_batch` 和 `python tools/import_run.py <目录> --batch-summary` 是同一份文本（行来自 `sts2sim/saveimport.py` 的 `batch_summary`；`lines=true` 对应 `--lines`）。它不带 `import_save` 那种牌和遗物要点。路径不存在或目录里没有对局文件时，返回 `{"ok": false, "read_only": true, "error": "..."}`。
 
@@ -40,7 +43,28 @@ python tools/mcp_server.py --http --port 8765   # streamable-HTTP → http://127
 
 `seed_preview` 只在对战服务器上（需要已经生成本机游戏逻辑，和 `new_run` 一样）。成功时没有 `ok` 字段，就是那份 v1 文档：`v`、`seed_input`、`seed`、`warnings`、`character`、`ascension`、`acts`、`maps`、`rooms`、`distribution`、`ancient`、`neow_options`、`after_neow`、`relics`、`limits`。可选 `cache=true` 按规范化种子、角色、进阶和 `neow` 选择器写入 `cache_dir`（空着则用 `DECKBENCH_CACHE/seed-preview`），不进仓库。
 
-*Seed preview is the same stable v1 document as `python tools/seed_preview.py <seed> --json -`. `neow` is `first`, `all`, `none`, or a decimal index such as `"2"`. It does not start a run. A bad selector or a missing local engine returns `{"ok": false, "error": "..."}` instead of an invented map. `--import-only` stays import-only.*
+*Seed preview is the same stable v1 document as `python tools/seed_preview.py <seed> --json -`. `neow` is `first`, `all`, `none`, or a decimal index such as `"2"`. It does not start a run. A bad selector or a missing local engine returns `{"ok": false, "error": "..."}` instead of an invented map. `--import-only` does not expose `seed_preview`.*
+
+## 只读分析已有结果 / Read results without the GUI
+
+`batch_run_summary`、`card_ab`、`explain_fight` 不打开图形界面，也不新开一局模拟。胜率和 A/B 的区间、p 值、样本警告都从 `sts2sim/stats.py` 来，和 `tools/batch.py` 的胜率行、`tools/ab_card.py --format json`、报告页、`GET /api/ab` 是同一套数。说明日志是 `--explain` 已经写好的 JSONL（`tools/explain_fight.py` 读的那种），这里按一场战斗把决策分页返回，不重新打分。
+
+*These three tools do not open the GUI and do not start a simulation. Win-rate intervals, the A/B p-value and the small-sample warning come from `sts2sim/stats.py`, the same numbers as the `tools/batch.py` win-rate line, `tools/ab_card.py --format json`, the report page and `GET /api/ab`. The explanation log is the JSONL `--explain` already wrote (what `tools/explain_fight.py` reads); one fight is returned a page of decisions at a time, without scoring again.*
+
+路径按真实路径算（符号链接看目标）。允许读的目录只有：
+
+- 界面数据目录：`STS2SIM_GUI_DATA`，没设就是 `gui/.data`（一次测试在 `runs/<id>/runs.jsonl`）
+- DeckBench 缓存（`DECKBENCH_CACHE`，否则是用户缓存下的 `deckbench`）以及其中的 `mcp_runs`（或 `DECKBENCH_MCP_RUNS`）
+- `DECKBENCH_ANALYSIS_ROOTS`：额外目录，用系统的路径分隔符分开。`tools/batch.py --out` 和旁边的 `*.explain.jsonl` 放在哪，就把那个目录加进来
+
+以下直接拒绝，不读内容，也不创建文件：
+
+- 上面这些目录以外的路径（`..` 或符号链接跳出去也算）
+- 存档树：路径上名叫 `saves`、`history`、`SlayTheSpire2` 的目录，以及本机游戏数据根；还有 `.run` / `.save`。规则和导入工具拒绝写入时相同（`saveimport.refuse_save_write`）
+
+失败也是 JSON：`{"ok": false, "read_only": true, "error": "..."}`。`error` 有 `path_not_allowed`、`refuse_write`、`not_found`、`not_json`、`not_batch`、`not_explain`、`need_b`、`ambiguous_pair`、`fight_out_of_range`。成功时 `ok` 和 `read_only` 都是 true。
+
+*`--import-only` exposes these three tools next to the importers. It still has no play tools and no `seed_preview`. A path is allowed only inside the GUI data directory, the DeckBench cache (including `mcp_runs`), or `DECKBENCH_ANALYSIS_ROOTS`. Anything else, including a symlink that escapes, is `path_not_allowed`. Save trees and `.run` / `.save` files are `refuse_write`, the same rule as the import tools. Failures are JSON (`ok: false`, `read_only: true`) and nothing is written.*
 
 ## 资源 / Resources
 | 资源 | 说明 |

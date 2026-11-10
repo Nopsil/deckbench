@@ -155,7 +155,7 @@ python tools/import_dll_mod.py "/path/to/Slay the Spire 2/mods/MyMod" --out mods
 ## AI アシスタントに 1 手ずつプレイさせる（MCP）
 
 Claude や Cursor など MCP に対応した AI アシスタントを使っているなら、シミュレーターの中で実際に 1 ラン遊ばせることができます。盤面を見て、選択肢を選び、理由を書き、やり直しもできます。最後に操作リストを書き出せるので、同じシードで実際のゲームをその通りにプレイできます。
-現在はソースからの実行のみ対応しています：`pip install -r requirements-mcp.txt` のあと `python tools/mcp_server.py`。カード名は実行時にあなた自身のゲームのインストールから読み込みます。詳しくは [docs/MCP.md](docs/MCP.md) を参照してください。
+現在はソースからの実行のみ対応しています：`pip install -r requirements-mcp.txt` のあと `python tools/mcp_server.py`。カード名は実行時にあなた自身のゲームのインストールから読み込みます。同じサーバーは、GUI を開かずに結果も読めます。`batch_run_summary`（勝率、Wilson 区間、`sample_warning`）、`card_ab`（すでに終わった 2 組の `p_value`。新しい模擬は始めません）、`explain_fight`（`--explain` の 1 戦闘をページして読む）。パスは許可したディレクトリの中だけです。詳しくは [docs/MCP.md](docs/MCP.md) を参照してください。
 
 ## 結果の見かた
 
