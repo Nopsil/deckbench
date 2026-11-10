@@ -1,4 +1,4 @@
-"""荆棘、受击加格挡、多敌人总伤害：同一颗种子上，打开修正比关掉少掉血。
+"""荆棘、受击加格挡、多敌人总伤害：同一颗种子上，显式打开修正比默认（关）少掉血。
 
 数字是这些构造局面的掉血（玩家起始生命减去打完时的生命）：
 
@@ -120,9 +120,9 @@ def _explain_off():
 def test_thorns_block_before_multihit_loses_less_hp():
     foes = [("荆", 80, 3, {"THORNS": 4})]
     deck = [DEFEND, MULTI]
-    off = _fight(HeuristicAgent(mechanic_aware=False), deck, foes, 50, 2, 2, 1)
-    on = _fight(HeuristicAgent(), deck, foes, 50, 2, 2, 1, log=True)
-    quiet = _fight(HeuristicAgent(), deck, foes, 50, 2, 2, 1, log=False)
+    off = _fight(HeuristicAgent(), deck, foes, 50, 2, 2, 1)
+    on = _fight(HeuristicAgent(mechanic_aware=True), deck, foes, 50, 2, 2, 1, log=True)
+    quiet = _fight(HeuristicAgent(mechanic_aware=True), deck, foes, 50, 2, 2, 1, log=False)
     assert off["played"] == ["MULTI", "DEFEND"]
     assert off["hp_lost"] == 16
     assert on["played"] == ["DEFEND", "MULTI"]
@@ -134,13 +134,13 @@ def test_thorns_block_before_multihit_loses_less_hp():
 
     # 默认束搜索看得深，这两张牌本来就会先格挡。只展开一步时，修正本身把 16 降到 7。
     kw = dict(cards=deck, foes=foes, hp=50, energy=2, hand=2, turns=1)
-    deep_off = _fight(BeamAgent(width=4, depth=3, mechanic_aware=False), **kw)
-    deep_on = _fight(BeamAgent(width=4, depth=3), **kw, log=True)
+    deep_off = _fight(BeamAgent(width=4, depth=3), **kw)
+    deep_on = _fight(BeamAgent(width=4, depth=3, mechanic_aware=True), **kw, log=True)
     assert deep_off["hp_lost"] == 7 and deep_on["hp_lost"] == 7
     assert deep_on["played"][0] == "DEFEND"
     assert any("thorns:" in n for n in _notes(deep_on["rows"]))
-    ply_off = _fight(BeamAgent(width=4, depth=1, mechanic_aware=False), **kw)
-    ply_on = _fight(BeamAgent(width=4, depth=1), **kw)
+    ply_off = _fight(BeamAgent(width=4, depth=1), **kw)
+    ply_on = _fight(BeamAgent(width=4, depth=1, mechanic_aware=True), **kw)
     assert ply_off["hp_lost"] == 16 and ply_off["played"][0] == "MULTI"
     assert ply_on["hp_lost"] == 7 and ply_on["played"][0] == "DEFEND"
 
@@ -149,10 +149,10 @@ def test_skittish_focuses_the_unarmoured_enemy_and_loses_less_hp():
     foes = [("甲", 18, 7, {"SKITTISH": 8}), ("乙", 18, 7, {"SKITTISH": 8})]
     deck = [STRIKE] * 8
     for cls, kw in ((HeuristicAgent, {}), (BeamAgent, {"width": 4, "depth": 4})):
-        off = _fight(cls(mechanic_aware=False, **kw), deck, foes, 70, 2, 5, 1)
-        on = _fight(cls(**kw), deck, foes, 70, 2, 5, 1, log=True)
-        full_off = _fight(cls(mechanic_aware=False, **kw), deck, foes, 70, 2, 5, 6)
-        full_on = _fight(cls(**kw), deck, foes, 70, 2, 5, 6)
+        off = _fight(cls(**kw), deck, foes, 70, 2, 5, 1)
+        on = _fight(cls(mechanic_aware=True, **kw), deck, foes, 70, 2, 5, 1, log=True)
+        full_off = _fight(cls(**kw), deck, foes, 70, 2, 5, 6)
+        full_on = _fight(cls(mechanic_aware=True, **kw), deck, foes, 70, 2, 5, 6)
         assert off["enemies"] == [("甲", 12, True), ("乙", 18, True)]
         assert on["enemies"] == [("甲", 12, True), ("乙", 12, True)]
         assert any(n == "armour" for n in _notes(on["rows"]))
@@ -187,8 +187,8 @@ def test_total_incoming_blocks_before_a_pure_attack():
     # 牌堆顶两张是小防和重击，未来留在牌堆里，修正只能看见「还剩 1 张」。
     deck = [FUTURE, BIG, SMALL]
     for cls, kw in ((HeuristicAgent, {}), (BeamAgent, {"width": 3, "depth": 2})):
-        off = _fight(cls(mechanic_aware=False, **kw), deck, foes, 40, 1, 2, 1)
-        on = _fight(cls(**kw), deck, foes, 40, 1, 2, 1, log=True)
+        off = _fight(cls(**kw), deck, foes, 40, 1, 2, 1)
+        on = _fight(cls(mechanic_aware=True, **kw), deck, foes, 40, 1, 2, 1, log=True)
         assert off["played"] == ["BIG"] and off["hp_lost"] == 20
         assert on["played"] == ["DEF8"] and on["hp_lost"] == 12
         assert any(n == "incoming:20>0x2+unknown" for n in _notes(on["rows"]))
@@ -201,18 +201,18 @@ def test_adjust_ignores_unseen_card_identity_and_does_not_draw_rng():
     player.energy = 1
     player.draw_pile = [Card(FUTURE)]
     foes = [_foe("甲", 40, 10), _foe("乙", 40, 10)]
-    combat = Combat(player, foes, _Mod(), rng=random.Random(1), agent=HeuristicAgent(), max_turns=2)
+    combat = Combat(player, foes, _Mod(), rng=random.Random(1), agent=HeuristicAgent(mechanic_aware=True), max_turns=2)
     combat.turn = 1
     combat.phase = "player"
     for foe in foes:
         foe.intent = foe.m.moves["HIT"]
     state = combat.rng.getstate()
     clones = combat._clone_n
-    HeuristicAgent().best_action(combat)
+    HeuristicAgent(mechanic_aware=True).best_action(combat)
     assert combat.rng.getstate() == state
     aware_clones = combat._clone_n - clones
     combat._clone_n = clones
-    HeuristicAgent(mechanic_aware=False).best_action(combat)
+    HeuristicAgent().best_action(combat)
     assert combat.rng.getstate() == state
     assert combat._clone_n - clones == aware_clones
 
@@ -232,24 +232,30 @@ def test_adjust_ignores_unseen_card_identity_and_does_not_draw_rng():
     assert "FUTURE" not in note_future and "OTHER" not in note_other
 
 
-def test_flag_defaults_on_and_experiment_kw_can_disable_it():
+def test_flag_defaults_off_and_experiment_kw_can_enable_it():
     assert as_bool(True) is True
     assert as_bool(False) is False
     assert as_bool("false") is False
     assert as_bool("off") is False
     assert as_bool("0") is False
-    assert HeuristicAgent().mechanic_aware is True
-    assert HeuristicAgent(mechanic_aware="no").mechanic_aware is False
-    assert BeamAgent().mechanic_aware is True
-    assert BeamAgent(width=2, depth=1, mechanic_aware=False).mechanic_aware is False
+    assert as_bool("true") is True
+    assert as_bool(None, default=False) is False
+    assert HeuristicAgent().mechanic_aware is False
+    assert HeuristicAgent(mechanic_aware=True).mechanic_aware is True
+    assert HeuristicAgent(mechanic_aware="yes").mechanic_aware is True
+    assert BeamAgent().mechanic_aware is False
+    assert BeamAgent(width=2, depth=1, mechanic_aware=True).mechanic_aware is True
     exp = {"mods": ["claude_v34"], "decks": ["claude_start"], "rooms": ["普通"], "fights": 1,
-           "seed": 1, "agent": "heuristic", "agent_kw": {"mechanic_aware": False}}
+           "seed": 1, "agent": "heuristic", "agent_kw": {"mechanic_aware": True}}
     tasks = plan(exp, ModSet(["claude_v34"]), fights=1)
-    assert tasks and tasks[0][1]["agent_kw"]["mechanic_aware"] is False
+    assert tasks and tasks[0][1]["agent_kw"]["mechanic_aware"] is True
+    plain = {"mods": ["claude_v34"], "decks": ["claude_start"], "rooms": ["普通"], "fights": 1, "seed": 1}
+    assert plan(plain, ModSet(["claude_v34"]), fights=1)[0][1]["agent_kw"] == {}
 
 
 def test_runner_help_lists_the_switch():
     proc = subprocess.run([sys.executable, "-m", "sts2sim.runner", "--help"],
                           check=False, capture_output=True, text=True)
     assert proc.returncode == 0
+    assert "--mechanic-aware" in proc.stdout
     assert "--no-mechanic-aware" in proc.stdout

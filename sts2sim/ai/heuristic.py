@@ -1,6 +1,6 @@
 """启发式 AI：对每个合法动作（卡 × 目标）复制战斗、实际结算一次，用局面估值打分，贪心选最高。
-不偷看牌堆：估值只看手牌数量与公开信息。mechanic_aware（默认开）在这一步的分数上
-再扣荆棘自伤、已有格挡的目标和多敌人总伤害没盖住的部分；不额外抽随机数。"""
+不偷看牌堆：估值只看手牌数量与公开信息。mechanic_aware 默认关；打开后在这一步的分数上
+再扣荆棘自伤、已有格挡的目标和多敌人总伤害没盖住的部分。不额外抽随机数。"""
 from ..core import LoopAlarm
 from .. import explain
 from .base import Agent, _copy_note, _step, as_bool, evaluate, mechanic_adjust, resources, score_delta
@@ -9,10 +9,10 @@ from .base import Agent, _copy_note, _step, as_bool, evaluate, mechanic_adjust, 
 class HeuristicAgent(Agent):
     name = "heuristic"
 
-    def __init__(self, threshold=0.05, cost_weight=0.6, mechanic_aware=True):
+    def __init__(self, threshold=0.05, cost_weight=0.6, mechanic_aware=False):
         self.threshold = threshold
         self.cost_weight = cost_weight
-        self.mechanic_aware = as_bool(mechanic_aware)
+        self.mechanic_aware = as_bool(mechanic_aware, default=False)
 
     def best_action(self, C):
         acts = C.legal_actions()

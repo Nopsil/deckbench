@@ -1,7 +1,7 @@
 """单回合束搜索 AI：在本回合内搜索出牌序列（宽度 width、深度 depth），
 按序列结束时的局面估值选最好的序列，执行它的第一步，然后重新搜索。
 比启发式慢约一个数量级，用来对照启发式 AI 是否打得太笨。日后可在这里换成 MCTS。
-mechanic_aware（默认开）和启发式用同一套荆棘 / 受击格挡 / 总伤害修正，记在序列上，不额外抽随机数。"""
+mechanic_aware 默认关。打开后和启发式用同一套荆棘 / 受击格挡 / 总伤害修正，记在序列上，不额外抽随机数。"""
 from ..core import LoopAlarm
 from .. import explain
 from .base import Agent, _copy_note, _step, as_bool, evaluate, mechanic_adjust, resources
@@ -10,10 +10,10 @@ from .base import Agent, _copy_note, _step, as_bool, evaluate, mechanic_adjust, 
 class BeamAgent(Agent):
     name = "beam"
 
-    def __init__(self, width=4, depth=4, mechanic_aware=True):
+    def __init__(self, width=4, depth=4, mechanic_aware=False):
         self.width = width
         self.depth = depth
-        self.mechanic_aware = as_bool(mechanic_aware)
+        self.mechanic_aware = as_bool(mechanic_aware, default=False)
 
     def _expand(self, C):
         acts = C.legal_actions()
