@@ -204,6 +204,22 @@ def _wait_health(proc, base, log_path, timeout=40):
     raise RuntimeError(f"server did not become healthy ({last})\n{_read_log(log_path)}")
 
 
+@pytest.fixture(scope="module", autouse=True)
+def _release_playwright_event_loop(playwright, browser):
+    """这个模块结束后关掉同步 Playwright。
+
+    ``sync_playwright()`` 在主线程上把事件循环标成正在运行（``asyncio._set_running_loop``），
+    pytest-playwright 的 session 夹具要到全部测试结束才 ``stop()``。
+    后面的 MCP 注册测试用 ``asyncio.run`` 调工具，循环还标着就会报
+    ``asyncio.run() cannot be called from a running event loop``。
+    单独跑那份测试时循环没人占，所以能过。这里在浏览器冒烟结束时先关掉浏览器和驱动，
+    不靠重排测试，也不跳过。
+    """
+    yield
+    browser.close()
+    playwright.stop()
+
+
 @pytest.fixture(scope="module")
 def gui_server(tmp_path_factory):
     if not _BROWSER_OK:
