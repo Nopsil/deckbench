@@ -61,7 +61,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { NConfigProvider, NMessageProvider, NDialogProvider, NIcon, NSelect, NSpin, darkTheme, zhCN, dateZhCN, enUS, dateEnUS, jaJP, dateJaJP, koKR, dateKoKR } from 'naive-ui'
-import { CirclePlus, PlayerPlay, ChartBar, Scale, History, World, Puzzle, Folder, Map, ListSearch } from '@vicons/tabler'
+import { CirclePlus, PlayerPlay, ChartBar, Scale, History, World, Puzzle, Folder, Map, ListSearch, ChartDots } from '@vicons/tabler'
 import { themeFor } from './theme'
 import { store } from './api'
 import { t, lang, LANGS, setLang } from './i18n'
@@ -76,6 +76,7 @@ const nav = [
   { to: '/import', text: 'nav.import', icon: Folder },
   { to: '/preview', text: 'nav.preview', icon: Map },
   { to: '/explain', text: 'nav.explain', icon: ListSearch },
+  { to: '/calibrate', text: 'nav.calibrate', icon: ChartDots },
   { to: '/mods', text: 'nav.mods', icon: Puzzle },
 ]
 const NAIVE = { zhs: { ui: zhCN, date: dateZhCN }, en: { ui: enUS, date: dateEnUS }, ja: { ui: jaJP, date: dateJaJP }, ko: { ui: koKR, date: dateKoKR } }
@@ -110,7 +111,7 @@ onUnmounted(() => clearInterval(timer))
 .logo svg { width: 24px; height: 24px; }
 .bt { font-weight: 700; font-size: 16px; letter-spacing: .02em; }
 .bs { font-size: 11.5px; color: #77736C; margin-top: 2px; }
-nav { display: flex; flex-direction: column; gap: 3px; }
+nav { display: flex; flex-direction: column; gap: 3px; flex: 1; min-height: 0; overflow-y: auto; }
 .nav { display: flex; align-items: center; gap: 12px; height: 42px; padding: 0 12px; border-radius: 10px; color: #A9A49C; text-decoration: none; font-size: 14px; font-weight: 500; transition: background .15s, color .15s; position: relative; }
 .nav:hover { background: #202024; color: #E4DFD8; }
 .nav.on { background: rgba(217,119,87,.13); color: #F2A385; }
@@ -121,7 +122,7 @@ nav { display: flex; flex-direction: column; gap: 3px; }
 .lang-ic { color: #77736C; flex: none; }
 .eng { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border-radius: 12px; background: #1E1E22; border: 1px solid #2A2A2F; }
 .ver { margin-top: 10px; padding: 0 4px; font-size: 11px; color: #77736C; letter-spacing: .02em; }
-.eng.err { color: #E06C6C; font-size: 12px; }
+.eng.err { color: #E06C6C; font-size: 12px; max-height: 72px; overflow: hidden; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: #8FBF8F; margin-top: 6px; box-shadow: 0 0 0 3px rgba(143,191,143,.15); flex: none; }
 .et { font-size: 12.5px; font-weight: 600; }
 .es { font-size: 11px; color: #77736C; margin-top: 3px; line-height: 1.45; }

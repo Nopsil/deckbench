@@ -153,6 +153,8 @@ python tools/calibrate.py path/to/history/123.run path/to/runs.jsonl --json -
 
 `POST /api/calibrate` takes `{"real","sim"}`. `sim` has to sit in an allowed directory (the same rule as `batch_run_summary`); `real` is one run file. MCP `calibrate(real, sim)` is read-only and is also on `--import-only`. It does not start a simulation and does not modify saves. The ids in the fixture are fictional.
 
+**Calibration** in the sidebar (`#/calibrate`) picks an imported real run and a `runs.jsonl` in an allowed folder, or an uploaded file. The table shows floor, room, encounter, real HP lost, simulated mean / p10 / p90 and percentile, and highlights a likely sim gap. Unmatched floors are grey, with the reason. Each fight has a strip for the simulated band and the real value.
+
 ## Preview a seed
 
 Open **Seed preview**. Enter a seed from the game (plus character and ascension) and see each act's map, how normals, elites and bosses are ordered, the opening choices and the rewards of the first normal fight — without an AI playing the whole run. Useful for picking a seed to record or for planning a route. Maps from act 2 on are projections; act 1 can be checked against a screenshot.

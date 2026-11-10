@@ -55,6 +55,7 @@ FRONTEND_PAGES = (
     "gui/web/src/pages/SeedPreview.vue",
     "gui/web/src/pages/ModEditor.vue",
     "gui/web/src/pages/ExplainLog.vue",
+    "gui/web/src/pages/Calibrate.vue",
 )
 DECOMPILER_SOURCES = (
     "gui/packaging/decompiler/Program.cs",
