@@ -341,9 +341,11 @@ tests/               单元测试
 python gui/packaging/dry_check.py
 # 1) 自包含反编译器（只需一次；需要 .NET 9 SDK，可以在任何系统上交叉发布 win-x64）
 dotnet tool install -g ilspycmd --version 9.1.0.7988
-dotnet publish gui\packaging\decompiler\ilspycmd-host.csproj -c Release -r win-x64 --self-contained -o <decompiler 目录> -p:IlspyToolDir=<ilspycmd 工具目录 tools\net8.0\any>
+$ver = (python gui\packaging\read_version.py).Trim()   # sts2sim.__version__，现在是 0.1.5
+dotnet publish gui\packaging\decompiler\ilspycmd-host.csproj -c Release -r win-x64 --self-contained -o <decompiler 目录> -p:IlspyToolDir=<ilspycmd 工具目录 tools\net8.0\any> -p:Version=$ver -p:FileVersion=0.1.5.0 -p:AssemblyVersion=0.1.5.0 -p:InformationalVersion=$ver -p:IncludeSourceRevisionInInformationalVersion=false
 # 2) 打包（Python 3.12 venv 里装 requirements-gui.txt + pyinstaller；需要 Node.js）
-powershell -ExecutionPolicy Bypass -File gui\packaging\build.ps1 -Work <工作目录> -Py <venv>\Scripts\python.exe -Decompiler <decompiler 目录> -Version 0.1.5
+#    不写 -Version 时，build.ps1 自己读 sts2sim.__version__。zip 是 DeckBench-0.1.5-win64.zip。
+powershell -ExecutionPolicy Bypass -File gui\packaging\build.ps1 -Work <工作目录> -Py <venv>\Scripts\python.exe -Decompiler <decompiler 目录>
 # 3) 审计：确认包里没有任何游戏文件/数据/生成代码（可选：与游戏安装、本机缓存逐文件比对哈希）
 powershell -ExecutionPolicy Bypass -File gui\packaging\audit.ps1 -Path <工作目录>\DeckBench-0.1.5-win64.zip -GameDir "<游戏目录>" -Cache "$env:LOCALAPPDATA\deckbench"
 ```
@@ -371,7 +373,7 @@ powershell -ExecutionPolicy Bypass -File gui\packaging\audit.ps1 -Path <工作�
 它按上面的路径打包：Python 3.12 的 venv（`requirements-gui.txt` + pyinstaller）、当前 Node.js LTS、.NET 8 与 .NET 9 SDK、`ilspycmd` 9.1.0.7988、自包含发布 `gui/packaging/decompiler`，然后：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File gui\packaging\build.ps1 -Work <运行器临时目录>\deckbench-build -Py <该目录>\buildenv\Scripts\python.exe -Decompiler <decompiler 目录> -Version 0.1.5
+powershell -ExecutionPolicy Bypass -File gui\packaging\build.ps1 -Work <运行器临时目录>\deckbench-build -Py <该目录>\buildenv\Scripts\python.exe -Decompiler <decompiler 目录> -Version <sts2sim.__version__>
 ```
 
 构建之后：
@@ -379,10 +381,10 @@ powershell -ExecutionPolicy Bypass -File gui\packaging\build.ps1 -Work <运行�
 - `python gui/packaging/dry_check.py --app <工作目录>\dist\DeckBench`（仓库清单和打出来的目录一起查）。
 - `powershell -ExecutionPolicy Bypass -File gui\packaging\audit.ps1 -Path <工作目录>\DeckBench-0.1.5-win64.zip`。运行器上没有游戏安装，所以不加 `-GameDir` / `-Cache`，不做逐文件哈希对照。
 - 冒烟用 **zip 里的 `sim/`**，不用仓库工作副本。`python -m sts2sim --help` 必须成功，并且输出里有 `--fights`。然后再打一场内部引擎的木桩：`mods: [claude_v34]`、卡组 `probe_noengine`、`encounter: DUMMY`、`--workers 1`、1 回合。不需要游戏。
-- 接口冒烟：`gui/packaging/smoke_api.ps1` 把同一个 zip 再解到临时目录，启动里面的 `DeckBench.exe --serve`（`DECKBENCH_NO_DIALOG=1`，不开窗口）。`GET /api/health` 要返回 `ok`、版本 `0.1.5`、`frozen: true`。然后 `POST /api/runs` 打一场同样的木桩。响应按 UTF-8 字节读取，并核对这场的 `enc_name`。这场用的预设只写在解压目录的 `sim/experiments` 里，不进仓库，也不进 zip。结束后关掉进程。日志上传为 artifact。任一步失败，工作流失败。
+- 接口冒烟：`gui/packaging/smoke_api.ps1` 把同一个 zip 再解到临时目录，启动里面的 `DeckBench.exe --serve`（`DECKBENCH_NO_DIALOG=1`，不开窗口）。`GET /api/health` 要返回 `ok`、版本 `0.1.5`、`frozen: true`。`GET /api/version` 要返回同一个版本，并且和 `VERSION.txt`、exe 的 `ProductVersion` 一致。然后 `POST /api/runs` 打一场同样的木桩。响应按 UTF-8 字节读取，并核对这场的 `enc_name`。这场用的预设只写在解压目录的 `sim/experiments` 里，不进仓库，也不进 zip。结束后关掉进程。日志上传为 artifact。任一步失败，工作流失败。工作流里的版本来自 `gui/packaging/read_version.py`（`sts2sim.__version__`），不是写死在 yaml 里的另一个数字。
 - 把 `DeckBench-0.1.5-win64.zip` 上传为 Actions artifact，保留 30 天。不创建 GitHub Release，也不把 zip 发到别的地方。
 
-*`.github/workflows/windows-package.yml` does not run on every push or pull request. It starts from the Actions tab (`workflow_dispatch`) or from a tag named `v*`, on `windows-latest`. It follows the packager above: a Python 3.12 venv (`requirements-gui.txt` + pyinstaller), current Node.js LTS, the .NET 8 and .NET 9 SDKs, ilspycmd 9.1.0.7988, a self-contained publish of `gui/packaging/decompiler`, then `build.ps1` with `-Version 0.1.5`. It runs `python gui/packaging/dry_check.py --app` on `dist\DeckBench` and `audit.ps1` on `DeckBench-0.1.5-win64.zip`. The runner has no game install, so the audit is not given `-GameDir` or `-Cache` and does not hash files against one. The CLI smoke uses `sim/` from the zip, not the checkout: `python -m sts2sim --help` must succeed and mention `--fights`, then one internal-engine training-dummy fight (`claude_v34`, deck `probe_noengine`, `encounter: DUMMY`, `--workers 1`, one turn). That fight does not need a game. `gui/packaging/smoke_api.ps1` extracts the same zip again, starts `DeckBench.exe --serve` with `DECKBENCH_NO_DIALOG=1` and no window, requires `GET /api/health` to report ok, version 0.1.5 and frozen true, then `POST /api/runs` for the same dummy fight, reading response bytes as UTF-8 and checking `enc_name`. That preset file is written only under the extracted `sim/experiments`; it is not committed and it is not in the zip. The process is then stopped. The smoke log is uploaded as an artifact. A failed step fails the workflow. The zip is uploaded as an Actions artifact kept for 30 days. The workflow does not create a GitHub Release and does not publish the zip anywhere else.*
+*`.github/workflows/windows-package.yml` does not run on every push or pull request. It starts from the Actions tab (`workflow_dispatch`) or from a tag named `v*`, on `windows-latest`. It follows the packager above: a Python 3.12 venv (`requirements-gui.txt` + pyinstaller), current Node.js LTS, the .NET 8 and .NET 9 SDKs, ilspycmd 9.1.0.7988, a self-contained publish of `gui/packaging/decompiler`, then `build.ps1`. The workflow reads `sts2sim.__version__` with `gui/packaging/read_version.py` and passes that string as `-Version`. The decompiler publish stamps the same string with `-p:Version=`, `-p:FileVersion=`, `-p:AssemblyVersion=` and `-p:InformationalVersion=`. It runs `python gui/packaging/dry_check.py --app` on `dist\DeckBench` and `audit.ps1` on `DeckBench-0.1.5-win64.zip`. The runner has no game install, so the audit is not given `-GameDir` or `-Cache` and does not hash files against one. The CLI smoke uses `sim/` from the zip, not the checkout: `python -m sts2sim --help` must succeed and mention `--fights`, then one internal-engine training-dummy fight (`claude_v34`, deck `probe_noengine`, `encounter: DUMMY`, `--workers 1`, one turn). That fight does not need a game. `gui/packaging/smoke_api.ps1` extracts the same zip again, starts `DeckBench.exe --serve` with `DECKBENCH_NO_DIALOG=1` and no window, requires `GET /api/health` and `GET /api/version` to report the stamped version (0.1.5 today) and health frozen true, and checks `VERSION.txt` plus the exe file version, then `POST /api/runs` for the same dummy fight, reading response bytes as UTF-8 and checking `enc_name`. That preset file is written only under the extracted `sim/experiments`; it is not committed and it is not in the zip. The process is then stopped. The smoke log is uploaded as an artifact. A failed step fails the workflow. The zip is uploaded as an Actions artifact kept for 30 days. The workflow does not create a GitHub Release and does not publish the zip anywhere else.*
 
 ## 已知限制 / Known limitations
 

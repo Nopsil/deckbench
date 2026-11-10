@@ -815,3 +815,53 @@ def test_deck_card_impact_shows_a_sortable_table(gui):
     table.scroll_into_view_if_needed()
     _save_shot(page, "card-impact.png")
     _assert_clean(gui, "card-impact")
+
+
+def test_about_shows_the_version_and_an_update_check(gui):
+    """页脚和关于里显示 GET /api/version。检查更新只有点击才发，而且不打到 GitHub。"""
+    reported = _get_json(gui.base + "/api/version")
+    assert reported["name"] == "DeckBench"
+    version = reported["version"]
+    assert version
+    page = gui.page
+    page.goto(gui.base + "/#/new", wait_until="domcontentloaded")
+    gui.expect(page.locator("h1")).to_have_text("New test")
+    footer = page.get_by_test_id("about-version")
+    gui.expect(footer).to_have_text(f"DeckBench v{version}")
+    seen = []
+    page.on("request", lambda req: seen.append(req.url))
+    footer.click()
+    dialog = page.get_by_test_id("about-dialog")
+    gui.expect(dialog).to_be_visible()
+    gui.expect(dialog).to_contain_text(version)
+    gui.expect(page.get_by_test_id("check-updates")).to_have_text("Check for updates")
+    assert not any("/api/updates/check" in url or "api.github.com" in url for url in seen)
+
+    state = {
+        "ok": True,
+        "status": "up_to_date",
+        "current": version,
+        "latest": version,
+        "html_url": "https://github.com/Nopsil/deckbench/releases/latest",
+    }
+
+    def fulfill(route):
+        route.fulfill(status=200, content_type="application/json", body=json.dumps(state))
+
+    page.route("**/api/updates/check", fulfill)
+    page.get_by_test_id("check-updates").click()
+    gui.expect(page.get_by_test_id("update-result")).to_have_text("Up to date.")
+    state.update({
+        "status": "update_available",
+        "latest": "9.9.9",
+        "html_url": "https://github.com/Nopsil/deckbench/releases/tag/v9.9.9",
+    })
+    page.get_by_test_id("check-updates").click()
+    result = page.get_by_test_id("update-result")
+    gui.expect(result).to_contain_text("New version 9.9.9 available.")
+    gui.expect(result.get_by_role("link")).to_have_attribute(
+        "href", "https://github.com/Nopsil/deckbench/releases/tag/v9.9.9",
+    )
+    assert not any("api.github.com" in url for url in seen)
+    _save_shot(page, "about-version.png")
+    _assert_clean(gui, "about")

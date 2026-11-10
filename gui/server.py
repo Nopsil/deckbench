@@ -1254,12 +1254,11 @@ def ping():
 
 
 def _sim_version():
-    """sts2sim.__version__（直接读源文件，不导入模拟器）。"""
+    """sts2sim.__version__（读源文件，不导入模拟器，也不访问网络）。"""
     try:
-        with open(os.path.join(paths.SIM_ROOT, "sts2sim", "__init__.py"), encoding="utf-8") as f:
-            m = re.search(r'^__version__\s*=\s*["\']([^"\']+)["\']', f.read(), re.M)
-        return m.group(1) if m else "?"
-    except OSError:
+        from sts2sim.version import read_project_version
+        return read_project_version(paths.SIM_ROOT)
+    except (OSError, ValueError):
         return "?"
 
 
@@ -1281,6 +1280,13 @@ def post_settings(req: SettingsReq):
 @app.get("/api/version")
 def version():
     return {"name": "DeckBench", "version": _sim_version()}
+
+
+@app.post("/api/updates/check")
+def updates_check():
+    """手动检查 GitHub Releases。启动时不调用，界面只有点击按钮才打到这里。"""
+    from sts2sim.version import check_latest
+    return check_latest(current=_sim_version())
 
 
 @app.get("/api/health")

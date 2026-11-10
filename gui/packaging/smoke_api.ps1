@@ -5,7 +5,9 @@
 #   powershell -ExecutionPolicy Bypass -File gui\packaging\smoke_api.ps1 -Zip <DeckBench-win64.zip> -Log <smoke.log>
 #
 # Extracts the zip, starts DeckBench.exe --serve, waits for GET /api/health,
-# runs one training-dummy fight through POST /api/runs, then stops the process.
+# checks GET /api/version against that version, VERSION.txt, and the exe
+# file version, runs one training-dummy fight through POST /api/runs, then
+# stops the process.
 # The fight matches the CLI smoke (claude_v34, probe_noengine, encounter DUMMY)
 # and does not need a game install. The preset file is written only into the
 # extracted sim\experiments so the shipped zip and the repo stay unchanged.
@@ -17,7 +19,7 @@ param(
   [Parameter(Mandatory = $true)][string]$Zip,
   [Parameter(Mandatory = $true)][string]$Log,
   [string]$Extract = "",
-  [string]$ExpectedVersion = "0.1.5",
+  [string]$ExpectedVersion = "",
   [int]$Port = 0,
   [int]$HealthTimeoutSec = 180,
   [int]$RunTimeoutSec = 300
@@ -56,6 +58,13 @@ function Convert-FightLines([string]$Text) {
     if ($fightLine -eq "") { continue }
     $script:FightLines += ,($fightLine | ConvertFrom-Json)
   }
+}
+
+function Test-VersionMatch([string]$Got, [string]$Want) {
+  if ([string]::IsNullOrEmpty($Got) -or [string]::IsNullOrEmpty($Want)) { return $false }
+  if ($Got -eq $Want) { return $true }
+  if ($Got -eq ($Want + ".0")) { return $true }
+  return $false
 }
 
 function Write-Log([string]$Message) {
@@ -170,6 +179,32 @@ try {
   $script:Packed = Join-Path $Extract "DeckBench"
   $exe = Join-Path $script:Packed "DeckBench.exe"
   if (-not (Test-Path -LiteralPath $exe)) { throw "zip is missing DeckBench.exe" }
+  $versionTxt = Join-Path $script:Packed "VERSION.txt"
+  if (-not (Test-Path -LiteralPath $versionTxt)) { throw "VERSION.txt missing" }
+  $stamped = ([System.IO.File]::ReadAllText($versionTxt)).Trim()
+  if (-not $stamped) { throw "VERSION.txt is empty" }
+  if (-not $ExpectedVersion) { $ExpectedVersion = $stamped }
+  if ($stamped -ne $ExpectedVersion) {
+    throw "VERSION.txt '$stamped' != expected '$ExpectedVersion'"
+  }
+  $info = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($exe)
+  Write-Log ("exe ProductVersion={0} FileVersion={1}" -f $info.ProductVersion, $info.FileVersion)
+  if (-not (Test-VersionMatch ([string]$info.ProductVersion) $ExpectedVersion)) {
+    throw "exe ProductVersion '$($info.ProductVersion)' != '$ExpectedVersion'"
+  }
+  if (-not (Test-VersionMatch ([string]$info.FileVersion) $ExpectedVersion)) {
+    throw "exe FileVersion '$($info.FileVersion)' != '$ExpectedVersion'"
+  }
+  $decompiler = Join-Path $script:Packed "decompiler\ilspycmd-host.exe"
+  if (Test-Path -LiteralPath $decompiler) {
+    $dinfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($decompiler)
+    Write-Log ("decompiler ProductVersion={0} FileVersion={1}" -f $dinfo.ProductVersion, $dinfo.FileVersion)
+    $productOk = Test-VersionMatch ([string]$dinfo.ProductVersion) $ExpectedVersion
+    $fileOk = Test-VersionMatch ([string]$dinfo.FileVersion) $ExpectedVersion
+    if (-not $productOk -and -not $fileOk) {
+      throw "decompiler file version does not match '$ExpectedVersion'"
+    }
+  }
   $expDir = Join-Path $script:Packed "sim\experiments"
   if (-not (Test-Path -LiteralPath $expDir)) { throw "zip is missing sim/experiments" }
   $preset = Join-Path $expDir "api_smoke.yaml"
@@ -215,6 +250,16 @@ try {
     throw "health version '$($health.version)' != '$ExpectedVersion'"
   }
   if ($health.frozen -ne $true) { throw "health frozen is not true" }
+
+  $reported = Invoke-Utf8Json -Uri "$base/api/version" -TimeoutSec 15
+  Write-Log ("version " + ($reported | ConvertTo-Json -Compress -Depth 4))
+  if ([string]$reported.name -ne "DeckBench") { throw "GET /api/version name is not DeckBench" }
+  if ([string]$reported.version -ne $ExpectedVersion) {
+    throw "GET /api/version '$($reported.version)' != '$ExpectedVersion'"
+  }
+  if ([string]$reported.version -ne [string]$health.version) {
+    throw "GET /api/version does not match GET /api/health"
+  }
 
   $bodyObj = @{
     kind = "combat"

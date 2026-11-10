@@ -8,12 +8,23 @@ param(
   [string]$Work = "",
   [string]$Py = "",
   [string]$Decompiler = "",
-  [string]$Version = "0.1.5"
+  [string]$Version = ""
 )
 $ErrorActionPreference = "Stop"
 $Repo = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 if (-not $Work) { $Work = Join-Path (Split-Path $Repo -Parent) "build-work" }
 if (-not $Py) { $Py = Join-Path $Work "buildenv\Scripts\python.exe" }
+# Version comes from sts2sim.__version__. -Version overrides that read for one build.
+$verExe = "python"
+if ($Py -and (Test-Path -LiteralPath $Py)) { $verExe = $Py }
+if (-not $Version) {
+  $reader = Join-Path $PSScriptRoot "read_version.py"
+  $got = & $verExe $reader
+  if ($LASTEXITCODE -ne 0) { throw "could not read sts2sim.__version__ (exit $LASTEXITCODE)" }
+  $Version = "$got".Trim()
+  if (-not $Version) { throw "sts2sim.__version__ was empty" }
+}
+Write-Host "version: $Version"
 New-Item -ItemType Directory -Force $Work | Out-Null
 # 临时文件、npm 缓存、PyInstaller 缓存都放到工作目录（避免占用 C 盘）
 $tmp = Join-Path $Work "tmp"; New-Item -ItemType Directory -Force $tmp | Out-Null
@@ -53,6 +64,10 @@ Copy-Item -Recurse (Join-Path $Repo "gui\web\dist") (Join-Path $src "gui\web\dis
 foreach ($f in "launcher.py", "DeckBench.spec", "icon.ico") { Copy-Item (Join-Path $PSScriptRoot $f) $src }
 
 Write-Host "[3/5] PyInstaller"
+$verInfo = Join-Path $src "file_version_info.txt"
+& $verExe (Join-Path $PSScriptRoot "write_version_info.py") --out $verInfo --version $Version
+if ($LASTEXITCODE -ne 0) { throw "Windows file version resource was not written" }
+if (-not (Test-Path -LiteralPath $verInfo)) { throw "file_version_info.txt missing" }
 $dist = Join-Path $Work "dist"
 Push-Location $src
 & $Py -m PyInstaller --noconfirm --distpath $dist --workpath (Join-Path $Work "pyi-work") DeckBench.spec

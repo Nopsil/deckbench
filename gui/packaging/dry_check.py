@@ -18,8 +18,6 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ET
 
-EXPECTED_VERSION = "0.1.5"
-
 # Surfaces the 0.1.5 package must stage. ship-manifest.txt can list more;
 # deleting one of these fails the dry-check even if audit.ps1 is not re-run.
 REQUIRED_PATHS = (
@@ -380,27 +378,68 @@ def check(root=None):
         if any(p in folders or p in ("sts2_rs", "sts2_hint", "mentor") for p in parts):
             bad.append(f"staged path uses a forbidden folder: {rel}")
 
-    bad.extend(_version_problems(root, build_text))
+    bad.extend(_version_problems(root, build_text, spec_text))
     bad.extend(packaging_project_xml_problems(root))
     bad.extend(powershell_encoding_problems(root))
     return bad
 
 
-def _version_problems(root, build_text):
+def project_version(root):
+    """The only version literal is sts2sim.__version__. Callers compare other copies to it."""
+    sys.path.insert(0, root)
+    from sts2sim.version import read_project_version
+    return read_project_version(root)
+
+
+def _version_problems(root, build_text, spec_text):
     bad = []
-    if f'[string]$Version = "{EXPECTED_VERSION}"' not in build_text:
-        bad.append(f"build.ps1 default -Version is not {EXPECTED_VERSION}")
-    init = _read(os.path.join(root, "sts2sim", "__init__.py"))
-    if f'__version__ = "{EXPECTED_VERSION}"' not in init:
-        bad.append(f"sts2sim.__version__ is not {EXPECTED_VERSION}")
+    try:
+        version = project_version(root)
+    except (OSError, ValueError) as exc:
+        return [str(exc)]
+    if re.search(r"""\[string\]\$Version\s*=\s*["']\d""", build_text):
+        bad.append("build.ps1 hardcodes -Version; read sts2sim.__version__ instead")
+    if "read_version.py" not in build_text or "__version__" not in build_text:
+        bad.append("build.ps1 does not read sts2sim.__version__")
+    if "DeckBench-$Version-win64.zip" not in build_text:
+        bad.append("build.ps1 zip name does not use the project version")
+    if "write_version_info.py" not in build_text or "file_version_info.txt" not in build_text:
+        bad.append("build.ps1 does not write the Windows file version resource")
+    if "file_version_info.txt" not in spec_text or '["version"]' not in spec_text:
+        bad.append("DeckBench.spec does not embed file_version_info.txt on Windows")
     pkg = json.loads(_read(os.path.join(root, "gui", "web", "package.json")))
-    if pkg.get("version") != EXPECTED_VERSION:
-        bad.append(f"gui/web/package.json version is not {EXPECTED_VERSION}")
+    if pkg.get("version") != version:
+        bad.append(f"gui/web/package.json version is not {version}")
+    lock = json.loads(_read(os.path.join(root, "gui", "web", "package-lock.json")))
+    locked = lock.get("version")
+    locked_root = (lock.get("packages") or {}).get("", {}).get("version")
+    if locked != version or locked_root != version:
+        bad.append(f"gui/web/package-lock.json version is not {version}")
     dev = _read(os.path.join(root, "docs", "DEVELOPER.md"))
-    if f"-Version {EXPECTED_VERSION}" not in dev or f"DeckBench-{EXPECTED_VERSION}-win64.zip" not in dev:
-        bad.append(f"docs/DEVELOPER.md packaging commands are not {EXPECTED_VERSION}")
+    if f"DeckBench-{version}-win64.zip" not in dev:
+        bad.append(f"docs/DEVELOPER.md packaging commands are not {version}")
+    if "sts2sim.__version__" not in dev or "read_version.py" not in dev:
+        bad.append("docs/DEVELOPER.md does not read the package version from sts2sim.__version__")
     if "-Version 0.1.3" in dev or "DeckBench-0.1.3" in dev:
         bad.append("docs/DEVELOPER.md still shows the 0.1.3 packaging commands")
+    workflow = _read(os.path.join(root, ".github", "workflows", "windows-package.yml"))
+    if "read_version.py" not in workflow:
+        bad.append("windows-package.yml does not read sts2sim.__version__")
+    if re.search(r"PACKAGE_VERSION:\s*[\"']\d", workflow):
+        bad.append("windows-package.yml hardcodes PACKAGE_VERSION")
+    for flag in ("-p:Version=", "-p:FileVersion=", "-p:AssemblyVersion=", "-p:InformationalVersion="):
+        if flag not in workflow:
+            bad.append(f"windows-package.yml does not stamp {flag}")
+    csproj = _read(os.path.join(root, "gui", "packaging", "decompiler", "ilspycmd-host.csproj"))
+    if re.search(r"<Version>\s*[0-9]", csproj):
+        bad.append("decompiler csproj hardcodes Version; stamp it at publish")
+    if "IncludeSourceRevisionInInformationalVersion" not in csproj:
+        bad.append("decompiler csproj should keep InformationalVersion free of a git suffix")
+    smoke = _read(os.path.join(root, "gui", "packaging", "smoke_api.ps1"))
+    if "/api/version" not in smoke:
+        bad.append("smoke_api.ps1 does not assert GET /api/version")
+    if re.search(r"""ExpectedVersion\s*=\s*["']\d""", smoke):
+        bad.append("smoke_api.ps1 hardcodes ExpectedVersion")
     return bad
 
 
@@ -425,8 +464,12 @@ def main(argv=None):
         for item in bad:
             print(f" - {item}")
         return 1
+    try:
+        stamped = project_version(root)
+    except (OSError, ValueError):
+        stamped = "?"
     print(
-        "PASS: 0.1.5 packaging manifest matches git "
+        f"PASS: {stamped} packaging manifest matches git "
         "(import_run, seed_preview, dllmod, decompiler project, mentor.local.json docs pointer)"
     )
     return 0

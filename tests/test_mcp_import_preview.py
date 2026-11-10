@@ -342,7 +342,7 @@ def test_server_registers_preview_and_import_only_stays_import(monkeypatch):
         "import_save", "import_history_batch", "batch_run_summary", "card_ab", "compare_runs",
         "explain_fight", "calibrate", "gap_triage", "export_report",
         "list_cards", "list_encounters", "save_deck", "head_to_head", "card_impact",
-        "run_progress", "cancel_run",
+        "run_progress", "cancel_run", "check_update",
     ]
     assert "new_run" not in only_names and "seed_preview" not in only_names
     assert only._resource_manager.list_resources() == []
