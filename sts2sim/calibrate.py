@@ -656,9 +656,12 @@ def calibrate_json(real, sim):
 
 
 def parse_sim_bytes(data):
-    """上传的模拟 jsonl。空行跳过，一行一个对象。不写盘。"""
+    """上传的模拟 jsonl。空行跳过，一行一个对象。不写盘。超过存档上限的正文不解析。"""
+    from sts2sim.saveimport import MAX_BYTES
     if not isinstance(data, (bytes, bytearray)):
         raise AnalysisError("not_json", line=1)
+    if len(data) > MAX_BYTES:
+        raise AnalysisError("too_big")
     try:
         text = bytes(data).decode("utf-8-sig")
     except UnicodeDecodeError:
@@ -669,7 +672,7 @@ def parse_sim_bytes(data):
             continue
         try:
             row = json.loads(line)
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, RecursionError):
             raise AnalysisError("not_json", line=i)
         if not isinstance(row, dict):
             raise AnalysisError("not_json", line=i)

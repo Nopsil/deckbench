@@ -15,6 +15,26 @@ PROG = re.compile(r"^@@PROGRESS (.*)$")
 DONE = re.compile(r"^@@DONE (.*)$")
 
 
+def _runs_child(rid):
+    """runs/<rid> 的真实路径。必须是单个路径段，并且解析后仍在 RUNS_DIR 里面。
+
+    ``..``、带斜杠的 id、以及指到目录外的符号链接都返回 None，不读也不删。
+    """
+    if not isinstance(rid, str) or not rid or rid in (".", ".."):
+        return None
+    if "/" in rid or "\\" in rid or "\x00" in rid:
+        return None
+    root = os.path.realpath(paths.RUNS_DIR)
+    path = os.path.realpath(os.path.join(root, rid))
+    try:
+        inside = os.path.normcase(os.path.commonpath([root, path])) == os.path.normcase(root)
+    except ValueError:
+        return None
+    if not inside or os.path.normcase(path) == os.path.normcase(root):
+        return None
+    return path
+
+
 def _now():
     return _dt.datetime.now().astimezone().isoformat(timespec="seconds")
 
@@ -43,9 +63,12 @@ class JobManager:
         # 上次没跑完就关掉的，标记为中断
         for m in self.list():
             if m.get("status") in ("running", "queued"):
+                child = _runs_child(m.get("id"))
+                if child is None:
+                    continue
                 m["status"] = "interrupted"
                 m["error"] = i18n.t("jobs.interrupted")
-                with open(os.path.join(paths.RUNS_DIR, m["id"], "meta.json"), "w", encoding="utf-8") as f:
+                with open(os.path.join(child, "meta.json"), "w", encoding="utf-8") as f:
                     json.dump(m, f, ensure_ascii=False, indent=1)
 
     # ---------------- 历史
@@ -54,33 +77,46 @@ class JobManager:
         if not os.path.isdir(paths.RUNS_DIR):
             return out
         for d in os.listdir(paths.RUNS_DIR):
-            f = os.path.join(paths.RUNS_DIR, d, "meta.json")
+            child = _runs_child(d)
+            if child is None:
+                continue
+            f = os.path.join(child, "meta.json")
             if os.path.exists(f):
+                loaded = None
                 try:
-                    out.append(json.load(open(f, encoding="utf-8")))
-                except Exception:
-                    pass
+                    with open(f, encoding="utf-8") as fh:
+                        loaded = json.load(fh)
+                except (OSError, ValueError, TypeError):
+                    loaded = None
+                if isinstance(loaded, dict):
+                    out.append(loaded)
         out.sort(key=lambda m: m.get("created", ""), reverse=True)
         return out
 
     def get(self, rid):
-        if rid in self.jobs:
+        if isinstance(rid, str) and rid in self.jobs:
             return self.jobs[rid].meta
-        f = os.path.join(paths.RUNS_DIR, rid, "meta.json")
+        child = _runs_child(rid)
+        if child is None:
+            return None
+        f = os.path.join(child, "meta.json")
         if not os.path.exists(f):
             return None
         return json.load(open(f, encoding="utf-8"))
 
     def run_dir(self, rid):
-        d = os.path.join(paths.RUNS_DIR, os.path.basename(rid))
-        return d if os.path.isdir(d) else None
+        d = _runs_child(rid)
+        return d if d and os.path.isdir(d) else None
 
     def log_lines(self, rid, since=0):
-        j = self.jobs.get(rid)
+        j = self.jobs.get(rid) if isinstance(rid, str) else None
         if j:
             with j.lock:
                 return j.lines[since:], len(j.lines)
-        f = os.path.join(paths.RUNS_DIR, rid, "run.log")
+        child = _runs_child(rid)
+        if child is None:
+            return [], 0
+        f = os.path.join(child, "run.log")
         if not os.path.exists(f):
             return [], 0
         lines = open(f, encoding="utf-8", errors="replace").read().splitlines()

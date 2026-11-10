@@ -677,9 +677,38 @@ def _list_run_files(directory):
     return found
 
 
+def _link_escapes(path, root):
+    """目录扫描里，指向 root 外面的符号链接文件。普通文件、以及仍在 root 里的链接，不算。
+
+    用户直接点名的那个文件不走这里（那是他们自己选的路径）。history 目录本身是符号链接时，
+    里面的普通文件仍可读：要拦的是夹在目录里、跳到外面的链接。
+    """
+    if not os.path.islink(path):
+        return False
+    try:
+        target = os.path.normcase(os.path.realpath(path))
+        base = os.path.normcase(os.path.realpath(root))
+    except (OSError, ValueError):
+        return True
+    if target == base:
+        return True
+    try:
+        return os.path.normcase(os.path.commonpath([target, base])) != base
+    except ValueError:
+        return True
+
+
 def load_path(path):
     """文件 → {kind: run, run}；目录 → {kind: folder, entries}。只读。"""
-    path = os.path.abspath(os.path.expanduser(path))
+    if not isinstance(path, str):
+        raise SaveImportError("not_found", path="")
+    if "\x00" in path:
+        raise SaveImportError("not_found", path=path.split("\x00", 1)[0])
+    try:
+        path = os.path.abspath(os.path.expanduser(path))
+    except (TypeError, ValueError, OSError) as e:
+        raise SaveImportError("not_found", path="") from e
+    # 用户点名的那一个文件，即使是链接也读。目录扫描里的外链在下面拒绝。
     if os.path.isfile(path):
         return {"v": 1, "kind": "run", "run": parse_path(path)}
     if not os.path.isdir(path):
@@ -691,6 +720,9 @@ def load_path(path):
         files = files[:MAX_FILES]
     entries = []
     for full, role in files:
+        if _link_escapes(full, path):
+            # 不打开链接目标。整次导入失败，避免把目录外的内容收进摘要。
+            raise SaveImportError("path_not_allowed", path=os.path.basename(full))
         try:
             run = parse_path(full)
             entries.append({"file": os.path.basename(full), "path": full, "role": role, "run": run})
@@ -1106,3 +1138,5 @@ def summary_json(path):
         return json.dumps(summarize(load_path(path)), ensure_ascii=False)
     except SaveImportError as e:
         return json.dumps(_error_body(e), ensure_ascii=False)
+    except (TypeError, ValueError, OSError):
+        return json.dumps(_error_body(SaveImportError("not_found", path="")), ensure_ascii=False)

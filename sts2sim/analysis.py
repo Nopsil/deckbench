@@ -102,8 +102,14 @@ def resolve_read(path):
     """规范化后的可读路径。目录外、存档树、不存在，都是 AnalysisError，不读内容。"""
     if not isinstance(path, str) or not path.strip():
         raise AnalysisError("need_path")
-    raw = os.path.abspath(os.path.expanduser(path.strip()))
-    real = _realpath(raw)
+    shown = path.strip().split("\x00", 1)[0]
+    if "\x00" in path:
+        raise AnalysisError("path_not_allowed", path=shown)
+    try:
+        raw = os.path.abspath(os.path.expanduser(path.strip()))
+        real = _realpath(raw)
+    except (TypeError, ValueError, OSError):
+        raise AnalysisError("path_not_allowed", path=shown)
     if _matching_root(real) is None:
         raise AnalysisError("path_not_allowed", path=real)
     if not os.path.exists(real):
@@ -135,9 +141,14 @@ def _call(fn, *args, **kwargs):
 
 
 def _load_jsonl(path):
+    from sts2sim.saveimport import MAX_BYTES
     rows = []
     try:
+        if os.path.getsize(path) > MAX_BYTES:
+            raise AnalysisError("too_big", path=path)
         fh = open(path, "r", encoding="utf-8-sig")
+    except AnalysisError:
+        raise
     except OSError:
         raise AnalysisError("unreadable", path=path)
     with fh:
@@ -147,7 +158,7 @@ def _load_jsonl(path):
                     continue
                 try:
                     row = json.loads(line)
-                except json.JSONDecodeError:
+                except (json.JSONDecodeError, RecursionError):
                     raise AnalysisError("not_json", path=path, line=i)
                 if not isinstance(row, dict):
                     raise AnalysisError("not_json", path=path, line=i)

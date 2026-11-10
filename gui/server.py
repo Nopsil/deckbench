@@ -12,9 +12,10 @@ import zipfile
 
 import yaml
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from . import i18n, paths
 from .backend import get_backend
@@ -26,6 +27,66 @@ jobs = JobManager(backend)
 app = FastAPI(title="DeckBench GUI")
 app.include_router(modeditor_router)
 T = i18n.t
+
+_VALIDATION_TYPES = {
+    "string_type": "api.type.string",
+    "string_unicode": "api.type.string",
+    "int_type": "api.type.integer",
+    "int_parsing": "api.type.integer",
+    "int_from_float": "api.type.integer",
+    "bool_type": "api.type.boolean",
+    "bool_parsing": "api.type.boolean",
+    "float_type": "api.type.number",
+    "float_parsing": "api.type.number",
+    "dict_type": "api.type.object",
+    "model_attributes_type": "api.type.object",
+    "list_type": "api.type.array",
+    "tuple_type": "api.type.array",
+}
+
+
+def _validation_message(exc):
+    """校验失败时给一句能照着改的话。不回显输入，也不带异常文本。"""
+    errors = list(exc.errors()) if hasattr(exc, "errors") else []
+    if not errors:
+        return T("api.err.bad_json")
+    err = errors[0]
+    typ = str(err.get("type") or "")
+    if typ.startswith("json"):
+        return T("api.err.bad_json")
+    parts = [str(part) for part in (err.get("loc") or ())]
+    if parts and parts[0] in ("body", "query", "path", "header", "cookie"):
+        parts = parts[1:]
+    field = ".".join(parts) or "request"
+    if typ == "missing":
+        return T("api.err.missing", field=field)
+    type_key = _VALIDATION_TYPES.get(typ)
+    if type_key:
+        return T("api.err.bad_type", field=field, expected=T(type_key))
+    return T("api.err.bad_field", field=field)
+
+
+@app.exception_handler(RequestValidationError)
+async def _invalid_request(_request, exc):
+    return JSONResponse(status_code=400, content={"detail": _validation_message(exc)})
+
+
+async def _read_capped(file, limit, message):
+    """按块读上传，超过 limit 就 400。不把超限的正文留在内存里。"""
+    size = getattr(file, "size", None)
+    if isinstance(size, int) and not isinstance(size, bool) and size > limit:
+        raise HTTPException(400, message)
+    chunks = []
+    total = 0
+    while True:
+        block = await file.read(min(65536, limit - total + 1))
+        if not block:
+            break
+        total += len(block)
+        if total > limit:
+            raise HTTPException(400, message)
+        chunks.append(block)
+    return b"".join(chunks)
 
 
 @app.middleware("http")
@@ -225,9 +286,7 @@ NAME_RE = re.compile(r"^[A-Za-z0-9_]{1,40}$")
 
 @app.post("/api/mods/upload")
 async def upload_mod(file: UploadFile = File(...)):
-    data = await file.read()
-    if len(data) > 50 * 1024 * 1024:
-        raise HTTPException(400, T("err.tooBig"))
+    data = await _read_capped(file, 50 * 1024 * 1024, T("err.tooBig"))
     try:
         zf = zipfile.ZipFile(io.BytesIO(data))
     except zipfile.BadZipFile:
@@ -315,11 +374,13 @@ def delete_mod(name: str):
 
 
 class ImportPathReq(BaseModel):
+    model_config = ConfigDict(strict=True)
     path: str
 
 
 class ImportBatchReq(BaseModel):
     """path 必填。lines 只跟命令行对齐，不改变 HTTP 的正文形状。"""
+    model_config = ConfigDict(strict=True)
     path: str | None = None
     lines: bool = False
 
@@ -332,10 +393,12 @@ class PreviewReq(BaseModel):
 
 
 class ExplainPathReq(BaseModel):
+    model_config = ConfigDict(strict=True)
     path: str
 
 
 class ExplainFightReq(BaseModel):
+    model_config = ConfigDict(strict=True)
     path: str
     seed: str = ""
     fight: int = 0
@@ -344,6 +407,7 @@ class ExplainFightReq(BaseModel):
 
 
 class CalibrateReq(BaseModel):
+    model_config = ConfigDict(strict=True)
     real: str = ""
     sim: str = ""
 
@@ -373,6 +437,8 @@ def _import_http(err):
         msg = T("imp.err.not_a_run")
     elif err.code == "too_big":
         msg = T("imp.err.too_big")
+    elif err.code == "path_not_allowed":
+        msg = T("imp.err.path_not_allowed", path=p.get("path", ""))
     elif err.code == "decode":
         msg = T("imp.err.decode")
     elif err.code == "dir_empty":
@@ -442,6 +508,8 @@ def _explain_http(err):
         return T("exp.err.ambiguous_explain", n=p.get("n", 0), path=path)
     if code == "not_json":
         return T("exp.err.not_json", line=p.get("line", "?"))
+    if code == "too_big":
+        return T("imp.err.too_big")
     if code == "unreadable":
         return T("exp.err.unreadable", path=path)
     if code == "bad_fight":
@@ -531,9 +599,7 @@ async def calibrate_upload(real: str = Form(""), file: UploadFile = File(...)):
     from sts2sim.analysis import AnalysisError
     from sts2sim.calibrate import CalibrateError, calibrate_rows, parse_sim_bytes
     from sts2sim.saveimport import MAX_BYTES, SaveImportError
-    data = await file.read()
-    if len(data) > MAX_BYTES:
-        raise HTTPException(400, T("imp.err.too_big"))
+    data = await _read_capped(file, MAX_BYTES, T("imp.err.too_big"))
     try:
         body = calibrate_rows(real, parse_sim_bytes(data))
     except SaveImportError as e:
@@ -553,9 +619,7 @@ async def calibrate_upload(real: str = Form(""), file: UploadFile = File(...)):
 async def import_upload(file: UploadFile = File(...)):
     """浏览器选中的存档只在内存里解析，不写回游戏目录。"""
     from sts2sim.saveimport import MAX_BYTES, SaveImportError, parse_bytes
-    data = await file.read()
-    if len(data) > MAX_BYTES:
-        raise HTTPException(400, T("imp.err.too_big"))
+    data = await _read_capped(file, MAX_BYTES, T("imp.err.too_big"))
     try:
         run = parse_bytes(data, filename=file.filename or "upload.run")
     except SaveImportError as e:
