@@ -47,6 +47,7 @@
           <span class="sr-only" data-progress-total>{{ prog.total }}</span>
         </div>
         <div v-if="partial" class="hint" data-partial>{{ t('run.partialHint') }}</div>
+        <card-impact-table v-if="meta.kind === 'card_impact'" :job-id="id" />
         <div v-else-if="prog.cancel_requested && status === 'running'" class="hint">{{ t('run.stopping') }}</div>
         <div class="grid g4" style="margin-top:18px">
           <stat :label="meta.kind === 'batch' ? t('run.doneRuns') : t('run.doneFights')" :value="`${prog.done} / ${prog.total || '—'}`" />
@@ -74,6 +75,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NButton, NCheckbox, NIcon, NPopconfirm, NSpin, NTag, useMessage } from 'naive-ui'
 import { PlayerStop, Refresh, ChartBar, FileExport } from '@vicons/tabler'
+import CardImpactTable from '../components/CardImpactTable.vue'
 import Stat from '../components/Stat.vue'
 import { api, store, fmt, runTitle, STATUS } from '../api'
 import { t, lang, MESSAGES } from '../i18n'
@@ -113,6 +115,9 @@ const exportHref = computed(() => {
 })
 const paramChips = computed(() => {
   const p = meta.value?.params || {}
+  if (meta.value?.kind === 'card_impact') {
+    return [t('kind.card_impact'), p.deck ? t('chip.preset', { id: p.deck }) : '', t('chip.seed', { s: p.seed })].filter(Boolean)
+  }
   if (meta.value?.kind === 'batch') {
     const x = [t('kind.batch'), store.charName(p.char), 'A' + p.asc, t('chip.nRuns', { n: p.n }), store.agentName('batch', p.agent), t('chip.parallel', { n: p.procs })]
     x.push(t('chip.style', { style: store.styleName(p.style) }))

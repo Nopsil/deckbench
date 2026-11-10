@@ -8,13 +8,13 @@
 
 一份文件里可以有这三段里的一段或几段：
 
-- 一次已完成的测试（整局 `runs.jsonl`，或战斗实验的 `cells.csv` / `raw.jsonl`）。数字和报告页、`GET /api/runs/<id>/summary` 是同一套。
+- 一次已完成的测试（整局 `runs.jsonl`，或战斗实验的 `cells.csv` / `raw.jsonl`）。数字和报告页、`GET /api/runs/<id>/summary` 是同一套。单卡贡献的父任务另带一张表：每种牌是变体减去基线的胜率、掉血和回合，并标明样本太小或 Wilson 区间重叠。
 - 两次已完成的战斗实验的对比。数字和 `GET /api/runs/compare` 是同一套：格子上的胜率、超时、回合、掉血、每回合输出，以及单卡使用和效率。
 - 一份校准 JSON（`tools/calibrate.py --json` 或 `POST /api/calibrate`），以及由它算出的缺口分诊。已经分诊好的 JSON 也可以。
 
 *One file can hold any of these, alone or together:*
 
-- *One finished test (a full-run `runs.jsonl`, or a combat test's `cells.csv` / `raw.jsonl`). The numbers are the same as the report page and `GET /api/runs/<id>/summary`.*
+- *One finished test (a full-run `runs.jsonl`, or a combat test's `cells.csv` / `raw.jsonl`). The numbers are the same as the report page and `GET /api/runs/<id>/summary`. A card-impact parent also includes a table: for each card, the variant minus the baseline for win rate, HP lost and turns, with a too-small or overlapping-Wilson flag.*
 - *A comparison of two finished combat tests. The numbers are the same as `GET /api/runs/compare`: win rate, timeout, turns, HP loss and damage per turn per cell, plus per-card usage and efficiency.*
 - *A calibration JSON (`tools/calibrate.py --json` or `POST /api/calibrate`), plus the gap triage computed from it. A triage JSON that was already written is accepted too.*
 

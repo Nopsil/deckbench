@@ -328,9 +328,10 @@ def test_server_registers_analysis_tools_on_play_and_import_only():
     mcp = _load_mcp()
     play = mcp.build()
     names = [t.name for t in play._tool_manager.list_tools()]
-    assert names[-11:] == [
+    assert names[-14:] == [
         "batch_run_summary", "card_ab", "compare_runs", "explain_fight", "calibrate", "gap_triage",
         "export_report", "list_cards", "list_encounters", "save_deck", "head_to_head",
+        "card_impact", "run_progress", "cancel_run",
     ]
     tools = {t.name: t for t in play._tool_manager.list_tools()}
     assert tools["batch_run_summary"].parameters["required"] == ["path"]
@@ -364,8 +365,12 @@ def test_server_registers_analysis_tools_on_play_and_import_only():
     assert only_names == [
         "import_save", "import_history_batch", "batch_run_summary", "card_ab", "compare_runs",
         "explain_fight", "calibrate", "gap_triage", "export_report",
-        "list_cards", "list_encounters", "save_deck", "head_to_head",
+        "list_cards", "list_encounters", "save_deck", "head_to_head", "card_impact",
+        "run_progress", "cancel_run",
     ]
+    impact = tools["card_impact"]
+    assert "Wilson" in impact.description and "400" in impact.description
+    assert set(impact.parameters["properties"]) >= {"deck", "job", "plus", "scale"}
     h2h = tools["head_to_head"]
     assert h2h.parameters["required"] == ["a", "b"]
     assert "400" in h2h.description

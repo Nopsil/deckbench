@@ -2,9 +2,9 @@
 
 [← 文档索引](INDEX.md) · [MCP](MCP.md) · [模组格式](MODDING.md)
 
-侧栏「组牌」（`#/decks`）用来浏览模拟器已经认识的牌，组成一套牌，勾选要打的遭遇，存成战斗预设。新建测试里选这份预设就能开打，自定义战斗也可以直接勾选遭遇。不改模拟器的出牌、种子和 AI，也不改 `experiments/` 里的出厂预设、`mods/`、种子或已有配置。
+侧栏「组牌」（`#/decks`）用来浏览模拟器已经认识的牌，组成一套牌，勾选要打的遭遇，存成战斗预设。新建测试里选这份预设就能开打，自定义战斗也可以直接勾选遭遇。存好的预设还可以做留一法，看每张牌对胜率、掉血和回合的影响。不改模拟器的出牌、种子和 AI，也不改 `experiments/` 里的出厂预设、`mods/`、种子或已有配置。
 
-*Deck builder (`#/decks`) browses the cards the simulator already knows, builds a deck, ticks the encounters it should run, and saves a combat preset. New test can start that preset immediately, and a custom combat test can tick encounters too. Simulator play, seeds and AI stay as they are. Shipped presets under `experiments/`, `mods/`, seeds and existing configs are not changed.*
+*Deck builder (`#/decks`) browses the cards the simulator already knows, builds a deck, ticks the encounters it should run, and saves a combat preset. New test can start that preset immediately, and a custom combat test can tick encounters too. A saved preset can also run leave-one-out, to see how each card moves win rate, HP lost and turns. Simulator play, seeds and AI stay as they are. Shipped presets under `experiments/`, `mods/`, seeds and existing configs are not changed.*
 
 ## 牌池 / Card pool
 
@@ -135,9 +135,35 @@
 
 MCP `head_to_head(a, b, encounters="", gauntlet="", max_turns=None, seed=None)` 做同一件事，也是马上返回。`encounters` 是上面的 JSON 数组文本。成功的 JSON 和 HTTP 相同。失败是 `{"ok": false, "error": "..."}`，不抛异常。`--import-only` 也有这个工具：训练木桩不需要本机游戏数据，真正开打用的仍是原来的战斗测试。进度和取消是 `run_progress` / `cancel_run`。
 
+## 单卡贡献 / Card impact
+
+组牌页上「单卡贡献」选一份已经保存的用户预设。`POST /api/decks/<id>/card_impact` 用已有的战斗测试做留一法：先打基线，再对每一种牌（同一 id、同一种升级算一种）打一份少一张的变体。`plus: true` 时再为每种牌打一份多一张的变体；已经有 15 张的不再加，记在 `skipped` 里，原因是 `count`。遭遇、种子、回合上限和卡组 id 都和基线相同。卡组 id 不变，所以 `sts2sim.runner` 原来的播种（种子、卡组、幕、房间、场次、遭遇）不变。不另写一套出牌。
+
+全体变体合计最多 400 场，和一份预设自己的上限是同一个数。默认 `scale: true`：放不下就按原来的场数比例缩小每种遭遇（最大余数法），所有变体共用缩小后的那一份名单。`scale: false`，或者缩到每个变体 1 场仍超过 400，是 400，`too_many_fights`，一句说明，没有堆栈，也不开跑。拿掉一张就会把牌组打空（牌组里只剩这一张）是 `ablation`。
+
+请求在变体都**排队**之后就返回，不等打完。正文有 `id` / `job`（父任务）、`runs`（基线和每个变体的测试 id）、`status: "running"`、`seed`、`max_turns`、`encounters`、`fights`（每个变体的场数）、`total_fights`、`scaled`。进度和取消用父任务 id：`GET /api/runs/<id>/progress`、`POST /api/runs/<id>/cancel`。取消不杀进程。正在打的那场打完，还没开始的变体不再派发。状态是 `cancelled`，`partial` 为 true。
+
+`GET /api/decks/<id>/card_impact` 是这份牌组最近一次的结果。`GET /api/runs/<job>/card_impact` 是某一次父任务的结果，跑完或还在跑都可以读。每一行是变体减基线：`delta_win`、`delta_hp_lost`、`delta_turns`，以及 `n`。胜率带 Wilson 95% 区间。任一侧局数小于 30（`sample_warning`），`noisy_reason` 是 `too_small`；局数够了但两侧 Wilson 区间重叠，是 `wilson_overlap`。两种都让 `noisy` 为真。牌的名字来自模拟器已经加载的牌面，不另编。拿掉一张时，胜率差为负表示这张牌在帮胜率，掉血差为正表示它在少掉血。多一张时方向相反。`win_effect` / `hp_effect` 是 `helps`、`hurts` 或 `flat`。
+
+`#/decks` 上是进度条、取消，和一张按差值排序的表。跑完的父任务在运行页上也能看到这张表。`GET /api/runs/<id>/export.html` 把同一张表写进离线 HTML。见 [EXPORT.md](EXPORT.md)。
+
+MCP `card_impact(deck, job="", plus=false, scale=true, encounters="", gauntlet="", max_turns=None, seed=None)` 做同一件事。不写 `job` 就开跑并马上返回。写了 `job` 就只读那一次的结果。失败是 `{"ok": false, "error": "..."}`，不抛异常。`--import-only` 也有这个工具。训练木桩不需要本机游戏数据。
+
+*Deck builder has **Card impact**. Pick one saved user preset. `POST /api/decks/<id>/card_impact` runs leave-one-out with the combat test that already exists: the baseline, then one variant per unique card (the same id and the same upgrade) with one copy removed. `plus: true` also runs one extra copy of each card. A card already at 15 copies is not increased; it is listed in `skipped` with reason `count`. Encounters, seed, turn cap and deck id match the baseline. The deck id does not change, so `sts2sim.runner` keeps its existing seeding (seed, deck, act, room, index and encounter together). There is no second play implementation.*
+
+*Every variant together is at most 400 fights, the same cap as one preset. The default `scale: true` shrinks each encounter in proportion to its original fight count (largest remainder) when the total would not fit. Every variant shares that shorter list. `scale: false`, or a list that still exceeds 400 at one fight per variant, is a 400, `too_many_fights`, one sentence, no stack trace, and no run is started. A deck that would be empty after removing its only card is `ablation`.*
+
+*The request returns once the variants are **queued**. It does not wait for them to finish. The body has `id` / `job` (the parent), `runs` (the baseline and each variant), `status: "running"`, `seed`, `max_turns`, `encounters`, `fights` (fights per variant), `total_fights` and `scaled`. Progress and cancel use the parent id: `GET /api/runs/<id>/progress` and `POST /api/runs/<id>/cancel`. Cancel does not kill the process. The fight in progress finishes, and variants that have not started are not dispatched. The status is `cancelled` and `partial` is true.*
+
+*`GET /api/decks/<id>/card_impact` is the latest result for that deck. `GET /api/runs/<job>/card_impact` is one parent run, finished or still going. Each row is the variant minus the baseline: `delta_win`, `delta_hp_lost`, `delta_turns`, and `n`. Win rate includes a Wilson 95% interval. If either side has fewer than 30 fights (`sample_warning`), `noisy_reason` is `too_small`. If both sides are large enough and the Wilson intervals overlap, it is `wilson_overlap`. Either one sets `noisy`. Card names come from the cards the simulator already loaded. They are not invented. After a removal, a negative win-rate delta means the card was helping win rate, and a positive HP-lost delta means it was saving hit points. An added copy reads the other way. `win_effect` / `hp_effect` is `helps`, `hurts` or `flat`.*
+
+*`#/decks` shows a progress bar, Cancel, and a table sortable by delta. A finished parent also shows the table on the run page. `GET /api/runs/<id>/export.html` writes the same table into the offline HTML. See [EXPORT.md](EXPORT.md).*
+
+*MCP `card_impact(deck, job="", plus=false, scale=true, encounters="", gauntlet="", max_turns=None, seed=None)` does the same thing. Omit `job` to start and return immediately. Pass `job` to read that result and not start another run. A failure is `{"ok": false, "error": "..."}` and does not raise. `--import-only` exposes this tool too. A training dummy does not need a local game install.*
+
 ## 进度和取消 / Progress and cancel
 
-新建测试、组牌预设、连战和对打都可以是几百场。页面不再干等。`GET /api/runs/<id>/progress` 返回 `done`、`total`、`encounter`、`encounter_name`、`elapsed`（秒）、`status`、`partial`。轮询即可。新建测试（`#/new`）、组牌（`#/decks`）和对打面板上有进度条和取消。运行页（`#/run/<id>`）也显示当前遭遇。
+新建测试、组牌预设、连战、对打和单卡贡献都可以是几百场。页面不再干等。单卡贡献的进度和取消用返回的父任务 id。`GET /api/runs/<id>/progress` 返回 `done`、`total`、`encounter`、`encounter_name`、`elapsed`（秒）、`status`、`partial`。轮询即可。新建测试（`#/new`）、组牌（`#/decks`）和对打面板上有进度条和取消。运行页（`#/run/<id>`）也显示当前遭遇。
 
 `POST /api/runs/<id>/cancel` 和 MCP `cancel_run` 不杀进程。工人在两场之间停下：正在打的那场打完，还没开始的不再派发。状态记成 `cancelled`，`partial` 为 true。打完的场次留在 `raw.jsonl` 或 `runs.jsonl` 里，报告开头写明是部分结果。对比和导出读这些结果，不抛栈；还在跑的仍是 400 / 409。见 [COMPARE.md](COMPARE.md)、[EXPORT.md](EXPORT.md)、[MCP.md](MCP.md)。
 
@@ -151,6 +177,6 @@ MCP `head_to_head(a, b, encounters="", gauntlet="", max_turns=None, seed=None)` 
 
 ## Progress and cancel
 
-*New test, a saved deck, a gauntlet and a head-to-head can be hundreds of fights. The page does not sit and wait. `GET /api/runs/<id>/progress` returns `done`, `total`, `encounter`, `encounter_name`, `elapsed` (seconds), `status` and `partial`. Polling is enough. **New test** (`#/new`), **Deck builder** (`#/decks`) and the head-to-head panel show a progress bar and Cancel. The run page (`#/run/<id>`) shows the current encounter too.*
+*New test, a saved deck, a gauntlet, a head-to-head and a card impact can be hundreds of fights. The page does not sit and wait. Card impact progress and cancel use the parent id from the response. `GET /api/runs/<id>/progress` returns `done`, `total`, `encounter`, `encounter_name`, `elapsed` (seconds), `status` and `partial`. Polling is enough. **New test** (`#/new`), **Deck builder** (`#/decks`) and the head-to-head panel show a progress bar and Cancel. The run page (`#/run/<id>`) shows the current encounter too.*
 
 *`POST /api/runs/<id>/cancel` and MCP `cancel_run` do not kill the process. The worker stops between fights: the one in progress finishes, and fights that have not started are not dispatched. The status is `cancelled` and `partial` is true. Finished fights stay in `raw.jsonl` or `runs.jsonl`, and the report says the result is partial. Compare and export read those results and do not raise. A test that is still running is still a 400 / 409. See [COMPARE.md](COMPARE.md), [EXPORT.md](EXPORT.md) and [MCP.md](MCP.md).*

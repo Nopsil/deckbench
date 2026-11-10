@@ -273,6 +273,71 @@ async def decks_head_to_head(request: Request):
         raise HTTPException(400, _deck_http(err)) from err
 
 
+async def _deck_body(request):
+    from sts2sim import deckpresets as decks
+    length = request.headers.get("content-length")
+    if length and length.isdigit() and int(length) > decks.MAX_BYTES:
+        raise HTTPException(400, T("deck.err.too_big", n=decks.MAX_BYTES))
+    chunks = []
+    total = 0
+    async for block in request.stream():
+        if total + len(block) > decks.MAX_BYTES:
+            raise HTTPException(400, T("deck.err.too_big", n=decks.MAX_BYTES))
+        chunks.append(block)
+        total += len(block)
+    try:
+        payload = json.loads(b"".join(chunks).decode("utf-8")) if chunks else {}
+    except (UnicodeError, json.JSONDecodeError):
+        raise HTTPException(400, T("deck.err.bad_json")) from None
+    return payload
+
+
+@app.post("/api/decks/{deck_id}/card_impact")
+async def start_card_impact(deck_id: str, request: Request):
+    """对一份已保存的牌组做留一法。马上返回父任务 id 和每个变体的测试 id。
+
+    全体变体合计最多 400 场。默认按比例缩小场数；``scale: false`` 时超限直接 400。
+    进度和取消走原来的 ``/api/runs/<id>/progress`` 和 ``cancel``，id 用返回的父任务。
+    """
+    from gui.cardimpact import start as start_impact
+    from sts2sim import deckpresets as decks
+    payload = await _deck_body(request)
+    if not isinstance(payload, dict):
+        raise HTTPException(400, T("api.err.bad_type", field="body", expected=T("api.type.object")))
+    try:
+        return await asyncio.to_thread(start_impact, deck_id, payload)
+    except decks.DeckPresetError as err:
+        raise HTTPException(400, _deck_http(err)) from err
+
+
+@app.get("/api/decks/{deck_id}/card_impact")
+def deck_card_impact(deck_id: str):
+    """这份牌组最近一次单卡贡献。还在跑时也返回，已经算完的行带上。"""
+    from gui.cardimpact import result_for_deck
+    from sts2sim import deckpresets as decks
+    try:
+        doc = result_for_deck(deck_id)
+    except decks.DeckPresetError as err:
+        raise HTTPException(400, _deck_http(err)) from err
+    if doc is None:
+        raise HTTPException(404, T("deck.impactNone"))
+    return doc
+
+
+@app.get("/api/runs/{rid}/card_impact")
+def run_card_impact(rid: str):
+    """某一次单卡贡献的结果。战斗测试 id 不是这个接口。"""
+    from gui.cardimpact import result_for_run
+    from sts2sim import deckpresets as decks
+    try:
+        doc = result_for_run(rid)
+    except decks.DeckPresetError as err:
+        raise HTTPException(400, _deck_http(err)) from err
+    if doc is None:
+        raise HTTPException(404, T("err.runNotFound"))
+    return doc
+
+
 @app.get("/api/catalog")
 def catalog(refresh: bool = False, lang: str | None = None):
     try:
@@ -505,6 +570,15 @@ def cancel(rid: str):
 @app.post("/api/runs/{rid}/rerun")
 def rerun(rid: str):
     m = _need(rid)
+    if m.get("kind") == "card_impact":
+        from gui.cardimpact import start as start_impact
+        from sts2sim.deckpresets import DeckPresetError
+        params = m.get("params") if isinstance(m.get("params"), dict) else {}
+        payload = params.get("request") if isinstance(params.get("request"), dict) else {}
+        try:
+            return start_impact(params.get("deck") or "", payload)
+        except DeckPresetError as err:
+            raise HTTPException(400, _deck_http(err)) from err
     t = m.get("title") or ""
     return jobs.start(m["kind"], m["params"], (t + T("err.rerunSuffix")) if t else None, lang=i18n.current())
 

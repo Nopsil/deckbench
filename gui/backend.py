@@ -415,12 +415,15 @@ class LocalPythonBackend(SimBackend):
             mod_parent = None
             if p.get("preset"):
                 from sts2sim.deckpresets import DeckPresetError, open_for_run
+                cards = p.get("deck_cards")
                 try:
-                    loaded, mod_parent = open_for_run(p.get("preset"), run_dir)
+                    loaded, mod_parent = open_for_run(p.get("preset"), run_dir, cards=cards)
                 except DeckPresetError as err:
                     key = "deck.err." + err.code
                     raise ValueError(i18n.t(key) if i18n.has(key) else i18n.t("deck.err.preset")) from err
                 if loaded is None:
+                    if cards is not None:
+                        raise ValueError(i18n.t("deck.err.preset"))
                     exp = yaml.safe_load(open(os.path.join(paths.SIM_ROOT, "experiments", p["preset"] + ".yaml"), encoding="utf-8"))
                 else:
                     exp = loaded
@@ -449,6 +452,9 @@ class LocalPythonBackend(SimBackend):
         raise ValueError(kind)
 
     def summarize(self, kind, run_dir):
+        if kind == "card_impact":
+            from gui.cardimpact import read_result
+            return read_result(run_dir)
         if kind == "batch":
             f = os.path.join(run_dir, "runs.jsonl")
             return metrics.batch_summary(metrics.load_jsonl(f)) if os.path.exists(f) else None

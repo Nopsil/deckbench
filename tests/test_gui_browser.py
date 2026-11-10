@@ -762,3 +762,56 @@ def test_multi_fight_run_shows_progress_then_cancel(gui):
     done = len([line for line in raw.splitlines() if line.strip()])
     assert 1 <= done < 30
     _assert_clean(gui, "progress-cancel")
+
+
+def test_deck_card_impact_shows_a_sortable_table(gui):
+    """两张牌对训练木桩做留一法，组牌页上出现可排序的差值表，并标明样本太小。"""
+    page = gui.page
+    page.goto(gui.base + "/#/decks", wait_until="domcontentloaded")
+    gui.expect(page.locator("[data-page='decks']")).to_be_visible()
+    search = page.locator("[data-deck='search'] input")
+    search.fill("YIHESHI")
+    first = page.locator("[data-card='claude_v34:YIHESHI']")
+    gui.expect(first).to_be_visible()
+    first.locator("[data-add]").click()
+    search.fill("XIAOBENBEN")
+    second = page.locator("[data-card='claude_v34:XIAOBENBEN']")
+    gui.expect(second).to_be_visible()
+    second.locator("[data-add]").click()
+    page.locator("[data-deck='id'] input").fill("impactdeck")
+    page.locator("[data-deck='name'] input").fill("Impact deck")
+    page.locator("[data-deck='save'] button").click()
+    gui.expect(page.locator("[data-deck='saved']")).to_have_text("Saved preset impactdeck")
+
+    panel = page.locator("[data-deck='impact']")
+    panel.scroll_into_view_if_needed()
+    button = page.locator("[data-deck='impact-run'] button")
+    if not button.is_enabled():
+        page.locator("[data-deck='impact-deck'] .n-base-selection").click()
+        option = page.locator(".n-base-select-option").filter(has_text="Impact deck").last
+        gui.expect(option).to_be_visible()
+        option.click()
+    gui.expect(button).to_be_enabled()
+    button.click()
+    table = page.locator("[data-table='card-impact']")
+    from playwright.sync_api import TimeoutError as PlaywrightTimeout
+    try:
+        gui.expect(table).to_be_visible(timeout=180_000)
+        gui.expect(page.locator("[data-impact-row]")).to_have_count(2, timeout=180_000)
+    except PlaywrightTimeout as exc:
+        raise AssertionError("card impact table did not appear\n" + _run_log_tail(gui.data)) from exc
+    gui.expect(page.locator("[data-impact-status='done']")).to_be_visible()
+    gui.expect(page.locator("[data-card='YIHESHI']")).to_be_visible()
+    gui.expect(page.locator("[data-card='XIAOBENBEN']")).to_be_visible()
+    gui.expect(page.locator("[data-change='remove']")).to_have_count(2)
+    gui.expect(page.locator("[data-noisy-reason='too_small']")).to_have_count(2)
+    gui.expect(page.get_by_text("Too small", exact=True).first).to_be_visible()
+    gui.expect(table).to_have_attribute("data-sort-key", "delta_win")
+    page.locator("[data-sort='delta_hp_lost']").click()
+    gui.expect(table).to_have_attribute("data-sort-key", "delta_hp_lost")
+    gui.expect(table).to_have_attribute("data-sort-dir", "desc")
+    page.locator("[data-sort='delta_win']").click()
+    gui.expect(table).to_have_attribute("data-sort-key", "delta_win")
+    table.scroll_into_view_if_needed()
+    _save_shot(page, "card-impact.png")
+    _assert_clean(gui, "card-impact")
