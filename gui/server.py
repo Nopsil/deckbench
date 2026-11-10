@@ -11,7 +11,7 @@ import tempfile
 import zipfile
 
 import yaml
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import (
     FileResponse,
@@ -168,6 +168,66 @@ def _need(rid):
     if not m:
         raise HTTPException(404, T("err.runNotFound"))
     return m
+
+
+def _deck_http(err):
+    """牌组接口的失败说明。不回显用户输入，也不带堆栈。"""
+    code = err.code
+    params = err.params or {}
+    if code == "missing":
+        return T("api.err.missing", field=params.get("field") or "request")
+    if code == "bad_type":
+        expected = T("api.type." + str(params.get("expected") or "string"))
+        return T("api.err.bad_type", field=params.get("field") or "request", expected=expected)
+    if code == "too_big":
+        return T("deck.err.too_big", n=params.get("n") or 0)
+    key = "deck.err." + code
+    if i18n.has(key):
+        return T(key)
+    return T("deck.err.cards")
+
+
+@app.get("/api/cards")
+def cards(
+    q: str = "",
+    character: str = "",
+    card_type: str = Query("", alias="type"),
+    cost: str = "",
+    rarity: str = "",
+    mod: str = "",
+    offset: int = 0,
+    limit: int = 40,
+):
+    """只读牌池。分页，可按角色、类型、费用、稀有度和中英文名字搜索。"""
+    from sts2sim.deckpresets import DeckPresetError, list_cards
+    try:
+        return list_cards(q, character, card_type, cost, rarity, mod, offset, limit)
+    except DeckPresetError as err:
+        raise HTTPException(400, _deck_http(err)) from err
+
+
+@app.post("/api/decks")
+async def save_deck(request: Request):
+    """校验一套牌，写成用户预设。只写允许的预设目录，不覆盖出厂预设。"""
+    from sts2sim import deckpresets as decks
+    length = request.headers.get("content-length")
+    if length and length.isdigit() and int(length) > decks.MAX_BYTES:
+        raise HTTPException(400, T("deck.err.too_big", n=decks.MAX_BYTES))
+    chunks = []
+    total = 0
+    async for block in request.stream():
+        if total + len(block) > decks.MAX_BYTES:
+            raise HTTPException(400, T("deck.err.too_big", n=decks.MAX_BYTES))
+        chunks.append(block)
+        total += len(block)
+    try:
+        payload = json.loads(b"".join(chunks).decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError):
+        raise HTTPException(400, T("deck.err.bad_json")) from None
+    try:
+        return decks.save_preset(payload)
+    except decks.DeckPresetError as err:
+        raise HTTPException(400, _deck_http(err)) from err
 
 
 @app.get("/api/catalog")
@@ -1094,6 +1154,9 @@ if os.path.isdir(paths.WEB_DIST):
 
     @app.get("/{full:path}")
     def spa(full: str):
+        # 未知的 /api 保持 404。否则前端构建之后，折叠过的路径会拿到 index.html。
+        if full == "api" or full.startswith("api/"):
+            raise HTTPException(404, "Not Found")
         f = os.path.join(paths.WEB_DIST, full)
         if full and os.path.isfile(f) and os.path.abspath(f).startswith(os.path.abspath(paths.WEB_DIST)):
             return FileResponse(f)

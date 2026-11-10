@@ -61,7 +61,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { NConfigProvider, NMessageProvider, NDialogProvider, NIcon, NSelect, NSpin, darkTheme, zhCN, dateZhCN, enUS, dateEnUS, jaJP, dateJaJP, koKR, dateKoKR } from 'naive-ui'
-import { CirclePlus, PlayerPlay, ChartBar, Scale, ArrowsLeftRight, History, World, Puzzle, Folder, Map, ListSearch, ChartDots } from '@vicons/tabler'
+import { CirclePlus, PlayerPlay, ChartBar, Scale, ArrowsLeftRight, History, World, Puzzle, Folder, Map, ListSearch, ChartDots, Stack2 } from '@vicons/tabler'
 import { themeFor } from './theme'
 import { store } from './api'
 import { t, lang, LANGS, setLang } from './i18n'
@@ -69,6 +69,7 @@ import { t, lang, LANGS, setLang } from './i18n'
 const route = useRoute()
 const nav = [
   { to: '/new', text: 'nav.new', icon: CirclePlus },
+  { to: '/decks', text: 'nav.decks', icon: Stack2 },
   { to: '/run', text: 'nav.run', icon: PlayerPlay },
   { to: '/report', text: 'nav.report', icon: ChartBar },
   { to: '/ab', text: 'nav.ab', icon: Scale },

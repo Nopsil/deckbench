@@ -16,6 +16,7 @@
 | [SAVE_FORMAT.md](SAVE_FORMAT.md) | 中文 + English | 对局记录的两种 JSON、批量摘要、种子预览 |
 | [CALIBRATION.md](CALIBRATION.md) | 中文 + English | 真对局对照同一条选牌路径上的模拟掉血：匹配规则、百分位、界面和 HTTP、MCP，以及缺口分诊（`tools/gap_triage.py`、`POST /api/gap_triage`、校准页） |
 | [COMPARE.md](COMPARE.md) | 中文 + English | 两次已完成的战斗实验：格子胜率、超时、回合、掉血、每回合输出，以及单卡使用和效率。`GET /api/runs/compare`、MCP `compare_runs`、界面 `#/compare` |
+| [DECKS.md](DECKS.md) | 中文 + English | 组牌页：搜索模拟器牌池，保存成和 `experiments/*.yaml` 一样的用户预设，并在新建测试里打一场训练木桩。`GET /api/cards`、`POST /api/decks`、MCP `list_cards` / `save_deck`、界面 `#/decks` |
 | [EXPORT.md](EXPORT.md) | 中文 + English | 把已完成的测试、可选的战斗对比、可选的校准 / 缺口分诊写成一份离线 HTML。`GET /api/runs/<id>/export.html`、`GET /api/runs/compare/export.html`、MCP `export_report`、`python -m tools.export_report` |
 | [MCP.md](MCP.md) | 中文 + English | MCP 对战，以及只读的 `import_save`、`import_history_batch`、`batch_run_summary`、`card_ab`、`compare_runs`、`explain_fight`、`calibrate`、`gap_triage` |
 | [PERFORMANCE.md](PERFORMANCE.md) | 中文 + English | `python tools/bench.py` 的样本、场/秒和内部战斗引擎改了什么 |

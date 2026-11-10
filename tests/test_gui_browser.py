@@ -64,6 +64,7 @@ PAGES = (
     ("/#/explain", "Decisions", "Explanation log"),
     ("/#/calibrate", "Calibration", "No comparison yet"),
     ("/#/mods", "Mod editor", "Open a mod or create a new one"),
+    ("/#/decks", "Deck builder", "Card pool"),
 )
 
 
@@ -498,3 +499,59 @@ def test_export_buttons_download_offline_html(gui):
     _offline(other)
     assert "Run comparison" in other
     _assert_clean(gui, "export")
+
+
+def test_deck_builder_saves_a_preset_and_starts_a_dummy_run(gui):
+    """组一套小牌组，存成预设，再从新建测试用它打一场木桩。"""
+    page = gui.page
+    page.goto(gui.base + "/#/decks", wait_until="domcontentloaded")
+    gui.expect(page.locator("h1")).to_have_text("Deck builder")
+    gui.expect(page.locator("[data-page='decks']")).to_be_visible()
+    gui.expect(page.get_by_text("Card pool", exact=True)).to_be_visible()
+
+    search = page.locator("[data-deck='search'] input")
+    search.fill("YIHESHI")
+    first = page.locator("[data-card='claude_v34:YIHESHI']")
+    gui.expect(first).to_be_visible()
+    first.locator("[data-add]").click()
+    search.fill("XIAOBENBEN")
+    second = page.locator("[data-card='claude_v34:XIAOBENBEN']")
+    gui.expect(second).to_be_visible()
+    second.locator("[data-add]").click()
+    row = page.locator("[data-deck-card='claude_v34:XIAOBENBEN']")
+    row.locator("[data-inc]").click()
+    gui.expect(row.locator("[data-count]")).to_have_text("2")
+    gui.expect(page.locator("[data-deck='size']")).to_have_text("3")
+    gui.expect(page.locator("[data-deck='curve']")).to_be_visible()
+    gui.expect(page.locator("[data-deck='split']")).to_be_visible()
+
+    page.locator("[data-deck='id'] input").fill("browserdeck")
+    page.locator("[data-deck='name'] input").fill("Browser deck")
+    page.locator("[data-deck='save'] button").click()
+    gui.expect(page.locator("[data-deck='saved']")).to_have_text("Saved preset browserdeck")
+    saved = (gui.data / "presets" / "browserdeck.yaml").read_text(encoding="utf-8")
+    assert "YIHESHI" in saved
+    assert "XIAOBENBEN×2" in saved or "XIAOBENBEN" in saved
+    assert "encounter: DUMMY" in saved
+    _save_shot(page, "gui-decks.png")
+    _assert_clean(gui, "decks")
+
+    page.goto(gui.base + "/#/new", wait_until="domcontentloaded")
+    gui.expect(page.get_by_text("Combat test", exact=True).first).to_be_visible()
+    page.locator("button.mode").filter(has_text="Combat test").click()
+    gui.expect(page.get_by_text("Test source", exact=True)).to_be_visible()
+    page.locator(".form .n-select").filter(has_text="(quick)").click()
+    page.locator(".n-base-select-option").filter(has_text="browserdeck").click()
+    gui.expect(page.get_by_text("Browser deck", exact=True).first).to_be_visible()
+    page.get_by_role("button", name="Start", exact=True).click()
+    page.wait_for_url("**/#/run/*")
+    from playwright.sync_api import TimeoutError as PlaywrightTimeout
+    try:
+        page.get_by_role("button", name="View report").wait_for(timeout=120_000)
+    except PlaywrightTimeout as exc:
+        raise AssertionError(
+            "saved deck dummy did not reach done\n" + _run_log_tail(gui.data)
+        ) from exc
+    gui.expect(page.locator(".n-tag").filter(has_text="Done")).to_be_visible()
+    gui.expect(page.get_by_text("preset browserdeck", exact=True)).to_be_visible()
+    _assert_clean(gui, "deck-run")
