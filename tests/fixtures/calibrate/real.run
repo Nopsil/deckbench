@@ -1,0 +1,80 @@
+{
+  "schema_version": 9,
+  "seed": "SAMPLESEED01",
+  "ascension": 0,
+  "win": false,
+  "players": [
+    {
+      "id": 1,
+      "character": "CHARACTER.IRONCLAD",
+      "deck": [{"id": "CARD.SAMPLE_PICK", "floor_added_to_deck": 2}]
+    }
+  ],
+  "acts": ["ACT.SAMPLE"],
+  "map_point_history": [
+    [
+      {
+        "map_point_type": "Ancient",
+        "rooms": [{"model_id": "EVENT.SAMPLE_START", "turns_taken": 1}],
+        "player_stats": [{"player_id": 1, "current_hp": 80, "max_hp": 80}]
+      },
+      {
+        "map_point_type": "Monster",
+        "rooms": [{
+          "model_id": "ENCOUNTER.SAMPLE_FIGHT",
+          "monster_ids": ["MONSTER.SAMPLE"],
+          "room_type": "Monster",
+          "turns_taken": 3
+        }],
+        "player_stats": [{
+          "player_id": 1,
+          "current_hp": 70,
+          "max_hp": 80,
+          "damage_taken": 10,
+          "card_choices": [
+            {"card": {"id": "CARD.SAMPLE_PICK"}, "was_picked": true},
+            {"card": {"id": "CARD.SAMPLE_SKIP"}, "was_picked": false}
+          ]
+        }]
+      },
+      {
+        "map_point_type": "Shop",
+        "rooms": [{"turns_taken": 0}],
+        "player_stats": [{"player_id": 1, "current_hp": 70, "max_hp": 80}]
+      },
+      {
+        "map_point_type": "Elite",
+        "rooms": [{
+          "model_id": "ENCOUNTER.SAMPLE_ELITE",
+          "room_type": "Elite",
+          "turns_taken": 4
+        }],
+        "player_stats": [{
+          "player_id": 1,
+          "current_hp": 20,
+          "max_hp": 80,
+          "damage_taken": 50
+        }]
+      },
+      {
+        "map_point_type": "Boss",
+        "rooms": [{
+          "model_id": "ENCOUNTER.SAMPLE_BOSS",
+          "room_type": "Boss",
+          "turns_taken": 5
+        }],
+        "player_stats": [{"player_id": 1, "current_hp": 0, "max_hp": 80}]
+      },
+      {
+        "map_point_type": "Monster",
+        "rooms": [{"room_type": "Monster", "turns_taken": 2}],
+        "player_stats": [{
+          "player_id": 1,
+          "current_hp": 16,
+          "max_hp": 80,
+          "damage_taken": 4
+        }]
+      }
+    ]
+  ]
+}

@@ -39,6 +39,7 @@ An unofficial balance-testing tool for Slay the Spire 2 mod authors and players.
 - **A desktop app, all on your PC**: pick settings with a few clicks, run with one button, live progress, chart reports and history. Nothing goes online and nothing is uploaded.
 - **Four languages**: English, 简体中文, 日本語 and 한국어, switchable in the app; game names (cards, characters, enemies) come from your own install in the same language.
 - **Import a real run**: read a finished run or the in-progress save (seed, route, card picks, relics) without modifying it.
+- **Calibrate a real run against simulations**: for the same seed, character and card-pick path, compare real HP lost in each fight with the simulated distribution. A floor that does not line up is unmatched; a neighbouring fight is not used in its place.
 - **Seed preview**: given a seed, see the map, encounter mix and opening rewards without playing a full run.
 
 ## Getting started (Windows)
@@ -139,6 +140,19 @@ python tools/import_dll_mod.py "/path/to/Slay the Spire 2/mods/MyMod" --out mods
 Open **Import run** on the left. It reads a finished `history/*.run` or the in-progress `current_run.save` from your own game folder: seed, ascension, rooms visited, which card you picked on each floor, relics and the deck. It does not modify the save.
 Command line: `python tools/import_run.py <file or folder>`. Where the files live, and how the two JSON shapes differ, is in [docs/SAVE_FORMAT.md](docs/SAVE_FORMAT.md).
 
+## Calibrate a real run against simulations
+
+Compare one imported run with simulations that share its **seed, character and card-pick path**. Each fight reports the real HP lost, the simulated mean, p10 and p90, and where the real value sits in that sample (midrank percentile). A real value outside the simulated p5–p95 band is flagged as a likely sim-model gap.
+
+A floor matches a simulated fight only when the floor number, the combat room (normal / elite / boss) and the encounter id all agree. If the real floor has no encounter id, the encounter differs, or no simulated fight is on that floor, the row is `unmatched`. A neighbouring floor or a different encounter is not used instead. The pick path is the ordered `was_picked` cards, with a leading `CARD.` removed. The simulated `picked` list has to be that whole sequence; one extra or one missing card is a different path.
+
+```bash
+python tools/calibrate.py tests/fixtures/calibrate/real.run tests/fixtures/calibrate/sims.jsonl
+python tools/calibrate.py path/to/history/123.run path/to/runs.jsonl --json -
+```
+
+`POST /api/calibrate` takes `{"real","sim"}`. `sim` has to sit in an allowed directory (the same rule as `batch_run_summary`); `real` is one run file. MCP `calibrate(real, sim)` is read-only and is also on `--import-only`. It does not start a simulation and does not modify saves. The ids in the fixture are fictional.
+
 ## Preview a seed
 
 Open **Seed preview**. Enter a seed from the game (plus character and ascension) and see each act's map, how normals, elites and bosses are ordered, the opening choices and the rewards of the first normal fight — without an AI playing the whole run. Useful for picking a seed to record or for planning a route. Maps from act 2 on are projections; act 1 can be checked against a screenshot.
@@ -155,7 +169,7 @@ A mod already installed in the game does not have to be rewritten by hand first.
 ## Let an AI assistant play step by step (MCP)
 
 If you use an AI assistant that supports MCP, such as Claude or Cursor, you can have it play a run in the simulator itself: it can read the situation, pick options, explain its reasons, undo and retry, and at the end export a step list so you can play the same seed in the real game and follow along.
-For now this only works from source: `pip install -r requirements-mcp.txt`, then `python tools/mcp_server.py`. Card names are read from your own game install at runtime. The same server can also read finished results without the GUI: `batch_run_summary` (win rate, Wilson interval, `sample_warning`), `card_ab` (a `p_value` for two result files you already have; it does not start a simulation) and `explain_fight` (one fight from an `--explain` log, paged). Paths have to sit in an allowed directory. See [docs/MCP.md](docs/MCP.md).
+For now this only works from source: `pip install -r requirements-mcp.txt`, then `python tools/mcp_server.py`. Card names are read from your own game install at runtime. The same server can also read finished results without the GUI: `batch_run_summary` (win rate, Wilson interval, `sample_warning`), `card_ab` (a `p_value` for two result files you already have; it does not start a simulation), `explain_fight` (one fight from an `--explain` log, paged) and `calibrate` (real HP lost against simulations on the same card-pick path; a floor that does not line up is `unmatched`). Paths have to sit in an allowed directory. See [docs/MCP.md](docs/MCP.md).
 
 ## Reading results
 

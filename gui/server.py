@@ -340,6 +340,11 @@ class ExplainFightReq(BaseModel):
     limit: int = 20
 
 
+class CalibrateReq(BaseModel):
+    real: str = ""
+    sim: str = ""
+
+
 def _import_detail(err):
     """解析器附带的一行原因。不进成功响应，只接在已经翻译的错误后面。"""
     raw = (getattr(err, "params", None) or {}).get("detail")
@@ -392,6 +397,28 @@ def _preview_http(err):
     if err.code == "cache_in_repo":
         return T("prev.err.cache_in_repo", path=p.get("path", ""))
     return T("prev.err.failed", err=err.code)
+
+
+def _calibrate_http(err):
+    p = getattr(err, "params", None) or {}
+    code = err.code
+    if code == "need_real":
+        return T("cal.err.need_real")
+    if code == "need_sim":
+        return T("cal.err.need_sim")
+    if code == "one_run":
+        return T("cal.err.one_run")
+    if code == "multiplayer":
+        return T("cal.err.multiplayer")
+    if code == "no_seed":
+        return T("cal.err.no_seed")
+    if code == "no_character":
+        return T("cal.err.no_character")
+    if code == "no_ascension":
+        return T("cal.err.no_ascension")
+    if code == "not_found":
+        return T("cal.err.not_found", path=p.get("path", ""))
+    return T("exp.err.failed", err=code)
 
 
 def _explain_http(err):
@@ -455,6 +482,26 @@ def import_batch(req: ImportBatchReq):
         return batch_summary(load_path(path))
     except SaveImportError as e:
         raise HTTPException(400, _import_http(e))
+
+
+@app.post("/api/calibrate")
+def calibrate_report(req: CalibrateReq):
+    """真对局对照同一条选牌路径上的模拟掉血。只读，不新开模拟。
+
+    real 是一份 .run / .save（和 /api/import 同一套解析）。sim 是 runs.jsonl
+    或含它的目录，路径规则和说明日志相同。对不上的层在 fights 里是 unmatched。
+    """
+    from sts2sim.analysis import AnalysisError
+    from sts2sim.calibrate import CalibrateError, calibrate_paths
+    from sts2sim.saveimport import SaveImportError
+    try:
+        return calibrate_paths(req.real, req.sim, restricted=True)
+    except SaveImportError as e:
+        raise HTTPException(400, _import_http(e))
+    except AnalysisError as e:
+        raise HTTPException(400, _explain_http(e))
+    except CalibrateError as e:
+        raise HTTPException(400, _calibrate_http(e))
 
 
 @app.post("/api/import/upload")

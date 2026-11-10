@@ -946,5 +946,13 @@
  "exp.err.bad_limit": "1 ページの件数は 1 以上にしてください。",
  "exp.err.bad_seed": "シードは文字列にしてください。",
  "exp.err.fight_out_of_range": "第 {fight} 戦はありません（全 {fight_count} 戦）。",
- "exp.err.failed": "説明ログを読めませんでした：{err}"
+ "exp.err.failed": "説明ログを読めませんでした：{err}",
+ "cal.err.need_real": "実ランのパスを入力してください。",
+ "cal.err.need_sim": "模擬結果のパスを入力してください（runs.jsonl、またはそれを含むフォルダー）。",
+ "cal.err.one_run": "較正にはランファイルが1つ必要です。フォルダーは使えません。",
+ "cal.err.multiplayer": "複数人ランです。模擬の一人のキャラクターには合わせません。",
+ "cal.err.no_seed": "このランにはシードがないので、模擬と揃えられません。",
+ "cal.err.no_character": "このランにはキャラクターがないので、模擬と揃えられません。",
+ "cal.err.no_ascension": "このランにはアセンションがないので、模擬と揃えられません。",
+ "cal.err.not_found": "見つかりません：{path}"
 }

@@ -39,6 +39,7 @@ Slay the Spire 2 の Mod 作者とプレイヤー向けの、非公式バラン�
 - **GUI アプリ、すべてローカルで完結**：クリックで設定、ワンクリックで実行、リアルタイムの進捗表示、グラフ付きレポート、履歴。ネットには接続せず、何もアップロードしません。
 - **4 つの表示言語**：日本語・English・简体中文・한국어。アプリ内で切り替えられ、カード・キャラクター・敵の名前もあなたのゲームから同じ言語で読み込みます。
 - **実際のランを読み込む**：終わったランか進行中のセーブを読み取り専用で開き、シード、ルート、カード選択、レリックを見られます。
+- **実ランと模擬の較正**：同じシード、同じキャラクター、同じカード選択の並びで、戦闘ごとに失った HP を模擬の分布と比べます。揃わない階は未対応のままにし、隣の戦闘で埋め合わせません。
 - **シードプレビュー**：シードを入れると、フルランをプレイせずにマップ、敵の分布、序盤報酬を見られます。
 
 ## はじめかた（Windows）
@@ -139,6 +140,19 @@ python tools/import_dll_mod.py "/path/to/Slay the Spire 2/mods/MyMod" --out mods
 左の **「ランを読み込む」** で、終わったラン（`history/*.run`）か進行中のセーブ（`current_run.save`）を読み取り専用で開けます。シード、アセンション、通った部屋、各階で選んだカード、レリック、デッキが見えます。セーブは変更しません。
 コマンドライン：`python tools/import_run.py <ファイルまたはフォルダー>`。場所と 2 種類の JSON の違いは [docs/SAVE_FORMAT.md](docs/SAVE_FORMAT.md)（中国語・英語）。
 
+## 実ランと模擬の較正
+
+読み込んだ実ランを、**同じシード・同じキャラクター・同じカード選択の並び**の模擬結果と、戦闘ごとの失った HP で比べます。各戦闘について、実ランの失った HP、模擬の平均、p10、p90、そして実測値が模擬サンプルのどの百分位か（midrank）を出します。実測値が模擬の p5–p95 の外なら、模擬モデルのずれ候補として印を付けます。
+
+揃う条件は、階層・戦闘部屋（通常 / エリート / ボス）・遭遇 ID がすべて一致することです。遭遇 ID がない、ID が違う、模擬にその戦闘がないときは `unmatched` で、隣の階層や別の遭遇で埋めません。選択の並びは、各階で `was_picked` だったカード（先頭の `CARD.` は除く）です。模擬の `picked` がこの並びと完全に同じランだけを使います。
+
+```bash
+python tools/calibrate.py tests/fixtures/calibrate/real.run tests/fixtures/calibrate/sims.jsonl
+python tools/calibrate.py path/to/history/123.run path/to/runs.jsonl --json -
+```
+
+`POST /api/calibrate`、本文 `{"real","sim"}`。`sim` は `batch_run_summary` と同じ許可ディレクトリの中。`real` はランファイル 1 つ。MCP の `calibrate(real, sim)` は読み取り専用で、`--import-only` にもあります。新しい模擬は始めず、セーブも変えません。フィクスチャの ID は架空です。
+
 ## シードを先に見る
 
 左の **「シードプレビュー」** にゲームのシード（キャラクターとアセンションも）を入れると、AI にフルランをプレイさせずに、各アクトのマップ、通常敵・エリート・ボスの並び、開始時の選択肢、最初の通常戦闘の報酬が見られます。録画するシード選びやルート計画に使えます。アクト 2 以降のマップは投影です。アクト 1 はゲームのスクリーンショットと照合できます。
@@ -155,7 +169,7 @@ python tools/import_dll_mod.py "/path/to/Slay the Spire 2/mods/MyMod" --out mods
 ## AI アシスタントに 1 手ずつプレイさせる（MCP）
 
 Claude や Cursor など MCP に対応した AI アシスタントを使っているなら、シミュレーターの中で実際に 1 ラン遊ばせることができます。盤面を見て、選択肢を選び、理由を書き、やり直しもできます。最後に操作リストを書き出せるので、同じシードで実際のゲームをその通りにプレイできます。
-現在はソースからの実行のみ対応しています：`pip install -r requirements-mcp.txt` のあと `python tools/mcp_server.py`。カード名は実行時にあなた自身のゲームのインストールから読み込みます。同じサーバーは、GUI を開かずに結果も読めます。`batch_run_summary`（勝率、Wilson 区間、`sample_warning`）、`card_ab`（すでに終わった 2 組の `p_value`。新しい模擬は始めません）、`explain_fight`（`--explain` の 1 戦闘をページして読む）。パスは許可したディレクトリの中だけです。詳しくは [docs/MCP.md](docs/MCP.md) を参照してください。
+現在はソースからの実行のみ対応しています：`pip install -r requirements-mcp.txt` のあと `python tools/mcp_server.py`。カード名は実行時にあなた自身のゲームのインストールから読み込みます。同じサーバーは、GUI を開かずに結果も読めます。`batch_run_summary`（勝率、Wilson 区間、`sample_warning`）、`card_ab`（すでに終わった 2 組の `p_value`。新しい模擬は始めません）、`explain_fight`（`--explain` の 1 戦闘をページして読む）、`calibrate`（同じカード選択の並びで、実ランの失った HP と模擬を比べる。揃わない階は `unmatched`）。パスは許可したディレクトリの中だけです。詳しくは [docs/MCP.md](docs/MCP.md) を参照してください。
 
 ## 結果の見かた
 

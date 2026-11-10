@@ -946,5 +946,13 @@
  "exp.err.bad_limit": "每页条数至少是 1。",
  "exp.err.bad_seed": "种子必须是文字。",
  "exp.err.fight_out_of_range": "没有第 {fight} 场（共 {fight_count} 场）。",
- "exp.err.failed": "读说明日志失败：{err}"
+ "exp.err.failed": "读说明日志失败：{err}",
+ "cal.err.need_real": "请填写真对局的路径。",
+ "cal.err.need_sim": "请填写模拟结果的路径（runs.jsonl，或含有它的目录）。",
+ "cal.err.one_run": "校准要一份对局文件，不能是目录。",
+ "cal.err.multiplayer": "这是多人局，对不上单个模拟角色，不猜测是哪一位。",
+ "cal.err.no_seed": "这份对局没有种子，不能和模拟对齐。",
+ "cal.err.no_character": "这份对局没有角色，不能和模拟对齐。",
+ "cal.err.no_ascension": "这份对局没有进阶数值，不能和模拟对齐。",
+ "cal.err.not_found": "找不到：{path}"
 }
