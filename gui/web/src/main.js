@@ -14,6 +14,7 @@ import SeedPreview from './pages/SeedPreview.vue'
 import ExplainLog from './pages/ExplainLog.vue'
 import Calibrate from './pages/Calibrate.vue'
 import ModEditor from './pages/ModEditor.vue'
+import Decks from './pages/Decks.vue'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -29,6 +30,7 @@ const router = createRouter({
     { path: '/preview', component: SeedPreview, meta: { key: 'preview' } },
     { path: '/explain', component: ExplainLog, meta: { key: 'explain' } },
     { path: '/calibrate', component: Calibrate, meta: { key: 'calibrate' } },
+    { path: '/decks', component: Decks, meta: { key: 'decks' } },
     { path: '/mods', component: ModEditor, meta: { key: 'mods' } },
   ],
 })

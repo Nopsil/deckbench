@@ -217,17 +217,32 @@ class LocalPythonBackend(SimBackend):
 
     def experiments(self, lang=None):
         out = []
+        seen = set()
         for f in sorted(glob.glob(os.path.join(paths.SIM_ROOT, "experiments", "*.yaml"))):
             try:
                 e = yaml.safe_load(open(f, encoding="utf-8")) or {}
             except Exception:
                 continue
             eid = os.path.basename(f)[:-5]
+            seen.add(eid)
             title = i18n.t(f"preset.{eid}", lang) if i18n.has(f"preset.{eid}", lang) else (e.get("title") or e.get("name"))
             out.append({"id": eid, "name": e.get("name"), "title": title,
                         "mods": e.get("mods", []), "decks": e.get("decks", []), "rooms": e.get("rooms", ["普通", "精英", "首领"]),
                         "fights": e.get("fights", 100), "max_turns": e.get("max_turns", 30), "agent": e.get("agent", "heuristic"),
                         "seed": e.get("seed", 1), "n_extra": len(e.get("extra") or [])})
+        from sts2sim.deckpresets import DeckPresetError, list_presets
+        try:
+            extra = list_presets()
+        except DeckPresetError:
+            extra = []
+        for e in extra:
+            if e["id"] in seen:
+                continue
+            seen.add(e["id"])
+            out.append({"id": e["id"], "name": e.get("name"), "title": e.get("title") or e.get("name"),
+                        "mods": e.get("mods", []), "decks": e.get("decks", []), "rooms": e.get("rooms", []),
+                        "fights": e.get("fights", 1), "max_turns": e.get("max_turns", 1), "agent": e.get("agent", "heuristic"),
+                        "seed": e.get("seed", 1), "n_extra": e.get("n_extra", 0), "user": True})
         return out
 
     def encounter_names(self, lang=None):
@@ -315,8 +330,18 @@ class LocalPythonBackend(SimBackend):
             return argv, worker_env(agent), paths.SIM_ROOT
         if kind == "combat":
             exp = {}
+            mod_parent = None
             if p.get("preset"):
-                exp = yaml.safe_load(open(os.path.join(paths.SIM_ROOT, "experiments", p["preset"] + ".yaml"), encoding="utf-8"))
+                from sts2sim.deckpresets import DeckPresetError, open_for_run
+                try:
+                    loaded, mod_parent = open_for_run(p.get("preset"), run_dir)
+                except DeckPresetError as err:
+                    key = "deck.err." + err.code
+                    raise ValueError(i18n.t(key) if i18n.has(key) else i18n.t("deck.err.preset")) from err
+                if loaded is None:
+                    exp = yaml.safe_load(open(os.path.join(paths.SIM_ROOT, "experiments", p["preset"] + ".yaml"), encoding="utf-8"))
+                else:
+                    exp = loaded
             if not p.get("preset") or p.get("custom"):
                 exp.update({"mods": p["mods"], "decks": p["decks"], "rooms": p.get("rooms") or ["普通", "精英", "首领"],
                             "max_turns": int(p.get("max_turns", 30))})
@@ -328,11 +353,15 @@ class LocalPythonBackend(SimBackend):
             exp["seed"] = int(p.get("seed", exp.get("seed", 1)))
             exp["fights"] = int(p.get("fights", exp.get("fights", 50)))
             exp["agent"] = p.get("agent") or exp.get("agent", "heuristic")
+            exp.pop("user_deck", None)
             ef = os.path.join(run_dir, "experiment.yaml")
             yaml.safe_dump(exp, open(ef, "w", encoding="utf-8"), allow_unicode=True, sort_keys=False)
             argv = worker_argv("combat", ef, "--jobs", str(int(p.get("procs") or os.cpu_count() or 1)),
                                "--out", os.path.join(run_dir, "out"))
-            return argv, worker_env(), paths.SIM_ROOT
+            env = worker_env()
+            if mod_parent:
+                env["STS2SIM_USER_MODS"] = mod_parent
+            return argv, env, paths.SIM_ROOT
         raise ValueError(kind)
 
     def summarize(self, kind, run_dir):
