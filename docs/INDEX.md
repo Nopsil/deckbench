@@ -15,7 +15,8 @@
 | [DLL_MODS.md](DLL_MODS.md) | 中文 + English | 把已经写好的游戏 mod DLL 读成 YAML。DLL 不执行 |
 | [SAVE_FORMAT.md](SAVE_FORMAT.md) | 中文 + English | 对局记录的两种 JSON、批量摘要、种子预览 |
 | [CALIBRATION.md](CALIBRATION.md) | 中文 + English | 真对局对照同一条选牌路径上的模拟掉血：匹配规则、百分位、界面和 HTTP、MCP，以及缺口分诊（`tools/gap_triage.py`、`POST /api/gap_triage`、校准页） |
-| [MCP.md](MCP.md) | 中文 + English | MCP 对战，以及只读的 `import_save`、`import_history_batch`、`batch_run_summary`、`card_ab`、`explain_fight`、`calibrate`、`gap_triage` |
+| [COMPARE.md](COMPARE.md) | 中文 + English | 两次已完成的战斗实验：格子胜率、超时、回合、掉血、每回合输出，以及单卡使用和效率。`GET /api/runs/compare`、MCP `compare_runs`、界面 `#/compare` |
+| [MCP.md](MCP.md) | 中文 + English | MCP 对战，以及只读的 `import_save`、`import_history_batch`、`batch_run_summary`、`card_ab`、`compare_runs`、`explain_fight`、`calibrate`、`gap_triage` |
 | [PERFORMANCE.md](PERFORMANCE.md) | 中文 + English | `python tools/bench.py` 的样本、场/秒和内部战斗引擎改了什么 |
 | [COVERAGE.md](COVERAGE.md) | 中文 + English | 补测试那一次的语句覆盖率快照，以及当时修的五处边界 |
 | [CI.md](CI.md) | 中文 + English | GitHub Actions：Ubuntu / Windows、Python 3.11 与 3.12、pytest-cov 作业摘要、ruff 0.17.4；Ubuntu 上单独的 Playwright 界面冒烟；Windows 安装包工作流、接口冒烟，以及响应的 `charset=utf-8` |

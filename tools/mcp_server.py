@@ -417,6 +417,24 @@ def card_ab(a: str, b: str = "") -> str:
     return card_ab_json(a, b)
 
 
+def compare_runs(a: str, b: str) -> str:
+    """只读比较两次已经跑完的战斗实验，返回格子差值和单卡使用/效率差值。不新开模拟，不写文件。
+
+    a、b：各是一次界面测试的 id（STS2SIM_GUI_DATA/runs/<id>），或结果目录，或其中的
+    raw.jsonl / cells.csv。两次指向同一目录，或传入同一个 id，error 为 same_run。
+    格子按（卡组，幕，房间）对齐。每个格子给出 win、timeout、turns、hp_loss、dpt 的
+    A、B 和 delta（B − A）。胜率和超时的 significant 来自 sts2sim/stats.py 的两比例 z 检验
+    （p < 0.05），并附上 Wilson 区间和 wilson_overlap。平均回合、掉血、每回合输出在
+    raw.jsonl 有逐场记录时用 Welch t 检验；只有 cells.csv 的平均数时 significant 为 null。
+    cards 是单卡每场使用次数的差（有逐场记录时同样是 Welch）和效率倍数的差。
+    任一侧场次少于 30 时 sample_warning 为 true，数字仍给出。
+    路径规则与 batch_run_summary 相同。类型不对是 bad_type。没跑完是 not_done。
+    不是战斗实验是 not_combat。失败也是 JSON（ok 为 false，read_only 为 true），不抛异常。
+    """
+    from sts2sim.analysis import compare_runs_json
+    return compare_runs_json(a, b)
+
+
 def explain_fight(path: str, fight: int = 0, seed: str = "", offset: int = 0, limit: int = 20) -> str:
     """只读一场战斗的决策说明日志（--explain 写的 JSONL），按决策分页返回前几名候选。不写文件。
 
@@ -500,8 +518,11 @@ def build(host="127.0.0.1", port=8765, host_check=True):
         "lines 为 true 时每局一行（--lines）。不写存档。current_run.save 不进目录结果。"
         "seed_preview(seed, character, ascension, neow) 不开始对局，返回和 seed_preview.py --json - 相同的稳定 v1 JSON；"
         "neow 取 first / all / none / 序号文本。资源 deckbench://seed-preview/v1 只列字段顺序，不生成地图。"
-        "batch_run_summary(path)、card_ab(a, b)、explain_fight(path, fight, …)、calibrate(real, sim)、"
+        "batch_run_summary(path)、card_ab(a, b)、compare_runs(a, b)、explain_fight(path, fight, …)、calibrate(real, sim)、"
         "gap_triage(reports, paths, …) 只读已有结果："
+        "compare_runs 比较两次已完成的战斗实验：格子上的胜率、超时、平均回合、掉血、每回合输出，"
+        "以及单卡使用次数和效率倍数。胜率和超时用两比例 z 检验和 Wilson 区间；"
+        "逐场记录上的连续指标用 Welch。"
         "胜率与 Wilson 区间和 sample_warning、单卡 A/B 的 p_value、一场战斗的候选分页，"
         "真对局和同一条选牌路径上模拟掉血的 mean / p10 / p90 / percentile，"
         "以及把 likely_sim_gap 按遭遇和敌人能力排成偏乐观（高于 p95）或偏悲观（低于 p5）。"
@@ -671,6 +692,7 @@ def build(host="127.0.0.1", port=8765, host_check=True):
     mcp.tool()(seed_preview)
     mcp.tool()(batch_run_summary)
     mcp.tool()(card_ab)
+    mcp.tool()(compare_runs)
     mcp.tool()(explain_fight)
     mcp.tool()(calibrate)
     mcp.tool()(gap_triage)
@@ -691,6 +713,8 @@ def build_import(host="127.0.0.1", port=8765, host_check=True):
         "（种子、进阶、角色、层数，有胜负或放弃才写 result）；lines 为 true 时每局一行。"
         "batch_run_summary(path) 读整局 runs.jsonl，返回胜率、Wilson 区间和 sample_warning。"
         "card_ab(a, b) 读两组已有结果，返回 p_value，不新开模拟。"
+        "compare_runs(a, b) 比较两次已完成的战斗实验：格子胜率、超时、回合、掉血、每回合输出，"
+        "以及单卡使用和效率。胜率和超时是两比例 z 检验和 Wilson 区间；逐场连续指标是 Welch。"
         "explain_fight(path, fight, seed, offset, limit) 读 --explain 的一场战斗，分页返回前几名候选。"
         "calibrate(real, sim) 对照一份真对局和同一条选牌路径上的模拟掉血：mean、p10、p90、percentile；"
         "p5–p95 之外是 likely_sim_gap；对不上的层是 unmatched。real 用导入解析，sim 的路径规则和批量摘要相同。"
@@ -701,6 +725,7 @@ def build_import(host="127.0.0.1", port=8765, host_check=True):
     mcp.tool()(import_history_batch)
     mcp.tool()(batch_run_summary)
     mcp.tool()(card_ab)
+    mcp.tool()(compare_runs)
     mcp.tool()(explain_fight)
     mcp.tool()(calibrate)
     mcp.tool()(gap_triage)
@@ -714,7 +739,7 @@ def main(argv=None):
     ap.add_argument("--port", type=int, default=int(os.environ.get("DECKBENCH_MCP_PORT", "8765")))
     ap.add_argument("--no-host-check", action="store_true", help="关闭 Host 头校验（经隧道/反代给远程连接器用）")
     ap.add_argument("--import-only", action="store_true",
-                    help="提供 import_save、import_history_batch，以及 batch_run_summary / card_ab / explain_fight / calibrate / gap_triage（只读 JSON）。"
+                    help="提供 import_save、import_history_batch，以及 batch_run_summary / card_ab / compare_runs / explain_fight / calibrate / gap_triage（只读 JSON）。"
                          "不检查本机游戏数据，不启动对局")
     a = ap.parse_args(argv)
     if a.import_only:

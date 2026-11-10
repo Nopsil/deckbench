@@ -57,6 +57,7 @@ PAGES = (
     ("/#/run", "Running", "No test is running right now"),
     ("/#/report", "Report", "Pick a finished test"),
     ("/#/ab", "Single-card A/B", "Pick two tests to compare"),
+    ("/#/compare", "Compare runs", "Pick two finished combat tests"),
     ("/#/history", "History", "Nothing here yet"),
     ("/#/import", "Import run", "Save path"),
     ("/#/preview", "Seed preview", "Which opening rewards"),
@@ -365,6 +366,67 @@ def test_dummy_combat_from_the_gui_reaches_done(gui):
     gui.expect(page.get_by_text("preset browser_smoke", exact=True)).to_be_visible()
     _save_shot(page, "gui-combat-done.png")
     _assert_clean(gui, "combat")
+
+
+def _combat_rows(wins, timeouts, hp_base, turns_base, dmg, plays, room):
+    rows = []
+    for i in range(40):
+        if i < timeouts:
+            result = "timeout"
+        elif i < timeouts + wins:
+            result = "win"
+        else:
+            result = "loss"
+        rows.append({
+            "deck": "probe",
+            "act": 1,
+            "room": room,
+            "result": result,
+            "turns": turns_base + (i % 3),
+            "hp_lost": hp_base + (i % 4),
+            "dmg_total": dmg,
+            "cards": {"STRIKE": [plays, dmg, 0, plays]},
+        })
+    return rows
+
+
+def _write_combat_run(data, rid, title, rows):
+    run = data / "runs" / rid
+    out = run / "out"
+    out.mkdir(parents=True, exist_ok=True)
+    meta = {
+        "id": rid,
+        "kind": "combat",
+        "title": title,
+        "status": "done",
+        "created": "2026-01-02T00:00:00+00:00",
+        "params": {},
+    }
+    (run / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
+    text = "".join(json.dumps(row) + "\n" for row in rows)
+    (out / "raw.jsonl").write_text(text, encoding="utf-8")
+
+
+def test_compare_page_highlights_cell_deltas(gui):
+    base = _combat_rows(2, 10, 20, 8, 8, 1, "Monster") + _combat_rows(30, 0, 4, 3, 36, 1, "Elite")
+    changed = _combat_rows(30, 0, 4, 3, 36, 4, "Monster") + _combat_rows(2, 10, 20, 8, 8, 4, "Elite")
+    _write_combat_run(gui.data, "cmp-a", "Baseline cells", base)
+    _write_combat_run(gui.data, "cmp-b", "Changed cells", changed)
+    page = gui.page
+    query = urlencode({"a": "cmp-a", "b": "cmp-b"})
+    page.goto(gui.base + "/#/compare?" + query, wait_until="domcontentloaded")
+    gui.expect(page.locator("h1")).to_have_text("Compare runs")
+    gui.expect(page.locator("[data-page='compare']")).to_be_visible()
+    cells = page.locator("[data-table='cells']")
+    gui.expect(cells).to_be_visible(timeout=30_000)
+    gui.expect(cells.locator("tr[data-metric='win'][data-sig='1']").first).to_be_visible()
+    gui.expect(cells.locator("td.good").first).to_be_visible()
+    gui.expect(cells.locator("td.bad").first).to_be_visible()
+    gui.expect(cells.locator(".sig").first).to_have_text("significant")
+    gui.expect(page.locator("[data-table='cards']").get_by_text("STRIKE", exact=True).first).to_be_visible()
+    cells.scroll_into_view_if_needed()
+    _save_shot(page, "gui-compare.png")
+    _assert_clean(gui, "compare")
 
 
 def test_gap_triage_renders_sample_calibration(gui):
