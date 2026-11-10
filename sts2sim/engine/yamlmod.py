@@ -611,10 +611,7 @@ def compile_effects(effects):
 
 # ---------------------------------------------------------------- 名字工具
 def _camel(cid, prefix=""):
-    s = str(cid)
-    if prefix and s.upper().startswith(prefix.upper() + "_"):
-        s = s[len(prefix) + 1:]
-    return prefix + "".join(w[:1].upper() + w[1:].lower() for w in re.split(r"[^0-9A-Za-z]+", s) if w)
+    return S.camel_class(cid, prefix)
 
 
 def _game_power_cls(pid):

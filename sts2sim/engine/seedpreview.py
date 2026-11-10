@@ -70,10 +70,22 @@ def _tools():
     return seed_probe
 
 
+def _id_list(value):
+    """一串 ID。整段字符串是一条 ID（「遭遇甲」不能拆成三个字）。"""
+    if isinstance(value, str):
+        return [value] if value else []
+    if value is None or isinstance(value, (bytes, bytearray)):
+        return []
+    try:
+        return list(value)
+    except TypeError:
+        return []
+
+
 def tally(ids):
     counts = {}
     order = []
-    for i in ids or []:
+    for i in _id_list(ids):
         if i not in counts:
             order.append(i)
             counts[i] = 0
@@ -84,8 +96,8 @@ def tally(ids):
 def distribution(rooms):
     out = []
     for a in rooms or []:
-        normals = list(a.get("normal") or [])
-        elites = list(a.get("elite") or [])
+        normals = _id_list(a.get("normal"))
+        elites = _id_list(a.get("elite"))
         out.append({
             "act": a.get("act"),
             "boss": a.get("boss"),
@@ -93,7 +105,7 @@ def distribution(rooms):
             "ancient": a.get("ancient"),
             "normal": normals,
             "elite": elites,
-            "events": list(a.get("events") or []),
+            "events": _id_list(a.get("events")),
             "normal_counts": tally(normals),
             "elite_counts": tally(elites),
         })
@@ -103,8 +115,15 @@ def distribution(rooms):
 def map_counts(mp):
     counts = {}
     saw_boss = False
-    for row in (mp or {}).get("rows") or []:
+    rows = (mp or {}).get("rows") or []
+    if isinstance(rows, (str, bytes, bytearray)):
+        rows = []
+    for row in rows:
+        if not isinstance(row, (list, tuple)):
+            continue
         for n in row:
+            if not isinstance(n, dict):
+                continue
             typ = n.get("type") or "Unassigned"
             counts[typ] = counts.get(typ, 0) + 1
             if typ == "Boss":
@@ -257,7 +276,7 @@ def assemble(seed, canon, warnings, character, ascension, acts, maps, rooms, anc
         "warnings": noted,
         "character": character,
         "ascension": int(ascension),
-        "acts": list(acts),
+        "acts": _id_list(acts),
         "maps": rich_maps,
         "rooms": rooms,
         "distribution": distribution(rooms),
@@ -335,6 +354,9 @@ def _dist_doc(dist):
     picked = _pick(dist, _DIST_KEYS)
     if picked is None:
         return None
+    for key in ("normal", "elite", "events"):
+        if key in picked:
+            picked[key] = _id_list(picked[key])
     for key in ("normal_counts", "elite_counts"):
         if key not in picked:
             continue
@@ -358,9 +380,9 @@ def _after_doc(block):
 def _relic_doc(relics):
     src = relics if isinstance(relics, dict) else {}
     return {
-        "starting": list(src.get("starting") or []),
-        "shared_queue": list(src.get("shared_queue") or []),
-        "character_queue": list(src.get("character_queue") or []),
+        "starting": _id_list(src.get("starting")),
+        "shared_queue": _id_list(src.get("shared_queue")),
+        "character_queue": _id_list(src.get("character_queue")),
     }
 
 
@@ -385,7 +407,7 @@ def public_document(res):
         "warnings": warnings,
         "character": src.get("character", ""),
         "ascension": _as_int(src.get("ascension"), 0),
-        "acts": list(src.get("acts") or []),
+        "acts": _id_list(src.get("acts")),
         "maps": maps,
         "rooms": rooms,
         "distribution": dist,
@@ -437,10 +459,13 @@ def _repo_root():
 
 
 def _inside_repo(path):
-    root = os.path.abspath(_repo_root())
-    target = os.path.abspath(path)
+    """缓存目录是不是仓库里面。realpath 认符号链接；normcase 让 Windows 上大小写不同的同一路径也对得上。"""
+    root = os.path.normcase(os.path.realpath(_repo_root()))
+    target = os.path.normcase(os.path.realpath(path))
+    if target == root:
+        return True
     try:
-        return os.path.commonpath([root, target]) == root
+        return os.path.normcase(os.path.commonpath([root, target])) == root
     except ValueError:
         return False
 
@@ -622,6 +647,11 @@ def preview(seed, char="Ironclad", asc=0, neow="first", *, use_cache=False, cach
     return doc
 
 
+def _join_ids(value, lang):
+    from gui import i18n
+    return i18n.join(_id_list(value), lang)
+
+
 def format_text(res, lang="zhs"):
     """命令行用的纯文本。名字保持 ID（游戏文本不进仓库）。"""
     from gui import i18n
@@ -634,7 +664,7 @@ def format_text(res, lang="zhs"):
             lines.append(w)
         elif isinstance(w, dict) and w.get("text"):
             lines.append(str(w["text"]))
-    lines.append(t("prev.text.acts", acts=i18n.join(res.get("acts") or [], lang) or t("common.none")))
+    lines.append(t("prev.text.acts", acts=_join_ids(res.get("acts"), lang) or t("common.none")))
     for mp in res.get("maps") or []:
         conf = mp.get("confidence") or ""
         label = t("prev.confidence." + conf) if conf and i18n.has("prev.confidence." + conf, lang) else conf
@@ -653,8 +683,8 @@ def format_text(res, lang="zhs"):
     for d in res.get("distribution") or []:
         lines.append(t("prev.text.actBoss", act=d.get("act"), boss=d.get("boss") or t("common.none"),
                        second=d.get("second_boss") or t("common.none"), ancient=d.get("ancient") or t("common.none")))
-        lines.append(t("prev.text.queue", kind=t("prev.normal"), ids=i18n.join(d.get("normal") or [], lang) or t("common.none")))
-        lines.append(t("prev.text.queue", kind=t("prev.elite"), ids=i18n.join(d.get("elite") or [], lang) or t("common.none")))
+        lines.append(t("prev.text.queue", kind=t("prev.normal"), ids=_join_ids(d.get("normal"), lang) or t("common.none")))
+        lines.append(t("prev.text.queue", kind=t("prev.elite"), ids=_join_ids(d.get("elite"), lang) or t("common.none")))
     lines.append("")
     lines.append(t("prev.text.neow", ancient=res.get("ancient") or t("common.none")))
     for o in res.get("neow_options") or []:
@@ -670,7 +700,7 @@ def format_text(res, lang="zhs"):
         lines.append("  " + t("prev.encounter") + " " + str(block.get("encounter")))
         for reward in block.get("rewards") or []:
             if "cards" in reward:
-                lines.append("  " + t("prev.cards") + " " + i18n.join(reward["cards"], lang))
+                lines.append("  " + t("prev.cards") + " " + _join_ids(reward["cards"], lang))
             if "gold" in reward:
                 lines.append("  " + t("prev.gold") + " " + str(reward["gold"]))
             if reward.get("potion"):
@@ -679,9 +709,9 @@ def format_text(res, lang="zhs"):
                 lines.append("  " + t("prev.relic") + " " + reward["relic"])
     rel = res.get("relics") or {}
     lines.append("")
-    lines.append(t("prev.text.starting", ids=i18n.join(rel.get("starting") or [], lang) or t("common.none")))
-    lines.append(t("prev.text.shared", ids=i18n.join(rel.get("shared_queue") or [], lang) or t("prev.noQueue")))
-    lines.append(t("prev.text.characterQueue", ids=i18n.join(rel.get("character_queue") or [], lang) or t("prev.noQueue")))
+    lines.append(t("prev.text.starting", ids=_join_ids(rel.get("starting"), lang) or t("common.none")))
+    lines.append(t("prev.text.shared", ids=_join_ids(rel.get("shared_queue"), lang) or t("prev.noQueue")))
+    lines.append(t("prev.text.characterQueue", ids=_join_ids(rel.get("character_queue"), lang) or t("prev.noQueue")))
     lines.append("")
     for code in res.get("limits") or []:
         if i18n.has("prev.limit." + code, lang):

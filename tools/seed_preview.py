@@ -25,7 +25,20 @@ def _emit_json(doc, fp):
     fp.write("\n")
 
 
+def _configure_stdio():
+    """标准输出按 UTF-8 写。Windows 上管道的默认编码写不出中文幕名、卡名和模组名。"""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="backslashreplace")
+        except (OSError, ValueError):
+            pass
+
+
 def main(argv=None):
+    _configure_stdio()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("seed")
     ap.add_argument("--char", default="Ironclad", choices=CHARS)

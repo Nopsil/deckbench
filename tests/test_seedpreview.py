@@ -738,3 +738,97 @@ def test_concurrent_cache_readers_do_not_crash(tmp_path, monkeypatch):
     assert payload["key"] == {"seed": "ZZZZZZZZZZZZ", "char": "Silent", "asc": 4, "neow": "none"}
     assert payload["preview"] == cold_results[0]
     assert not any(p.name.endswith(".tmp") for p in cold.iterdir())
+
+
+def test_non_ascii_ids_stay_whole_in_distribution_document_and_text():
+    from sts2sim.engine.seedpreview import public_document
+    dist = distribution([{"act": "第一幕", "normal": "遭遇甲", "elite": ["遭遇乙", "遭遇乙"]}])
+    assert dist[0]["normal"] == ["遭遇甲"]
+    assert dist[0]["normal_counts"] == [{"id": "遭遇甲", "n": 1}]
+    assert dist[0]["elite_counts"] == [{"id": "遭遇乙", "n": 2}]
+    doc = public_document({
+        "acts": "第一幕",
+        "relics": {"starting": "RELIC.模组遗物", "shared_queue": [], "character_queue": []},
+        "limits": ["full_unlocks"],
+        "distribution": [{"act": "第一幕", "normal": "遭遇甲", "elite": ["遭遇乙", "遭遇乙"]}],
+    })
+    assert doc["acts"] == ["第一幕"]
+    assert doc["relics"]["starting"] == ["RELIC.模组遗物"]
+    assert doc["distribution"][0]["normal"] == ["遭遇甲"]
+    assert doc["distribution"][0]["elite"] == ["遭遇乙", "遭遇乙"]
+    text = format_text({
+        "seed": "ABCDEFGHJKLM", "character": "Ironclad", "ascension": 0, "warnings": [],
+        "acts": "第一幕", "maps": [],
+        "distribution": [{"act": "第一幕", "normal": "遭遇甲", "elite": [], "boss": None,
+                          "second_boss": None, "ancient": None}],
+        "ancient": None, "neow_options": [], "after_neow": {},
+        "relics": {"starting": "RELIC.模组遗物", "shared_queue": [], "character_queue": []},
+        "limits": [],
+    }, "en")
+    assert "遭遇甲" in text
+    assert "第一幕" in text
+    assert "RELIC.模组遗物" in text
+    assert "遭, 遇, 甲" not in text
+
+
+def test_map_counts_ignores_nodes_that_are_not_objects():
+    mp = {"rows": [[{"type": "Monster"}, "遭遇", None], "不是一行"], "boss": {"col": 0, "row": 1}}
+    assert map_counts(mp)["Monster"] == 1
+    assert map_counts(mp)["Boss"] == 1
+    assert "遭遇" not in map_counts(mp)
+
+
+def test_cache_symlink_into_the_repo_is_refused(tmp_path, monkeypatch):
+    _stub_generate(monkeypatch)
+    target = os.path.join(ROOT, "tests", "fixtures", "_cache_link_target")
+    os.makedirs(target, exist_ok=True)
+    link = tmp_path / "cache-link"
+    link.symlink_to(target, target_is_directory=True)
+    try:
+        with pytest.raises(PreviewError) as err:
+            preview("ABCDEFGHJKLM", "Ironclad", 0, neow="none", use_cache=True, cache_dir=str(link))
+        assert err.value.code == "cache_in_repo"
+        assert not any(name.endswith(".json") for name in os.listdir(target))
+    finally:
+        for name in os.listdir(target):
+            os.remove(os.path.join(target, name))
+        os.rmdir(target)
+
+
+def test_repo_containment_folds_case_the_way_windows_paths_do(tmp_path, monkeypatch):
+    from sts2sim.engine import seedpreview as sp
+    repo = tmp_path / "Repo"
+    cache = tmp_path / "repo" / "cache"
+    repo.mkdir()
+    cache.mkdir(parents=True)
+    monkeypatch.setattr(sp, "_repo_root", lambda: str(repo))
+    orig = os.path.normcase
+    monkeypatch.setattr(os.path, "normcase", lambda p: orig(p).lower() if isinstance(p, str) else orig(p))
+    assert sp._inside_repo(str(cache)) is True
+    assert sp._inside_repo(str(tmp_path / "elsewhere")) is False
+
+
+def test_preview_json_stdout_keeps_non_ascii_names_on_a_narrow_encoding(monkeypatch):
+    import io
+    cli = _preview_cli()
+
+    def fake(seed, char="Ironclad", asc=0, neow="first", **kw):
+        return {
+            "v": 1, "seed_input": seed, "seed": "ABCDEFGHJKLM", "warnings": [],
+            "character": char, "ascension": int(asc), "acts": ["第一幕"],
+            "maps": [], "rooms": [], "distribution": [], "ancient": None,
+            "neow_options": [], "after_neow": {},
+            "relics": {"starting": ["RELIC.模组遗物"], "shared_queue": [], "character_queue": []},
+            "limits": ["full_unlocks"],
+        }
+
+    monkeypatch.setattr(cli, "preview", fake)
+    buf = io.BytesIO()
+    wrapper = io.TextIOWrapper(buf, encoding="cp1252", errors="strict", newline="\n")
+    monkeypatch.setattr(sys, "stdout", wrapper)
+    rc = cli.main(["ABCDEFGHJKLM", "--json", "-", "--neow", "none", "--lang", "en"])
+    wrapper.flush()
+    assert rc == 0
+    text = buf.getvalue().decode("utf-8")
+    assert "第一幕" in text
+    assert "RELIC.模组遗物" in text

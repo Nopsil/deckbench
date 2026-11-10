@@ -123,9 +123,10 @@ class Poison(Power):
     def on_turn_start(self, C, ev):
         if ev.creature is self.owner:
             C.push_attr(self.src or "中毒")
-            C.lose_hp(self.owner, self.amount, C.player, "hp_loss")
+            # 用实际失去的生命，不用扣血之后的当前生命回推：复活或钩子改血量时回推会把整段层数都算进去。
+            dealt = C.lose_hp(self.owner, self.amount, C.player, "hp_loss")
             if C.stats is not None and not self.owner.is_player:
-                C.stats.rec(self.src or "中毒", dmg=min(self.amount, max(0, self.owner.hp + self.amount)))
+                C.stats.rec(self.src or "中毒", dmg=max(0, dealt))
             C.pop_attr()
             self.amount -= 1
             if self.amount <= 0:

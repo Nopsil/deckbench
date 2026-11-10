@@ -16,6 +16,7 @@ from sts2sim.saveimport import (
     parse_bytes,
     parse_path,
     refuse_save_write,
+    summarize,
 )
 
 FIX = os.path.join(os.path.dirname(__file__), "fixtures", "saves")
@@ -702,7 +703,8 @@ def test_json_beside_save_fixtures_is_not_refuse_write(tmp_path, monkeypatch, ca
         assert ei.value.code == "refuse_write"
         assert cli.main([str(work / "h.run"), "--json", str(dest), "--lang", "en"]) == 2
         err = capsys.readouterr()
-        assert "refuse_write" in err.err
+        assert "Refusing to write inside a save folder" in err.err
+        assert str(dest) in err.err
         after = dest.read_bytes() if dest.exists() else None
         assert after == before
 
@@ -729,7 +731,9 @@ def test_json_beside_save_fixtures_is_not_refuse_write(tmp_path, monkeypatch, ca
         assert ei.value.code == "refuse_write"
     blocked = saves / "cli.json"
     assert cli.main([str(saves / "history" / "1.run"), "--summary", "--json", str(blocked), "--lang", "en"]) == 2
-    assert "refuse_write" in capsys.readouterr().err
+    refused = capsys.readouterr()
+    assert json.loads(refused.out)["error"] == "refuse_write"
+    assert "Refusing to write inside a save folder" in refused.err
     assert not blocked.exists()
 
     monkeypatch.setattr("sts2sim.saveimport.candidate_roots", lambda: [])
@@ -1025,3 +1029,86 @@ def test_batch_summary_cli_prints_json_and_skips_writes(tmp_path, capsys):
     assert "--batch-summary" in help_out.stdout
     assert "--lines" in help_out.stdout
     assert "result" in help_out.stdout
+
+
+def _windows_normcase(monkeypatch):
+    """模拟 Windows 路径比较：大小写不敏感。Linux 上 os.path.normcase 是恒等，不改生产行为。"""
+    orig = os.path.normcase
+
+    def folded(path):
+        path = orig(path)
+        return path.lower() if isinstance(path, str) else path
+
+    monkeypatch.setattr(os.path, "normcase", folded)
+
+
+def test_non_finite_hp_and_floor_do_not_crash_and_non_ascii_ids_round_trip():
+    raw = {
+        "seed": "NANSEED00001",
+        "win": False,
+        "players": [{
+            "character": "CHARACTER.IRONCLAD",
+            "current_hp": float("nan"),
+            "gold": float("inf"),
+            "max_hp": float("-inf"),
+            "deck": [{"id": "CARD.打击", "floor_added_to_deck": float("nan")}],
+            "relics": [{"id": "RELIC.模组遗物", "floor": 2}],
+        }],
+        "map_point_history": [],
+    }
+    run = parse_bytes(json.dumps(raw, ensure_ascii=False).encode("utf-8"), filename="甲.run")
+    player = run["players"][0]
+    assert player["current_hp"] is None
+    assert player["gold"] is None
+    assert player["max_hp"] is None
+    assert player["deck"] == [{"id": "CARD.打击", "floor": None, "upgraded": False, "enchantment": None}]
+    assert player["relics"][0]["id"] == "RELIC.模组遗物"
+    text = json.dumps(summarize(run), ensure_ascii=False)
+    assert "CARD.打击" in text and "RELIC.模组遗物" in text
+
+
+def test_windows_backup_matches_the_run_stem_case_insensitively(tmp_path, monkeypatch):
+    _windows_normcase(monkeypatch)
+    hist = tmp_path / "history"
+    hist.mkdir()
+    (hist / "Sample.run").write_text(json.dumps(_history(seed="PRIMARY")), encoding="utf-8")
+    (hist / "sample.run.backup").write_text(json.dumps(_history(seed="BACKUP")), encoding="utf-8")
+    seeds = [e["run"]["seed"] for e in load_path(str(hist))["entries"] if "run" in e]
+    assert seeds == ["PRIMARY"]
+
+
+def test_windows_discover_sees_current_run_regardless_of_case(tmp_path, monkeypatch):
+    _windows_normcase(monkeypatch)
+    root = tmp_path / "library"
+    folder = root / "profile" / "Saves"
+    folder.mkdir(parents=True)
+    (folder / "Current_Run.save").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr("sts2sim.saveimport.candidate_roots", lambda: [str(root)])
+    hits = {os.path.abspath(h["path"]): h for h in discover()}
+    found = hits[os.path.abspath(str(folder))]
+    assert found["has_current"] is True
+
+
+def test_summary_stdout_keeps_non_ascii_card_names_on_a_narrow_encoding(tmp_path):
+    path = tmp_path / "甲.run"
+    path.write_text(json.dumps(_history(
+        seed="NONASCIISEED",
+        win=True,
+        players=[{
+            "id": 1,
+            "character": "CHARACTER.IRONCLAD",
+            "deck": [{"id": "CARD.打击", "floor_added_to_deck": 2}],
+            "relics": [{"id": "RELIC.模组遗物", "floor": 3}],
+            "potions": [],
+        }],
+    ), ensure_ascii=False), encoding="utf-8")
+    env = dict(os.environ)
+    env["PYTHONIOENCODING"] = "cp1252"
+    proc = subprocess.run(
+        [sys.executable, IMPORT_CLI, str(path), "--summary", "--lang", "en"],
+        capture_output=True, env=env, check=False,
+    )
+    assert proc.returncode == 0, proc.stderr.decode("utf-8", "replace")
+    text = proc.stdout.decode("utf-8")
+    assert "CARD.打击" in text
+    assert "RELIC.模组遗物" in text

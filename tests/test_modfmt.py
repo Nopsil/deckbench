@@ -83,6 +83,26 @@ def test_claude_yaml_and_legacy_v34_validate():
     assert old["decks"]
 
 
+def test_non_ascii_names_do_not_collapse_to_one_ascii_id():
+    assert S._camel("Strike") == "Strike"
+    assert S._camel("mini_mod") == "MiniMod"
+    assert S._camel("2abc") == "M2abc"
+    assert S._camel("A") == "A"
+    strike, defend = S._camel("打击"), S._camel("防御")
+    assert strike != defend
+    assert strike[0].isalpha() and defend[0].isalpha()
+    assert S._camel("卡A") != "A"
+    assert S._camel("模组") != S._camel("卡组")
+    one, two = S.camel_class("打击", "Mini"), S.camel_class("防御", "Mini")
+    assert one != two and one.startswith("Mini") and two.startswith("Mini")
+    assert S.camel_class("STRIKE", "Mini") == "MiniStrike"
+    assert S.camel_class("ABC") == "Abc"
+    assert S.camel_class("2abc") == "2abc"
+    assert S.camel_class("MINI_STRIKE", "Mini") == "MiniStrike"
+    src = open(os.path.join(ROOT, "sts2sim", "engine", "yamlmod.py"), encoding="utf-8").read()
+    assert "S.camel_class" in src
+
+
 def test_yaml_cards_match_hand_port():
     """几张代表性的牌：YAML 版和手写 Python 版在同一局面下打出后的局面完全一样（全部 70 张见 tools/parity_yaml.py）。"""
     pytest.importorskip("sts2sim.gen.game")

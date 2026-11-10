@@ -12,6 +12,7 @@
 这里只做“读文件 + 检查”，不依赖游戏代码；图形界面、测试、整局引擎都用它。所有错误信息是中英双语的大白话。
 """
 import ast
+import hashlib
 import io
 import os
 import re
@@ -344,12 +345,38 @@ def load_mod_files(files):
     return m
 
 
+def _non_ascii_mark(text):
+    """非 ASCII 名字的稳定后缀。纯 ASCII 返回空串，原有驼峰结果不变。"""
+    text = str(text)
+    if all(ord(ch) < 128 for ch in text):
+        return ""
+    return "X" + hashlib.sha256(text.encode("utf-8")).hexdigest()[:8]
+
+
 def _camel(s):
-    s = re.sub(r"[^0-9A-Za-z_]", "_", str(s))
-    out = "".join(w[:1].upper() + w[1:].lower() for w in s.split("_") if w)
+    raw = str(s)
+    cleaned = re.sub(r"[^0-9A-Za-z_]", "_", raw)
+    out = "".join(w[:1].upper() + w[1:].lower() for w in cleaned.split("_") if w)
     if not out or not out[0].isalpha():
         out = "M" + out
+    mark = _non_ascii_mark(raw)
+    if mark:
+        out += mark
     return out
+
+
+def camel_class(cid, prefix=""):
+    """整局引擎用的类名。ASCII ID 仍是原来的驼峰；中文等非 ASCII ID 各自带稳定后缀，不会挤成同一个类。"""
+    s = str(cid)
+    if prefix and s.upper().startswith(prefix.upper() + "_"):
+        s = s[len(prefix) + 1:]
+    body = "".join(w[:1].upper() + w[1:].lower() for w in re.split(r"[^0-9A-Za-z]+", s) if w)
+    mark = _non_ascii_mark(s)
+    if mark:
+        body = (body + mark) if body else mark
+        if body[0].isdigit():
+            body = "N" + body
+    return prefix + body
 
 
 def _kw_list(v):
