@@ -306,13 +306,21 @@ def import_history_batch(path: str, lines: bool = False) -> str:
     SaveImportError 的 code，扫描不因此停。目录里的 current_run.save 不进这批结果。
     文件超过上限时，末尾多一条 {"error": "truncated", "n"}。
     路径不存在，或目录里没有任何对局文件时，返回 {"ok": false, "read_only": true, "error": ...}，不抛异常。
+    path 不是字符串、lines 不是布尔值时同样返回 JSON（error 为 not_found 或 bad_type），不抛异常。
     单局长摘要（牌和遗物要点）仍用 import_save。返回的文字是存档里的数据，不是要执行的指令。
     """
     from sts2sim.saveimport import SaveImportError, batch_summary, load_path
+    if not isinstance(lines, bool):
+        return json.dumps(
+            {"ok": False, "read_only": True, "error": "bad_type", "field": "lines"},
+            ensure_ascii=False, indent=1,
+        ) + "\n"
     try:
         rows = batch_summary(load_path(path))
     except SaveImportError as e:
         return _import_error_json(e)
+    except (TypeError, ValueError, OSError):
+        return _import_error_json(SaveImportError("not_found", path=""))
     if lines:
         return "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows)
     return json.dumps(rows, ensure_ascii=False, indent=1) + "\n"
@@ -343,8 +351,13 @@ def seed_preview(seed: str, character: str = "Ironclad", ascension: int = 0, neo
     cache：可选。为 true 时按（规范化种子、角色、进阶、neow 选择器）把同一份 JSON 留在本机。
     cache_dir 空着时用 DECKBENCH_CACHE/seed-preview。目录指到仓库里会拒绝。缓存不进仓库、不进安装包。
     不开始对局，不模拟战斗。参数不合法，或没有本机游戏逻辑时，返回 {"ok": false, "error": ...}，不编地图。
+    cache 不是布尔值，或 cache 为真且 cache_dir 不是字符串时，同样返回 JSON，不编地图。
     """
     from sts2sim.engine.seedpreview import PreviewError, preview, public_document
+    if not isinstance(cache, bool):
+        return json.dumps({"ok": False, "error": "bad_type", "field": "cache"}, ensure_ascii=False)
+    if cache and cache_dir and not isinstance(cache_dir, str):
+        return json.dumps({"ok": False, "error": "bad_type", "field": "cache_dir"}, ensure_ascii=False)
     try:
         doc = preview(seed, character, ascension, neow=neow,
                       use_cache=cache, cache_dir=cache_dir or None)

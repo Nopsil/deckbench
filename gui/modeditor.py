@@ -247,9 +247,8 @@ def export(name: str):
 @router.post("/import")
 async def import_zip(file: UploadFile = File(...)):
     """读一个 YAML mod 压缩包 → 返回内容给编辑器（不保存；按「保存」才写到你的 mod 文件夹）。"""
-    data = await file.read()
-    if len(data) > 20 * 1024 * 1024:
-        raise HTTPException(400, T("err.tooBig"))
+    from gui.server import _read_capped
+    data = await _read_capped(file, 20 * 1024 * 1024, T("err.tooBig"))
     try:
         zf = zipfile.ZipFile(io.BytesIO(data))
     except zipfile.BadZipFile:
@@ -302,9 +301,8 @@ def installed():
 @router.post("/import-dll")
 async def import_dll(file: UploadFile = File(...)):
     """作者自己的 mod zip（清单 JSON + DLL，可选 .pck）。读成 YAML 交给编辑器，不执行 DLL。"""
-    data = await file.read()
-    if len(data) > 80 * 1024 * 1024:
-        raise HTTPException(400, T("err.dllTooBig"))
+    from gui.server import _read_capped
+    data = await _read_capped(file, 80 * 1024 * 1024, T("err.dllTooBig"))
     import tempfile
     tmp = tempfile.NamedTemporaryFile(prefix="deckbench-modzip-", suffix=".zip", delete=False)
     try:
