@@ -162,7 +162,20 @@ def _error_payload(err):
     return body
 
 
+def _configure_stdio():
+    """标准输出按 UTF-8 写。Windows 上管道的默认编码（例如 cp1252）写不出中文卡名和模组名。"""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="backslashreplace")
+        except (OSError, ValueError):
+            pass
+
+
 def main(argv=None):
+    _configure_stdio()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("path", nargs="?", help="一个 .run / current_run.save，或存档目录")
     ap.add_argument("--json", help="把解析结果写成 JSON（拒绝写进存档目录）")

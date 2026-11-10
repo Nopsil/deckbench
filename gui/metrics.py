@@ -4,6 +4,7 @@ import csv
 import json
 import math
 import os
+import statistics
 
 ROOM_ZH = {"Monster": "普通", "Elite": "精英", "Boss": "首领"}
 
@@ -27,7 +28,7 @@ def batch_summary(res):
     floors = sorted(r["floor"] for r in ok)
     out.update({
         "avg_floor": sum(floors) / n,
-        "median_floor": floors[n // 2],
+        "median_floor": statistics.median(floors),
         "max_floor": floors[-1],
         "boss1": sum(map(_boss1, ok)) / n,
         "act2": sum(r["act"] >= 1 for r in ok) / n,

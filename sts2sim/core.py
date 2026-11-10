@@ -371,8 +371,9 @@ class Combat:
             left = max(0, p.amount - p.data.get("lost", 0))
             amount = min(amount, left)
             p.data["lost"] = p.data.get("lost", 0) + amount
-        lost = min(amount, target.hp)
-        target.hp -= amount
+        # 过量伤害停在 0。再往下减会让复活/中毒统计把「已经扣掉的生命」算成整段伤害。
+        lost = min(amount, max(0, target.hp))
+        target.hp = max(0, target.hp - lost)
         if lost > 0:
             self.emit("damage_taken", target=target, amount=lost, src=src, kind=kind)
         if target.hp <= 0 and target.alive:

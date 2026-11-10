@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import math
 import os
 import re
 import zlib
@@ -143,7 +144,10 @@ def _floor(d):
         if isinstance(n, bool):
             continue
         if isinstance(n, (int, float)):
-            return int(n)
+            n = _int(n)
+            if n is not None:
+                return n
+            continue
         if isinstance(n, str) and n.strip().isdigit():
             return int(n.strip())
     return None
@@ -177,7 +181,13 @@ def _int(v):
     if isinstance(v, int):
         return v
     if isinstance(v, float):
-        return int(v)
+        # NaN / Infinity 不是能用的生命或层数。按「这个字段没有」处理，不要让整份存档崩掉。
+        if not math.isfinite(v):
+            return None
+        try:
+            return int(v)
+        except (OverflowError, ValueError):
+            return None
     if isinstance(v, str):
         s = v.strip()
         if s.lstrip("-").isdigit():
@@ -642,6 +652,8 @@ def _list_run_files(directory):
     hist = hist if hist and os.path.isdir(hist) else directory
     if os.path.isdir(hist):
         names = set(os.listdir(hist))
+        # Windows 上 Sample.run 和 sample.run.backup 是同一局的主文件和备份。
+        folded = {os.path.normcase(n) for n in names}
         for name in sorted(names):
             low = name.lower()
             full = os.path.join(hist, name)
@@ -653,7 +665,7 @@ def _list_run_files(directory):
                 found.append((full, "history"))
             elif low.endswith(".run.backup") or low.endswith(".run.bak"):
                 primary = name.rsplit(".", 1)[0]
-                if primary not in names:
+                if os.path.normcase(primary) not in folded:
                     found.append((full, "history"))
     for name, role in (("current_run.save", "current"), ("current_run_mp.save", "current_mp")):
         full = os.path.join(directory, name)
@@ -726,9 +738,11 @@ def discover():
                 continue
             dirnames[:] = [d for d in dirnames if d.lower() not in ("logs", "replay")]
             base = os.path.basename(dirpath).lower()
-            interesting = base == "saves" or "current_run.save" in filenames or "current_run_mp.save" in filenames
+            folded = {os.path.normcase(name) for name in filenames}
+            has_current = "current_run.save" in folded or "current_run_mp.save" in folded
+            interesting = base == "saves" or has_current
             hist = os.path.join(dirpath, "history")
-            if interesting and (os.path.isdir(hist) or "current_run.save" in filenames or "current_run_mp.save" in filenames):
+            if interesting and (os.path.isdir(hist) or has_current):
                 ap = os.path.abspath(dirpath)
                 if ap not in seen:
                     seen.add(ap)
@@ -739,7 +753,7 @@ def discover():
                         "path": ap,
                         "label": os.path.relpath(ap, root),
                         "history": n,
-                        "has_current": "current_run.save" in filenames or "current_run_mp.save" in filenames,
+                        "has_current": has_current,
                     })
     return found
 

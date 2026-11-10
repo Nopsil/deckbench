@@ -42,9 +42,21 @@ ROADMAP = """## 9. 路线图（最终目标：复刻游戏里全部敌人、遗�
 """
 
 
+def _read_text(path):
+    """读报告文件。认 UTF-8、UTF-8 BOM、UTF-16 BOM，这样 Windows 记事本另存的中文卡名不会坏。"""
+    with open(path, "rb") as f:
+        data = f.read()
+    if data.startswith((b"\xff\xfe", b"\xfe\xff")):
+        return data.decode("utf-16")
+    if data.startswith(b"\xef\xbb\xbf"):
+        return data.decode("utf-8-sig")
+    return data.decode("utf-8")
+
+
 def _load(out_dir):
-    rows = [json.loads(l) for l in open(os.path.join(out_dir, "raw.jsonl"), encoding="utf-8")]
-    meta = json.load(open(os.path.join(out_dir, "meta.json"), encoding="utf-8"))
+    raw = _read_text(os.path.join(out_dir, "raw.jsonl"))
+    rows = [json.loads(line) for line in raw.splitlines() if line.strip()]
+    meta = json.loads(_read_text(os.path.join(out_dir, "meta.json")))
     return rows, meta
 
 
@@ -54,6 +66,14 @@ def _pct(a, b):
 
 def _r(x, n=1):
     return round(x, n) if x is not None else None
+
+
+def cell_text(c):
+    """胜场平均回合。0 回合取胜也是胜场；只有没有胜场（turns_win 为 None）才写「撑 N」。"""
+    tw = c["turns_win"]
+    if tw is None:
+        return f"{c['win']:.0f}% / 撑{c['turns']:.1f} / {c['hp_lost']:.0f} / {c['dpt']:.1f}"
+    return f"{c['win']:.0f}% / {tw:.1f} / {c['hp_lost']:.0f} / {c['dpt']:.1f}"
 
 
 def summarize_cells(rows):
@@ -186,8 +206,7 @@ def make_report(out_dir, M):
                     if not c:
                         cs.append("—")
                         continue
-                    tw = c["turns_win"]
-                    cs.append(f"{c['win']:.0f}% / {tw:.1f} / {c['hp_lost']:.0f} / {c['dpt']:.1f}" if tw else f"{c['win']:.0f}% / 撑{c['turns']:.1f} / {c['hp_lost']:.0f} / {c['dpt']:.1f}")
+                    cs.append(cell_text(c))
                 A(f"| {dk['name']}（第{a}幕） | " + " | ".join(cs) + " |")
         A("")
         A("回合 = 胜场平均回合数（胜率 0% 时写「撑 N」= 平均坚持回合数）；掉血 = 全部场次平均（战败算掉光）；每回合输出 = 对敌人造成的实际生命损失 ÷ 回合数（不受战败影响，最适合比较进攻速度）。")
