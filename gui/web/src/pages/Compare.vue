@@ -14,7 +14,10 @@
       </div>
       <div class="row between" style="margin-top:12px">
         <div class="hint" style="margin:0">{{ t('cmp.hint') }}</div>
-        <n-button v-if="exportHref" secondary tag="a" download data-action="export" :href="exportHref"><template #icon><n-icon :component="FileExport" /></template>{{ t('export.button') }}</n-button>
+        <div class="row">
+          <n-button v-if="bundleHref" secondary tag="a" download data-action="bundle" :href="bundleHref"><template #icon><n-icon :component="FileExport" /></template>{{ t('bundle.download') }}</n-button>
+          <n-button v-if="exportHref" secondary tag="a" download data-action="export" :href="exportHref"><template #icon><n-icon :component="FileExport" /></template>{{ t('export.button') }}</n-button>
+        </div>
       </div>
     </div>
 
@@ -139,6 +142,11 @@ const exportHref = computed(() => {
   if (!a.value || !b.value) return undefined
   const q = new URLSearchParams({ a: a.value, b: b.value, lang: lang.value })
   return '/api/runs/compare/export.html?' + q.toString()
+})
+const bundleHref = computed(() => {
+  if (!a.value || !b.value) return undefined
+  const q = new URLSearchParams({ a: a.value, b: b.value, lang: lang.value })
+  return '/api/runs/compare/bundle?' + q.toString()
 })
 const METRIC_KEY = { win: 'cmp.win', timeout: 'cmp.timeout', turns: 'cmp.turns', hp_loss: 'cmp.hpLoss', dpt: 'cmp.dpt' }
 const HIGHER = new Set(['win', 'dpt', 'efficiency', 'usage'])

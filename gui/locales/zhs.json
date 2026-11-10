@@ -1268,5 +1268,21 @@
   "deck.err.card_impact": "单卡贡献没有跑成。",
   "nt.encounters": "遭遇",
   "nt.encHint": "可选。勾选之后，这次测试打这些遭遇，不再从上面的房间里随机抽。上面的最大回合数对每一场生效。每种遭遇单独设场数。",
-  "nt.nEncounters": "{n} 个遭遇"
+  "nt.nEncounters": "{n} 个遭遇",
+  "bundle.import": "导入结果包",
+  "bundle.download": "下载结果包",
+  "bundle.imported": "已导入",
+  "bundle.importedFrom": "从 DeckBench {version} 导入",
+  "bundle.done": "已导入 {n} 次测试。",
+  "bundle.renamed": "原来的编号已经在用，这份改成了 {id}。",
+  "bundle.err.schema": "这个结果包的格式版本是 {schema}，当前 DeckBench 只读版本 {supported}。",
+  "bundle.err.schemaBad": "这个结果包的格式版本无法识别。当前 DeckBench 只读版本 1。",
+  "bundle.err.hash": "结果包里有文件和清单上的 SHA-256 对不上。",
+  "bundle.err.slip": "结果包里有不安全的路径，已拒绝。",
+  "bundle.err.tooBig": "这个结果包太大了。",
+  "bundle.err.manifest": "结果包的清单无效。",
+  "bundle.err.kind": "这不是 DeckBench 的结果包。",
+  "bundle.err.incomplete": "结果包缺了必要的文件。",
+  "bundle.err.extra": "结果包里有清单没有列出的文件。",
+  "bundle.err.need": "请指定一次已完成的测试，或两次已完成的战斗实验。"
 }

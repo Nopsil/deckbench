@@ -5,6 +5,7 @@
       <div v-if="meta" class="row">
         <n-button secondary size="small" @click="openFolder"><template #icon><n-icon :component="Folder" /></template>{{ t('common.openFolder') }}</n-button>
         <n-button v-if="S" secondary size="small" tag="a" download data-action="export" :href="exportHref"><template #icon><n-icon :component="FileExport" /></template>{{ t('export.button') }}</n-button>
+        <n-button v-if="S" secondary size="small" tag="a" download data-action="bundle" :href="bundleHref"><template #icon><n-icon :component="Download" /></template>{{ t('bundle.download') }}</n-button>
         <n-button secondary size="small" tag="a" :href="`/api/runs/${id}/files/${meta.kind === 'batch' ? 'runs.jsonl' : 'cells.csv'}`"><template #icon><n-icon :component="Download" /></template>{{ meta.kind === 'batch' ? t('rep.rawData') : 'cells.csv' }}</n-button>
       </div>
     </div>
@@ -103,6 +104,11 @@ const exportHref = computed(() => {
   if (!id.value) return undefined
   const q = new URLSearchParams({ lang: lang.value })
   return `/api/runs/${encodeURIComponent(id.value)}/export.html?` + q.toString()
+})
+const bundleHref = computed(() => {
+  if (!id.value) return undefined
+  const q = new URLSearchParams({ lang: lang.value })
+  return `/api/runs/${encodeURIComponent(id.value)}/bundle?` + q.toString()
 })
 const chips = computed(() => {
   const p = meta.value?.params || {}
