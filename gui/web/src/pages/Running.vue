@@ -31,6 +31,7 @@
             </n-popconfirm>
             <template v-else>
               <n-button secondary @click="rerun"><template #icon><n-icon :component="Refresh" /></template>{{ t('common.rerun') }}</n-button>
+              <n-button v-if="status === 'done'" secondary tag="a" download data-action="export" :href="exportHref"><template #icon><n-icon :component="FileExport" /></template>{{ t('export.button') }}</n-button>
               <n-button v-if="status === 'done'" type="primary" @click="$router.push('/report/' + id)"><template #icon><n-icon :component="ChartBar" /></template>{{ t('run.viewReport') }}</n-button>
             </template>
           </div>
@@ -64,10 +65,10 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NButton, NCheckbox, NIcon, NPopconfirm, NSpin, NTag, useMessage } from 'naive-ui'
-import { PlayerStop, Refresh, ChartBar } from '@vicons/tabler'
+import { PlayerStop, Refresh, ChartBar, FileExport } from '@vicons/tabler'
 import Stat from '../components/Stat.vue'
 import { api, store, fmt, runTitle, STATUS } from '../api'
-import { t, MESSAGES } from '../i18n'
+import { t, lang, MESSAGES } from '../i18n'
 
 const route = useRoute()
 const router = useRouter()
@@ -94,6 +95,11 @@ const speed = computed(() => (elapsed.value > 0 && prog.value.done ? prog.value.
 const eta = computed(() => {
   if (!speed.value || !prog.value.total || prog.value.done < 2) return null
   return (prog.value.total - prog.value.done) / speed.value
+})
+const exportHref = computed(() => {
+  if (!id.value || status.value !== 'done') return undefined
+  const q = new URLSearchParams({ lang: lang.value })
+  return `/api/runs/${encodeURIComponent(id.value)}/export.html?` + q.toString()
 })
 const paramChips = computed(() => {
   const p = meta.value?.params || {}

@@ -4,6 +4,7 @@
       <n-select v-model:value="sel" :options="runOptions" filterable :placeholder="t('rep.pick')" style="max-width:560px" @update:value="(v) => $router.push('/report/' + v)" />
       <div v-if="meta" class="row">
         <n-button secondary size="small" @click="openFolder"><template #icon><n-icon :component="Folder" /></template>{{ t('common.openFolder') }}</n-button>
+        <n-button v-if="S" secondary size="small" tag="a" download data-action="export" :href="exportHref"><template #icon><n-icon :component="FileExport" /></template>{{ t('export.button') }}</n-button>
         <n-button secondary size="small" tag="a" :href="`/api/runs/${id}/files/${meta.kind === 'batch' ? 'runs.jsonl' : 'cells.csv'}`"><template #icon><n-icon :component="Download" /></template>{{ meta.kind === 'batch' ? t('rep.rawData') : 'cells.csv' }}</n-button>
       </div>
     </div>
@@ -64,7 +65,7 @@
 import { computed, h, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NButton, NDataTable, NIcon, NSelect, NSpin, NTabPane, NTabs, useMessage } from 'naive-ui'
-import { Folder, Download } from '@vicons/tabler'
+import { Folder, Download, FileExport } from '@vicons/tabler'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import Stat from '../components/Stat.vue'
@@ -97,6 +98,11 @@ const combatWinSub = computed(() => {
   const s = S.value
   if (!s || s.win_ci_low == null || s.win_ci_high == null) return ''
   return t('rep.wilson', { lo: fmt.pct(s.win_ci_low), hi: fmt.pct(s.win_ci_high) })
+})
+const exportHref = computed(() => {
+  if (!id.value) return undefined
+  const q = new URLSearchParams({ lang: lang.value })
+  return `/api/runs/${encodeURIComponent(id.value)}/export.html?` + q.toString()
 })
 const chips = computed(() => {
   const p = meta.value?.params || {}

@@ -447,3 +447,54 @@ def test_gap_triage_renders_sample_calibration(gui):
     triage.scroll_into_view_if_needed()
     _save_shot(page, "gui-gap-triage.png")
     _assert_clean(gui, "gap-triage")
+
+
+def _offline(html):
+    low = html.lower()
+    assert "http://" not in low
+    assert "https://" not in low
+    assert "<script" not in low
+    assert "<link" not in low
+    assert "<iframe" not in low
+    assert "<svg" in low
+
+
+def test_export_buttons_download_offline_html(gui):
+    """运行页和对比页的「导出报告」点下去，得到一份离线 HTML。"""
+    base = _combat_rows(2, 10, 20, 8, 8, 1, "Monster") + _combat_rows(30, 0, 4, 3, 36, 1, "Elite")
+    changed = _combat_rows(30, 0, 4, 3, 36, 4, "Monster") + _combat_rows(2, 10, 20, 8, 8, 4, "Elite")
+    _write_combat_run(gui.data, "exp-a", "Export baseline", base)
+    _write_combat_run(gui.data, "exp-b", "Export changed", changed)
+    cells = gui.data / "runs" / "exp-a" / "out" / "cells.csv"
+    cells.write_text(
+        "卡组id,卡组,阶段,幕,房间,场数,胜率%,战败%,超时%,平均回合,平均掉血,每回合输出,循环报警场数\n"
+        "probe,Probe,,1,Monster,40,75.0,20.0,5.0,4.0,8.0,12.0,0\n",
+        encoding="utf-8",
+    )
+    page = gui.page
+    page.goto(gui.base + "/#/run/exp-a", wait_until="domcontentloaded")
+    gui.expect(page.get_by_text("Done", exact=True).first).to_be_visible()
+    export = page.locator("[data-action='export']")
+    gui.expect(export).to_be_visible()
+    with page.expect_download() as caught:
+        export.click()
+    saved = gui.data / "export-run.html"
+    caught.value.save_as(str(saved))
+    html = saved.read_text(encoding="utf-8")
+    _offline(html)
+    assert "Export baseline" in html
+    page.goto(saved.as_uri())
+    gui.expect(page.locator("h1")).to_be_visible()
+    _save_shot(page, "export-report.png")
+
+    query = urlencode({"a": "exp-a", "b": "exp-b"})
+    page.goto(gui.base + "/#/compare?" + query, wait_until="domcontentloaded")
+    gui.expect(page.locator("[data-table='cells']")).to_be_visible(timeout=30_000)
+    with page.expect_download() as caught:
+        page.locator("[data-action='export']").click()
+    compared = gui.data / "export-compare.html"
+    caught.value.save_as(str(compared))
+    other = compared.read_text(encoding="utf-8")
+    _offline(other)
+    assert "Run comparison" in other
+    _assert_clean(gui, "export")

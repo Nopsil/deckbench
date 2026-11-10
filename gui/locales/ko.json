@@ -1096,5 +1096,20 @@
  "err.compareCombat": "칸 비교에는 끝난 전투 테스트 두 개가 필요합니다.",
  "err.compareNoData": "비교할 전투 칸이 없습니다.",
  "err.compareBad": "전투 결과가 올바른 JSON이 아닙니다 ({line}행).",
- "hist.compareCells": "칸 차이"
+ "hist.compareCells": "칸 차이",
+ "export.button": "보고서 내보내기",
+ "export.pageTitle": "DeckBench 보고서",
+ "export.offline": "이 파일은 하나만으로 완결됩니다. 차트는 페이지 안에 그려집니다. 열어도 네트워크를 쓰지 않고, 시뮬레이션을 시작하지 않으며, 시드와 AI도 바꾸지 않습니다.",
+ "export.generated": "숫자는 이미 끝난 결과에서 옮긴 것입니다. 시뮬레이션을 다시 돌리지 않았습니다.",
+ "export.sectionRun": "끝난 테스트",
+ "export.sectionCompare": "두 테스트 비교",
+ "export.sectionCal": "보정",
+ "export.sectionGap": "격차 분류",
+ "export.footer": "DeckBench 오프라인 보고서",
+ "export.deltaChart": "칸별 승률 차 (B − A)",
+ "export.winBars": "칸별 승률",
+ "export.truncated": "앞 {n}개만 표시합니다.",
+ "export.err.noResult": "끝난 이 테스트에 읽을 수 있는 결과 파일이 없습니다.",
+ "export.err.need": "끝난 테스트, 비교할 전투 테스트 두 개, 또는 보정 보고서를 지정하세요.",
+ "export.err.badLang": "lang 은 zh-CN, en, ja, ko 중 하나여야 합니다."
 }
