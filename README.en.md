@@ -155,7 +155,7 @@ A mod already installed in the game does not have to be rewritten by hand first.
 ## Let an AI assistant play step by step (MCP)
 
 If you use an AI assistant that supports MCP, such as Claude or Cursor, you can have it play a run in the simulator itself: it can read the situation, pick options, explain its reasons, undo and retry, and at the end export a step list so you can play the same seed in the real game and follow along.
-For now this only works from source: `pip install -r requirements-mcp.txt`, then `python tools/mcp_server.py`. Card names are read from your own game install at runtime. See [docs/MCP.md](docs/MCP.md).
+For now this only works from source: `pip install -r requirements-mcp.txt`, then `python tools/mcp_server.py`. Card names are read from your own game install at runtime. The same server can also read finished results without the GUI: `batch_run_summary` (win rate, Wilson interval, `sample_warning`), `card_ab` (a `p_value` for two result files you already have; it does not start a simulation) and `explain_fight` (one fight from an `--explain` log, paged). Paths have to sit in an allowed directory. See [docs/MCP.md](docs/MCP.md).
 
 ## Reading results
 
@@ -165,7 +165,7 @@ For now this only works from source: `pip install -r requirements-mcp.txt`, then
 - **Single-card A/B**: both groups use the same random seeds, and the only difference is that one card, so the gap is that card's effect. The win-rate gap also has a **two-proportion z-test p-value** (two-sided). The paired difference and its 95% interval are still reported.
 - **Too few runs**: if either group has **fewer than 30** valid runs, the report says the sample is too small to conclude. The numbers are still printed; do not treat them as a verdict on the card.
 
-On the command line this shows up in `python tools/batch.py`, `python tools/ab_card.py ... --format text` (or `markdown` / `json`), `python tools/ab_table.py <dir> --format markdown` (also `text` / `json`), and `python tools/ai_summary.py a.jsonl b.jsonl` (`--json` prints JSON; from the second file on, a p-value against the first). The report page and the A/B page show the Wilson interval, the p-value and the small-sample warning. The report and A/B HTTP APIs (`/api/runs/{id}/summary`, `/api/ab`) add these fields and keep the old ones.
+On the command line this shows up in `python tools/batch.py`, `python tools/ab_card.py ... --format text` (or `markdown` / `json`), `python tools/ab_table.py <dir> --format markdown` (also `text` / `json`), and `python tools/ai_summary.py a.jsonl b.jsonl` (`--json` prints JSON; from the second file on, a p-value against the first). The report page and the A/B page show the Wilson interval, the p-value and the small-sample warning. The report and A/B HTTP APIs (`/api/runs/{id}/summary`, `/api/ab`) add these fields and keep the old ones. MCP `batch_run_summary` and `card_ab` return the same numbers without the GUI.
 
 **Important**: the AI is not a skilled human player, so these numbers are **not real player win rates**. They're good for **comparing things under the same settings** (new card vs. old card, before vs. after a number change, your character vs. a base-game character), not as an absolute measure of strength.
 
