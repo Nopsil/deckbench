@@ -7,6 +7,7 @@
   fights: 200              # 每个（卡组×房间）格子打多少场
   max_turns: 30
   agent: heuristic         # heuristic / beam
+  agent_kw: {mechanic_aware: true}   # 默认关。true 才计入荆棘 / 受击格挡 / 总伤害
   rooms: [普通, 精英, 首领]
   decks: [claude_start, ironclad_start, ...]   # 每个卡组按自己 acts 字段打对应幕
   extra:                   # 可选：额外格子，例如循环探针
@@ -126,18 +127,22 @@ def _task(a):
 def plan(exp, M, fights=None):
     tasks = []
     n = fights or exp.get("fights", 100)
+    kw = dict(exp.get("agent_kw") or {})
     for did in exp["decks"]:
         dk = M.decks[did]
         for act in dk.get("acts", [1]):
             for room in exp.get("rooms", ["普通", "精英", "首领"]):
                 for i in range(n):
                     tasks.append(((exp["mods"], did, act, room, i, exp.get("seed", 1)),
-                                  {"agent_name": exp.get("agent", "heuristic"), "max_turns": exp.get("max_turns", 30)}))
+                                  {"agent_name": exp.get("agent", "heuristic"), "max_turns": exp.get("max_turns", 30),
+                                   "agent_kw": dict(kw)}))
     for x in exp.get("extra", []) or []:
+        ekw = dict(kw)
+        ekw.update(x.get("agent_kw") or {})
         for i in range(x.get("fights", 20)):
             tasks.append(((exp["mods"], x["deck"], x.get("act", 1), x.get("room", "探针"), i, exp.get("seed", 1)),
                           {"agent_name": x.get("agent", exp.get("agent", "heuristic")), "max_turns": x.get("max_turns", 3),
-                           "encounter_id": x.get("encounter")}))
+                           "encounter_id": x.get("encounter"), "agent_kw": dict(ekw)}))
     return tasks
 
 
@@ -148,7 +153,8 @@ def worker_count(jobs=None, workers=None):
     return max(1, int(n))
 
 
-def run_experiment(path, fights=None, jobs=None, seed=None, agent=None, out_dir=None, explain=None, workers=None):
+def run_experiment(path, fights=None, jobs=None, seed=None, agent=None, out_dir=None, explain=None, workers=None,
+                   mechanic_aware=False, no_mechanic_aware=False):
     from . import explain as EX
     exp = yaml.safe_load(open(path, encoding="utf-8"))
     if seed is not None:
@@ -157,6 +163,14 @@ def run_experiment(path, fights=None, jobs=None, seed=None, agent=None, out_dir=
         exp["agent"] = agent
     if fights:
         exp["fights"] = fights
+    # 默认不改 agent_kw：构造函数里 mechanic_aware 是关。--mechanic-aware 打开；
+    # --no-mechanic-aware 显式保持关闭。两个都给时以打开为准。
+    if mechanic_aware:
+        exp["agent_kw"] = dict(exp.get("agent_kw") or {})
+        exp["agent_kw"]["mechanic_aware"] = True
+    elif no_mechanic_aware:
+        exp["agent_kw"] = dict(exp.get("agent_kw") or {})
+        exp["agent_kw"]["mechanic_aware"] = False
     for k, v in (exp.get("env") or {}).items():   # 变体开关：子进程继承环境变量
         os.environ[str(k)] = str(v)
     explain = bool(explain) or bool(exp.get("explain")) or EX.requested(False)
@@ -220,8 +234,13 @@ def main():
     ap.add_argument("--out")
     ap.add_argument("--explain", action="store_true",
                     help="把每步出牌、目标和药水的候选分数写到输出目录的 explain.jsonl（也认 DECKBENCH_EXPLAIN=1，或实验 YAML 的 explain: true）")
+    ap.add_argument("--mechanic-aware", action="store_true",
+                    help="打开启发式 / 束搜索对荆棘、受击加格挡和多敌人总伤害的出牌修正（默认关；实验 YAML 写 agent_kw.mechanic_aware: true）")
+    ap.add_argument("--no-mechanic-aware", action="store_true",
+                    help="显式保持该修正关闭（默认即关）。与 --mechanic-aware 同时给出时以 --mechanic-aware 为准。")
     a = ap.parse_args()
-    out, wall, n = run_experiment(a.experiment, a.fights, a.jobs, a.seed, a.agent, a.out, explain=a.explain, workers=a.workers)
+    out, wall, n = run_experiment(a.experiment, a.fights, a.jobs, a.seed, a.agent, a.out, explain=a.explain, workers=a.workers,
+                                  mechanic_aware=a.mechanic_aware, no_mechanic_aware=a.no_mechanic_aware)
     print(f"完成 {n} 场，用时 {wall:.1f} 秒，报告在 {out}")
     if a.explain or os.environ.get("DECKBENCH_EXPLAIN", "").strip().lower() in ("1", "true", "yes", "on"):
         print(f"说明日志 / explanation: {os.path.join(out, 'explain.jsonl')}")
