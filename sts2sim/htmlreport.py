@@ -277,6 +277,8 @@ def _run_from_dir(real):
         return _run_from_file(real)
     meta = _read_meta(real)
     kind = meta.get("kind")
+    if kind == "card_impact":
+        return _impact_payload(real, meta)
     out = os.path.join(real, "out")
     has_combat = os.path.isdir(out) or any(os.path.isfile(os.path.join(real, name)) for name in _COMBAT_FILES)
     has_batch = os.path.isfile(os.path.join(real, "runs.jsonl"))
@@ -341,6 +343,26 @@ def _batch_payload(run_dir, jsonl, meta):
     meta.setdefault("kind", "batch")
     meta.setdefault("id", os.path.basename(run_dir))
     meta.setdefault("status", "done")
+    return {"meta": meta, "summary": summary}
+
+
+def _impact_payload(run_dir, meta):
+    _ensure_done(meta)
+    path = os.path.join(run_dir, "card_impact.json")
+    if not os.path.isfile(path):
+        raise ExportError("no_result")
+    _guard_size(path)
+    try:
+        with open(path, encoding="utf-8") as handle:
+            summary = json.loads(handle.read())
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ExportError("no_result") from exc
+    if not isinstance(summary, dict):
+        raise ExportError("no_result")
+    meta = dict(meta or {})
+    meta.setdefault("kind", "card_impact")
+    meta.setdefault("id", os.path.basename(run_dir.rstrip(os.sep)) or "card-impact")
+    meta.setdefault("status", summary.get("status") or "done")
     return {"meta": meta, "summary": summary}
 
 
@@ -575,6 +597,20 @@ def _pct(value):
     return f"{number * 100:.1f}%"
 
 
+def _signed_pct(value):
+    number = _num(value)
+    if number is None:
+        return "—"
+    return f"{number * 100:+.1f}%"
+
+
+def _signed_plain(value):
+    number = _num(value)
+    if number is None:
+        return "—"
+    return f"{number:+.2f}"
+
+
 def _clip(text, limit):
     text = "" if text is None else str(text)
     if len(text) <= limit:
@@ -698,7 +734,9 @@ def _run_section(run, lang):
     if _marked_partial(meta):
         inner.append(_note(_t(lang, "export.partial")))
     inner.append(_chips(_run_chips(meta, lang)))
-    if kind == "combat":
+    if kind == "card_impact" or summary.get("method") == "leave_one_out":
+        inner.append(_impact_block(summary, lang))
+    elif kind == "combat":
         inner.append(_combat_block(summary, lang))
     else:
         inner.append(_batch_block(summary, lang))
@@ -709,7 +747,7 @@ def _run_chips(meta, lang):
     params = meta.get("params") if isinstance(meta.get("params"), dict) else {}
     kind = meta.get("kind")
     chips = []
-    if kind in ("batch", "combat"):
+    if kind in ("batch", "combat", "card_impact"):
         chips.append(_t(lang, "kind." + kind))
     if params.get("char"):
         chips.append(str(params.get("char")))
@@ -719,8 +757,8 @@ def _run_chips(meta, lang):
         chips.append(_t(lang, "chip.nRuns", n=params.get("n")))
     if params.get("agent"):
         chips.append(str(params.get("agent")))
-    if params.get("preset"):
-        chips.append(_t(lang, "chip.preset", id=params.get("preset")))
+    if params.get("preset") or (kind == "card_impact" and params.get("deck")):
+        chips.append(_t(lang, "chip.preset", id=params.get("preset") or params.get("deck")))
     if params.get("fights") is not None and kind == "combat":
         chips.append(_t(lang, "chip.perCell", n=params.get("fights")))
     seed = params.get("game_seed") or params.get("seed")
@@ -729,6 +767,94 @@ def _run_chips(meta, lang):
     if meta.get("created"):
         chips.append(str(meta.get("created")))
     return chips
+
+
+def _impact_name(row, lang):
+    if not isinstance(row, dict):
+        return ""
+    if lang == "zhs":
+        text = row.get("name_zh") or row.get("name") or row.get("card_id") or ""
+    else:
+        text = row.get("name_en") or row.get("name") or row.get("card_id") or ""
+    text = str(text)
+    if row.get("upgrade") and text and not text.endswith("+"):
+        text += "+"
+    return text
+
+
+def _impact_change(row, lang):
+    change = row.get("change")
+    if change == "add":
+        return _t(lang, "deck.impactAdd")
+    if change == "remove":
+        return _t(lang, "deck.impactRemove")
+    return str(change or "")
+
+
+def _impact_flag(row, lang):
+    if not row.get("noisy"):
+        return "—"
+    if row.get("noisy_reason") == "wilson_overlap":
+        return _t(lang, "deck.impactOverlap")
+    return _t(lang, "deck.impactTooSmall")
+
+
+def _impact_effect(code, lang):
+    if code == "helps":
+        return _t(lang, "deck.impactHelps")
+    if code == "hurts":
+        return _t(lang, "deck.impactHurts")
+    if code == "flat":
+        return _t(lang, "deck.impactFlat")
+    return ""
+
+
+def _impact_block(summary, lang):
+    parts = ["<h3>" + _esc(_t(lang, "export.impactTitle")) + "</h3>"]
+    parts.append(_note(_t(lang, "export.impactNote", min=summary.get("min_n") or 30)))
+    if summary.get("scaled"):
+        parts.append(_note(_t(
+            lang, "deck.impactScaled", n=summary.get("fights") or 0, cap=summary.get("cap") or 400,
+        ), warn=True))
+    baseline = summary.get("baseline") if isinstance(summary.get("baseline"), dict) else None
+    if baseline:
+        parts.append(_stats([
+            (_t(lang, "deck.impactN"), str(baseline.get("wins")) + " / " + str(baseline.get("n"))),
+            (_t(lang, "cmp.win"), _pct(baseline.get("win_rate"))),
+            (_t(lang, "cmp.hpLoss"), _plain(baseline.get("hp_lost"), 1)),
+            (_t(lang, "cmp.turns"), _plain(baseline.get("turns"), 1)),
+        ]))
+    rows = [row for row in (summary.get("rows") or []) if isinstance(row, dict)]
+    rows.sort(key=lambda row: (_num(row.get("delta_win")) is None, -(_num(row.get("delta_win")) or 0)))
+    body = []
+    for row in rows:
+        win = _signed_pct(row.get("delta_win"))
+        effect = _impact_effect(row.get("win_effect"), lang)
+        if effect:
+            win = win + " (" + effect + ")"
+        hp = _signed_plain(row.get("delta_hp_lost"))
+        hp_effect = _impact_effect(row.get("hp_effect"), lang)
+        if hp_effect:
+            hp = hp + " (" + hp_effect + ")"
+        body.append([
+            _impact_name(row, lang),
+            _impact_change(row, lang),
+            str(row.get("n") if row.get("n") is not None else "—"),
+            win,
+            hp,
+            _signed_plain(row.get("delta_turns")),
+            _impact_flag(row, lang),
+        ])
+    parts.append(_table([
+        _t(lang, "deck.impactCard"),
+        _t(lang, "deck.impactChange"),
+        _t(lang, "deck.impactN"),
+        _t(lang, "deck.impactDeltaWin"),
+        _t(lang, "deck.impactDeltaHp"),
+        _t(lang, "deck.impactDeltaTurns"),
+        _t(lang, "deck.impactNoisy"),
+    ], body) if body else _note(_t(lang, "deck.impactEmpty")))
+    return "".join(parts)
 
 
 def _batch_block(summary, lang):

@@ -125,6 +125,30 @@
         </div>
       </div>
     </div>
+
+    <div class="panel impact" data-deck="impact">
+      <h3>{{ t('deck.impact') }}</h3>
+      <div class="hint">{{ t('deck.impactHint') }}</div>
+      <div v-if="!savedPresets.length" class="hint">{{ t('deck.impactNeed') }}</div>
+      <div class="impact-form">
+        <div class="field" data-deck="impact-deck">
+          <div class="label">{{ t('deck.impactPick') }}</div>
+          <n-select v-model:value="impactDeck" :options="presetOptions" :placeholder="t('deck.impactPick')" />
+        </div>
+        <label class="check">
+          <input v-model="impactPlus" data-deck="impact-plus" type="checkbox" />
+          {{ t('deck.impactPlus') }}
+        </label>
+        <div data-deck="impact-run">
+          <n-button type="primary" :loading="impactStarting" :disabled="!canImpact" @click="runImpact">{{ t('deck.impactRun') }}</n-button>
+        </div>
+      </div>
+      <div v-if="impactErr" class="hint warn" data-deck="impact-error">{{ impactErr }}</div>
+      <div v-if="impactJob" data-deck="impact-progress">
+        <run-progress :run-id="impactJob" @update="onImpact" />
+        <card-impact-table :job-id="impactJob" />
+      </div>
+    </div>
   </div>
 </template>
 
@@ -132,6 +156,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { NButton, NInput, NSelect, useMessage } from 'naive-ui'
+import CardImpactTable from '../components/CardImpactTable.vue'
 import EncounterPicker from '../components/EncounterPicker.vue'
 import RunProgress from '../components/RunProgress.vue'
 import { api, store } from '../api'
@@ -171,6 +196,12 @@ const h2hRunning = ref(false)
 const h2hErr = ref('')
 const h2hIds = ref(null)
 const h2hState = ref({ a: null, b: null })
+const impactDeck = ref(null)
+const impactPlus = ref(false)
+const impactStarting = ref(false)
+const impactErr = ref('')
+const impactJob = ref('')
+const impactState = ref(null)
 let h2hLeft = false
 let timer
 function onlyDummy(list) {
@@ -337,6 +368,11 @@ const h2hPartial = computed(() => {
   return !!((a && (a.partial || a.status === 'cancelled')) || (b && (b.partial || b.status === 'cancelled')))
 })
 const canH2h = computed(() => !!h2hA.value && !!h2hB.value && h2hA.value !== h2hB.value && !h2hRunning.value && !h2hActive.value)
+const impactLive = computed(() => {
+  const row = impactState.value
+  return !!(impactJob.value && row && (row.status === 'running' || row.status === 'queued'))
+})
+const canImpact = computed(() => !!impactDeck.value && !impactStarting.value && !impactLive.value)
 
 async function save() {
   if (!canSave.value) return
@@ -354,6 +390,7 @@ async function save() {
     const saved = await api.post('/api/decks', body)
     savedId.value = saved.id
     await store.loadCatalog()
+    impactDeck.value = saved.id
   } catch (e) {
     msg.error(e.message)
   } finally {
@@ -391,6 +428,23 @@ function onH2h(side, view) {
   h2hLeft = true
   if (a.status === 'done' && b.status === 'done') {
     router.push({ path: '/compare', query: { a: a.id, b: b.id } })
+  }
+}
+function onImpact(view) { impactState.value = view }
+async function runImpact() {
+  if (!canImpact.value) return
+  impactStarting.value = true
+  impactErr.value = ''
+  try {
+    const saved = await api.post('/api/decks/' + encodeURIComponent(impactDeck.value) + '/card_impact', {
+      plus: impactPlus.value,
+    })
+    impactState.value = null
+    impactJob.value = saved.id || saved.job
+  } catch (e) {
+    impactErr.value = e.message
+  } finally {
+    impactStarting.value = false
   }
 }
 async function cancelHeadToHead() {
@@ -433,11 +487,15 @@ svg { width: 100%; height: auto; display: block; margin: 4px 0 10px; }
 .field { margin: 10px 0; }
 .field input[type="number"] { width: 100%; box-sizing: border-box; background: #1A1A1E; color: #EDE9E3; border: 1px solid #2E2E34; border-radius: 8px; padding: 6px 8px; font: inherit; }
 .hint.warn { color: #E0A86C; }
+.impact { margin-top: 16px; }
+.impact-form { display: grid; grid-template-columns: minmax(220px, 360px) auto auto; gap: 12px 16px; align-items: end; }
+.impact-form .check { margin: 0 0 8px; }
 .hint.ok { color: #8FBF8F; }
 .check { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0 12px; font-size: 13px; color: #B9B4AC; }
 .check input { margin-top: 2px; }
 @media (max-width: 980px) {
   .layout { grid-template-columns: 1fr; }
   .filters { grid-template-columns: 1fr 1fr; }
+  .impact-form { grid-template-columns: 1fr; }
 }
 </style>

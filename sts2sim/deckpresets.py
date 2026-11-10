@@ -1317,13 +1317,122 @@ def existing_user_preset(preset_id):
     return path
 
 
-def open_for_run(preset_id, run_dir):
-    """用户预设返回 (实验 dict, 临时 mod 父目录)。出厂预设返回 (None, None)。"""
+def parse_deck_tokens(tokens):
+    """把 ``id``、``id+``、``id×张数`` 收成 ``[(id, upgrade, count), ...]``。
+
+    顺序跟第一次出现的一样。同一种牌、同一种升级会合并。规则和 ``parse_deck``
+    拆张数、拆升级的顺序一致，不查这张牌在不在模组里。
+    """
+    if not isinstance(tokens, list):
+        raise DeckPresetError("bad_type", field="cards", expected="array")
+    merged = {}
+    order = []
+    for item in tokens:
+        if not isinstance(item, str) or not item.strip():
+            raise DeckPresetError("cards")
+        card_id, upgrade, count = _split_token(item)
+        key = (card_id, upgrade)
+        if key not in merged:
+            order.append(key)
+            merged[key] = 0
+        merged[key] += count
+        if merged[key] > MAX_COPIES:
+            raise DeckPresetError("count")
+    return [(card_id, upgrade, merged[(card_id, upgrade)]) for card_id, upgrade in order]
+
+
+def format_deck_tokens(lines):
+    """``[(id, upgrade, count), ...]`` 写成预设里的那一串。0 张的不写。"""
+    tokens = []
+    for card_id, upgrade, count in lines:
+        if count < 1:
+            continue
+        token = card_id + ("+" if upgrade else "")
+        if count != 1:
+            token += "×" + str(count)
+        tokens.append(token)
+    return tokens
+
+
+def _split_token(item):
+    text = item.strip()
+    count = 1
+    for sep in ("×", "*", " x"):
+        if sep in text:
+            text, raw = text.rsplit(sep, 1)
+            text = text.strip()
+            if not raw.strip().isdigit():
+                raise DeckPresetError("cards")
+            count = int(raw.strip())
+            break
+    upgrade = text.endswith("+")
+    if upgrade:
+        text = text[:-1].strip()
+    if not text or not _CARD_ID.match(text):
+        raise DeckPresetError("cards")
+    if count < 1 or count > MAX_COPIES:
+        raise DeckPresetError("count")
+    return text, upgrade, count
+
+
+def _one_copy_step(original, proposed):
+    """变体和原来只差一张牌的一张，或者完全一样。不能换进牌组里没有的牌。"""
+    before = {(card_id, upgrade): count for card_id, upgrade, count in original}
+    after = {(card_id, upgrade): count for card_id, upgrade, count in proposed}
+    if set(after) - set(before):
+        return False
+    deltas = []
+    for key in set(before) | set(after):
+        old = before.get(key, 0)
+        new = after.get(key, 0)
+        if new == 0 and old != 1:
+            return False
+        if new < 0 or new > MAX_COPIES:
+            return False
+        if new != old:
+            deltas.append(new - old)
+    if not deltas:
+        return True
+    return len(deltas) == 1 and deltas[0] in (-1, 1)
+
+
+def _apply_card_override(exp, cards):
+    """换成少一张或多一张的牌表。牌的 id 必须原来就在这份预设里。"""
+    if not isinstance(cards, list) or not all(isinstance(item, str) for item in cards):
+        raise DeckPresetError("bad_type", field="deck_cards", expected="array")
+    info = exp.get("user_deck")
+    if not isinstance(info, dict):
+        raise DeckPresetError("preset")
+    original = parse_deck_tokens(info.get("cards") if isinstance(info.get("cards"), list) else [])
+    proposed = parse_deck_tokens(cards)
+    if not proposed:
+        raise DeckPresetError("empty")
+    if not _one_copy_step(original, proposed):
+        raise DeckPresetError("cards")
+    mod_name = info.get("mod")
+    if not isinstance(mod_name, str) or not _MOD.match(mod_name):
+        raise DeckPresetError("preset")
+    modset, _shipped = _load_modset(mod_name)
+    tokens = _tokens(modset, mod_name, proposed)
+    updated = dict(exp)
+    deck = dict(info)
+    deck["cards"] = tokens
+    updated["user_deck"] = deck
+    return updated
+
+
+def open_for_run(preset_id, run_dir, cards=None):
+    """用户预设返回 (实验 dict, 临时 mod 父目录)。出厂预设返回 (None, None)。
+
+    ``cards`` 给出时，临时 mod 里的牌组换成这一份。卡组 id 不变，所以战斗播种不变。
+    """
     path = existing_user_preset(preset_id)
     if path is None:
         return None, None
     folder = os.path.dirname(path)
     exp = _read_mapping(path, folder)
+    if cards is not None:
+        exp = _apply_card_override(exp, cards)
     parent = materialize_run_mod(exp, run_dir)
     return exp, parent
 

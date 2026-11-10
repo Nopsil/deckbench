@@ -358,6 +358,119 @@ class JobManager:
                 j.save()
         return True
 
+    def open_local(self, kind, params, title=None, lang=None, total=0):
+        """记一次不另起模拟进程的测试，例如包着好几场战斗的单卡贡献。"""
+        rid = _dt.datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + secrets.token_hex(2)
+        folder = os.path.join(paths.RUNS_DIR, rid)
+        os.makedirs(folder)
+        lang = lang if lang in i18n.LANGS else i18n.current()
+        meta = {
+            "id": rid, "kind": kind, "title": title or params.get("title") or "",
+            "params": params, "backend": self.backend.id, "status": "running",
+            "created": _now(), "started_ts": time.time(), "lang": lang, "partial": False,
+            "progress": {"done": 0, "total": int(total or 0), "encounter": "", "encounter_name": ""},
+        }
+        job = Job(meta, folder)
+        job.save()
+        self.jobs[rid] = job
+        return job
+
+    def prepare(self, kind, params, title=None, lang=None, total=0):
+        """先建好目录，状态是 queued。``launch`` 才真正开跑。"""
+        rid = _dt.datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + secrets.token_hex(2)
+        folder = os.path.join(paths.RUNS_DIR, rid)
+        os.makedirs(folder)
+        lang = lang if lang in i18n.LANGS else i18n.current()
+        meta = {
+            "id": rid, "kind": kind, "title": title or params.get("title") or "",
+            "params": params, "backend": self.backend.id, "status": "queued",
+            "created": _now(), "started_ts": None, "lang": lang, "partial": False,
+            "progress": {"done": 0, "total": int(total or 0), "encounter": "", "encounter_name": ""},
+        }
+        job = Job(meta, folder)
+        job.save()
+        self.jobs[rid] = job
+        return job
+
+    def launch(self, rid):
+        """把一次 queued 的测试交出去跑。已经取消的不再开。"""
+        job = self.jobs.get(rid) if isinstance(rid, str) else None
+        if job is None:
+            return False
+        with job.lock:
+            if job.meta.get("status") != "queued":
+                return False
+            if job.cancelled or cancel_requested(job.dir):
+                self._finish_locked(job, "cancelled", partial=True)
+                return False
+            kind = job.meta.get("kind")
+            params = job.meta.get("params")
+            folder = job.dir
+            lang = job.meta.get("lang")
+        try:
+            argv, env, cwd = self.backend.build_command(kind, params, folder)
+        except Exception as exc:  # noqa: BLE001
+            with job.lock:
+                self._finish_locked(job, "failed", error=str(exc).splitlines()[0][:240] if str(exc) else "failed")
+            return False
+        env = dict(env)
+        env["DECKBENCH_LANG"] = lang if lang in i18n.LANGS else i18n.current()
+        env["DECKBENCH_CANCEL_FILE"] = cancel_path(folder)
+        with job.lock:
+            if job.meta.get("status") != "queued":
+                return False
+            if job.cancelled or cancel_requested(job.dir):
+                self._finish_locked(job, "cancelled", partial=True)
+                return False
+            job.meta["argv"] = argv
+            job.meta["status"] = "running"
+            job.meta["started_ts"] = time.time()
+            job.save()
+        threading.Thread(target=self._run, args=(job, argv, env, cwd), daemon=True).start()
+        return True
+
+    def _finish_locked(self, job, status, partial=False, headline=None, error=None):
+        job.meta["finished"] = _now()
+        started = job.meta.get("started_ts")
+        if isinstance(started, (int, float)) and not isinstance(started, bool):
+            job.meta["secs"] = round(max(0.0, time.time() - float(started)), 3)
+        job.meta["status"] = status
+        job.meta["partial"] = bool(partial) or status == "cancelled"
+        if headline is not None:
+            job.meta["headline"] = headline
+        if error:
+            job.meta["error"] = error
+        job.save()
+
+    def finish_local(self, job, status, partial=False, headline=None, error=None):
+        with job.lock:
+            self._finish_locked(job, status, partial=partial, headline=headline, error=error)
+
+    def drop_queued(self, rid):
+        job = self.jobs.get(rid) if isinstance(rid, str) else None
+        if job is None:
+            return
+        with job.lock:
+            if job.meta.get("status") == "queued":
+                self._finish_locked(job, "cancelled", partial=True)
+
+    def update_progress(self, job, done, total, encounter="", encounter_name=""):
+        with job.lock:
+            job.meta["progress"] = {
+                "done": int(done),
+                "total": int(total),
+                "encounter": str(encounter or ""),
+                "encounter_name": str(encounter_name or ""),
+            }
+            job.save()
+
+    def log_line(self, job, text):
+        line = str(text)
+        with job.lock:
+            job.lines.append(line)
+            with open(os.path.join(job.dir, "run.log"), "a", encoding="utf-8") as handle:
+                handle.write(line + "\n")
+
     def _kill(self, j):
         if not j.proc or j.proc.poll() is not None:
             return
