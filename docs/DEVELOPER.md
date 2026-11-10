@@ -352,6 +352,8 @@ powershell -ExecutionPolicy Bypass -File gui\packaging\audit.ps1 -Path <工作�
 - 自带的反编译器是**未修改的** ilspycmd 9.1.0.7988（MIT）加一个很小的启动器（`gui/packaging/decompiler/`），连同 .NET 9 运行时自包含发布，
   玩家不需要安装 .NET SDK。`sts2sim/gamedata.py` 查找顺序：`DECKBENCH_ILSPY` → exe 旁的 `decompiler\` → 系统里的 `ilspycmd`。
   它生成的 `game.py` 与 SDK 版 ilspycmd 生成的逐字节一致。
+  `ilspycmd-host.csproj` 的 XML 注释里不能出现连续两个连字符，也不能以 `-` 结尾，否则 `dotnet publish` 报 MSB4025。上面命令里的 `--version` / `--self-contained` 只能写在 shell 里，不能原样贴进注释。`dry_check.py` 会加载 `gui/packaging` 下的 csproj、props、targets 和 xml。
+  *The XML comment in `ilspycmd-host.csproj` cannot contain `--` or end with `-`, or `dotnet publish` reports MSB4025. The `--version` and `--self-contained` flags above belong in the shell, not in that comment. `dry_check.py` loads every csproj, props, targets, and xml file under `gui/packaging`.*
 - 第三方声明：`gui/packaging/THIRD-PARTY-NOTICES.txt` + `gui/packaging/notices/`，打包时一起放进 zip。
 - 打包版参数：`DeckBench.exe --game-dir <游戏目录>`（之后会记住）、`--browser`、`--serve --port N`；环境变量 `DECKBENCH_NO_DIALOG=1` 关闭弹窗（自动化测试用）。
 - `sim/gui`：我们自己的界面 Python（不含 `web/`、不含 `packaging/`），给玩家本机的 CPython 跑 `mentor-full` / `mentor-full-ev`。不要把 `sts2_rs`、`sts2_hint`、`.onnx`、`champions.toml`、`mentor.local.json` 或 `mentor\` 放进 zip。`audit.ps1` 会拒收这些路径和扩展名，并按 `ship-manifest.txt` 要求 `sim/` 里的导入 / 种子预览 / dllmod、`decompiler\ilspycmd-host.exe`，以及 `README.txt` 里的 `mentor.local.json` / `docs/DEVELOPER.md` 说明。还没编反编译器时加 `-AllowMissingDecompiler`。

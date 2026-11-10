@@ -16,6 +16,7 @@ import os
 import re
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 
 EXPECTED_VERSION = "0.1.5"
 
@@ -182,6 +183,47 @@ def _git_files(root):
     return [p.decode("utf-8") for p in out.stdout.split(b"\0") if p]
 
 
+PROJECT_XML_SUFFIXES = (".csproj", ".props", ".targets", ".xml")
+_XML_COMMENT = re.compile(r"<!--(.*?)-->", re.S)
+
+
+def xml_comment_problems(text):
+    """MSBuild MSB4025: a comment cannot contain '--' or end with '-'."""
+    bad = []
+    for match in _XML_COMMENT.finditer(text):
+        body = match.group(1)
+        if "--" in body:
+            bad.append("XML comment contains '--'")
+        if body.endswith("-"):
+            bad.append("XML comment ends with '-'")
+    return bad
+
+
+def packaging_project_xml_problems(root):
+    """Every packaging csproj/props/targets/xml file must load, comments included."""
+    packaging = os.path.join(root, "gui", "packaging")
+    bad = []
+    found = False
+    for dirpath, _dirs, files in os.walk(packaging):
+        for name in files:
+            if os.path.splitext(name)[1].lower() not in PROJECT_XML_SUFFIXES:
+                continue
+            found = True
+            path = os.path.join(dirpath, name)
+            rel = os.path.relpath(path, root).replace("\\", "/")
+            text = _read(path)
+            try:
+                ET.fromstring(text)
+            except ET.ParseError as e:
+                bad.append(f"packaging project XML is not loadable: {rel}: {e}")
+                continue
+            for item in xml_comment_problems(text):
+                bad.append(f"{item} (MSBuild MSB4025): {rel}")
+    if not found:
+        bad.append("no packaging csproj, props, targets, or xml files found")
+    return bad
+
+
 def check(root=None):
     """Return a list of problems. Empty means the tree is ready to pack."""
     root = root or repo_root()
@@ -288,6 +330,7 @@ def check(root=None):
             bad.append(f"staged path uses a forbidden folder: {rel}")
 
     bad.extend(_version_problems(root, build_text))
+    bad.extend(packaging_project_xml_problems(root))
     return bad
 
 

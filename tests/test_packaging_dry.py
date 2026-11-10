@@ -51,6 +51,15 @@ def test_stage_rules_keep_tools_and_skip_packaging_sources():
         assert not mod.would_stage(rel, prefixes, skips), rel
 
 
+def test_packaging_project_xml_loads_and_rejects_double_hyphen():
+    mod = _load()
+    assert mod.packaging_project_xml_problems(ROOT) == []
+    assert mod.xml_comment_problems("<!-- Self-contained host. -->") == []
+    flagged = mod.xml_comment_problems("<!-- dotnet tool install --version 9.1.0.7988 -->")
+    assert any("--" in item for item in flagged)
+    assert mod.xml_comment_problems("<!--ends--->")
+
+
 def test_pointer_checker_rejects_text_without_the_doc():
     mod = _load()
     assert mod.pointer_problems("README.txt", "put mentor.local.json next to the exe")
