@@ -394,7 +394,7 @@ def test_language_toggle_persists_in_local_storage(gui):
 
 
 def test_empty_history_loads_demo_and_compare_works(gui):
-    """空的历史页载入内置示例。两次训练木桩出现，对比能打开。"""
+    """空的历史页载入内置示例。两套探针对合成三人组的对打出现，对比能打开。"""
     page = gui.page
     page.goto(gui.base + "/#/history", wait_until="domcontentloaded")
     gui.expect(page.locator("h1")).to_have_text("History")
@@ -404,12 +404,12 @@ def test_empty_history_loads_demo_and_compare_works(gui):
     gui.expect(button).to_have_text("Load demo data")
     button.click()
     gui.expect(page.get_by_text("Loaded 2 sample test(s).")).to_be_visible()
-    gui.expect(page.get_by_text("Demo deck", exact=True).first).to_be_visible()
-    gui.expect(page.get_by_text("Demo probe", exact=True).first).to_be_visible()
+    gui.expect(page.get_by_text("探针·无引擎", exact=True).first).to_be_visible()
+    gui.expect(page.get_by_text("探针·路线D", exact=True).first).to_be_visible()
     listed = _get_json(gui.base + "/api/runs")
     by_title = {row.get("title"): row for row in listed}
-    deck = by_title["Demo deck"]
-    probe = by_title["Demo probe"]
+    deck = by_title["探针·无引擎"]
+    probe = by_title["探针·路线D"]
     assert deck["kind"] == "combat" and deck["status"] == "done"
     assert probe["kind"] == "combat" and probe["status"] == "done"
     assert deck.get("imported") is True and probe.get("imported") is True

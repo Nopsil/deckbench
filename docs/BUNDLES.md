@@ -56,9 +56,9 @@
 
 ## 示例数据 / Demo data
 
-没有游戏文件时，历史页是空的。点「载入示例数据」（`POST /api/demo/load`，MCP `load_demo`）会导入仓库里的 `gui/demo/sample.deckbench.zip`。这份 zip 是 `python tools/make_demo_bundle.py` 用现有战斗工人打出来的：两场训练木桩（`encounter: DUMMY`，各 2 场、1 回合），其中一场用 `save_preset` 写下的牌组，所以包里有 `preset.yaml`。清单 `kind` 是 `compare`，schema 是 1。导入走上面同一条校验，不执行包里的文件。两次测试出现在列表里，也能对比。Windows 包把这份 zip 放进 `sim/gui/demo/`。
+没有游戏文件时，历史页是空的。点「载入示例数据」（`POST /api/demo/load`，MCP `load_demo`）会导入仓库里的 `gui/demo/sample.deckbench.zip`。这份 zip 是 `python tools/make_demo_bundle.py` 用现有战斗工人打出来的：出厂探针 `probe_noengine` 和 `probe_D`，对 `sts2sim.fightcheck` 里的合成三人组（蛮兵、术士、荆棘）。不是游戏遭遇，也不是训练木桩。各 30 场，回合上限 30，场次下标各自播种。清单 `kind` 是 `head_to_head`，schema 是 1。导入走上面同一条校验，不执行包里的文件。两次测试出现在列表里，也能对比。Windows 包把这份 zip 放进 `sim/gui/demo/`。
 
-*With no game files, History is empty. **Load demo data** (`POST /api/demo/load`, MCP `load_demo`) imports `gui/demo/sample.deckbench.zip`. `python tools/make_demo_bundle.py` builds that zip with the existing combat worker: two training-dummy fights (`encounter: DUMMY`, 2 fights and 1 turn each). One of them uses a deck written by `save_preset`, so the zip includes `preset.yaml`. The manifest `kind` is `compare` and `schema` is 1. Import uses the same checks as above and does not execute anything in the bundle. The two tests show up in the run list and can be compared. The Windows package puts the zip in `sim/gui/demo/`.*
+*With no game files, History is empty. **Load demo data** (`POST /api/demo/load`, MCP `load_demo`) imports `gui/demo/sample.deckbench.zip`. `python tools/make_demo_bundle.py` builds that zip with the existing combat worker: shipped probes `probe_noengine` and `probe_D` against the synthetic trio in `sts2sim.fightcheck` (蛮兵, 术士, 荆棘). It is not a game encounter, and it is not the training dummy. Each side fights 30 times with a 30-turn cap, and each fight index has its own seed. The manifest `kind` is `head_to_head` and `schema` is 1. Import uses the same checks as above and does not execute anything in the bundle. The two tests show up in the run list and can be compared. The Windows package puts the zip in `sim/gui/demo/`.*
 
 ## 界面 / Pages
 

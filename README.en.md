@@ -137,7 +137,7 @@ python tools/import_dll_mod.py "/path/to/Slay the Spire 2/mods/MyMod" --out mods
 - The last two lines turn a mod already installed in the game (manifest JSON + DLL) into YAML. The DLL is not executed. In the app: **Mod editor → Import game mod**.
 - To screen recording seeds with `mentor-full`: the official package can run it, and does not ship spire-mentor. Put `mentor.local.json` next to the app (`site`, `py`, `python`). `python` is the interpreter that built `sts2_rs`. Do not use a win rate when fallback is about 100%. See [docs/DEVELOPER.md](docs/DEVELOPER.md).
 - Release notes #59–#64: the browser smoke releases the Playwright event loop when that module finishes; two saved decks can run a head-to-head (`#/decks`); a long test shows progress and cancels between fights; leave-one-out card impact; the Windows package stamps the existing `0.1.5` and the update check stays manual; combat batches can set `workers` (default 1).
-- #65–#67: What's new in the GUI, a 简体中文 / English switch, and a `.deckbench.zip` you can import on another DeckBench. With no game files, empty History can load demo data: two training-dummy fights and one saved deck, produced by the existing combat worker.
+- #65–#67: What's new in the GUI, a 简体中文 / English switch, and a `.deckbench.zip` you can import on another DeckBench. With no game files, empty History can load demo data: a 30-fight head-to-head of two probe decks against the synthetic trio, not the training dummy, produced by the existing combat worker.
 
 ## Import a real run
 

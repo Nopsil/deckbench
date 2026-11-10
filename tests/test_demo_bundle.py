@@ -34,25 +34,33 @@ def _member(path, name):
         return archive.read(name)
 
 
-def test_shipped_demo_is_a_compare_bundle_of_dummy_fights():
+def test_shipped_demo_is_a_head_to_head_against_the_synthetic_trio():
+    assert os.path.getsize(SHIPPED) < 1024 * 1024
     manifest = json.loads(_member(SHIPPED, "manifest.json"))
     assert manifest["format"] == "deckbench.bundle"
     assert manifest["schema"] == 1
-    assert manifest["kind"] == "compare"
-    assert manifest["runs"] == ["demo-deck", "demo-probe"]
-    preset = _member(SHIPPED, "runs/demo-deck/preset.yaml").decode("utf-8")
-    assert "user_deck:" in preset
-    assert "YIHESHI" in preset and "XIAOBENBEN" in preset
-    assert "encounter: DUMMY" in preset
+    assert manifest["kind"] == "head_to_head"
+    assert manifest["runs"] == ["demo-noengine", "demo-routed"]
+    preset = _member(SHIPPED, "runs/demo-noengine/preset.yaml").decode("utf-8")
+    assert "probe_noengine" in preset and "SYN_TRIO" in preset
+    other = _member(SHIPPED, "runs/demo-routed/preset.yaml").decode("utf-8")
+    assert "probe_D" in other
     rows = _raw_rows(SHIPPED)
-    assert set(rows) == {"runs/demo-deck/raw.jsonl", "runs/demo-probe/raw.jsonl"}
+    assert set(rows) == {"runs/demo-noengine/raw.jsonl", "runs/demo-routed/raw.jsonl"}
+    results = set()
+    hp = []
     for group in rows.values():
-        assert len(group) == 2
+        assert len(group) == 30
         for row in group:
-            assert row["encounter"] == "DUMMY"
-            assert row["enc_name"] == "木桩"
+            assert row["encounter"] == "SYN_TRIO"
+            assert row["enc_name"] == "蛮兵、术士、荆棘"
             assert row["result"] in ("win", "loss", "timeout")
+            assert row["turns"] >= 1
             assert row["cards"]
+            results.add(row["result"])
+            hp.append(row["hp_lost"])
+    assert "win" in results and "loss" in results
+    assert any(value > 0 for value in hp)
 
 
 def test_regenerated_demo_imports_and_matches_the_fights(tmp_path, monkeypatch):
@@ -74,14 +82,22 @@ def test_regenerated_demo_imports_and_matches_the_fights(tmp_path, monkeypatch):
     monkeypatch.setattr(paths, "RUNS_DIR", str(root))
     body = import_zip_bytes(dest.read_bytes(), filename="sample.deckbench.zip")
     assert body["ok"] is True
-    assert body["kind"] == "compare"
-    assert [row["original_id"] for row in body["runs"]] == ["demo-deck", "demo-probe"]
+    assert body["kind"] == "head_to_head"
+    assert [row["original_id"] for row in body["runs"]] == ["demo-noengine", "demo-routed"]
     assert all(row["kind"] == "combat" and row["imported"] for row in body["runs"])
     left = root / body["runs"][0]["id"] / "out"
     right = root / body["runs"][1]["id"] / "out"
     compared = compare_dirs(str(left), str(right))
-    assert compared["cells"]
-    assert any(cell.get("encounter") == "DUMMY" or cell.get("room") == "probe" for cell in compared["cells"])
+    cell = compared["cells"][0]
+    assert cell["room"] == "精英"
+    assert cell["n_a"] == 30 and cell["n_b"] == 30
+    win = cell["metrics"]["win"]
+    hp = cell["metrics"]["hp_loss"]
+    turns = cell["metrics"]["turns"]
+    assert win["delta"] not in (None, 0)
+    assert hp["delta"] not in (None, 0)
+    assert turns["delta"] not in (None, 0)
+    assert win["sample_warning"] is False
 
 
 def test_load_demo_endpoint_and_mcp_use_the_bundle_import(tmp_path, monkeypatch):
@@ -102,7 +118,7 @@ def test_load_demo_endpoint_and_mcp_use_the_bundle_import(tmp_path, monkeypatch)
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["ok"] is True and len(body["runs"]) == 2
-    assert {row["original_id"] for row in body["runs"]} == {"demo-deck", "demo-probe"}
+    assert {row["original_id"] for row in body["runs"]} == {"demo-noengine", "demo-routed"}
 
     again = json.loads(load_demo())
     assert again["ok"] is True

@@ -808,8 +808,9 @@ def import_bundle(path: str) -> str:
 def load_demo() -> str:
     """把内置的示例结果包导入界面测试。不执行包里的文件，不新开模拟。
 
-    包是 tools/make_demo_bundle.py 用训练木桩（encounter: DUMMY）跑出来的两场战斗，
-    外加一份 save_preset 写下的牌组。不需要游戏文件。
+    包是 tools/make_demo_bundle.py 用战斗工人打出来的：两套探针对
+    sts2sim.fightcheck 的合成三人组（蛮兵、术士、荆棘）各 30 场。不是训练木桩，
+    也不是游戏遭遇。不需要游戏文件。
     走和 import_bundle 相同的校验和写入（import_zip_bytes）。编号已经存在时换一个新编号。
     成功是 JSON，字段和 import_bundle 相同。找不到内置包时 error 是 missing。
     失败也是 JSON（ok 为 false，message 是一句说明），不抛异常，也不留下半截目录。
@@ -861,7 +862,7 @@ def build(host="127.0.0.1", port=8765, host_check=True):
         "export_bundle 把一次已完成的测试，或两次战斗实验（对打或单卡贡献），打成一个 .deckbench.zip，"
         "清单里有 DeckBench 版本、schema 版本和每个文件的 SHA-256。import_bundle 校验清单和哈希后导入，"
         "不执行包里的文件；schema 不对会说明当前只读哪一版；编号冲突时换一个新编号。"
-        "load_demo 导入内置的示例结果包（两场训练木桩和一份牌组预设），走和 import_bundle 相同的校验。"
+        "load_demo 导入内置的示例结果包（两套探针对合成三人组各 30 场的对打），走和 import_bundle 相同的校验。"
         "list_cards 只读列出模拟器牌池，可按角色、类型、费用、稀有度和中英文名字搜索。"
         "list_encounters 只读列出模拟器会打的遭遇，可按幕和房间（normal/elite/boss）筛选，并给出连战（例如第 1 幕全部精英）。"
         "save_deck 把一套牌存成用户预设（和 experiments/*.yaml 相同的战斗预设）。"
