@@ -16,6 +16,7 @@ import os
 import re
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 
 EXPECTED_VERSION = "0.1.5"
 
@@ -170,8 +171,57 @@ def forbidden_folders(audit_text):
 
 
 def _read(path):
-    with open(path, encoding="utf-8") as f:
+    # utf-8-sig drops a leading BOM so a packaging script saved for
+    # Windows PowerShell 5.1 still matches the text checks below.
+    with open(path, encoding="utf-8-sig") as f:
         return f.read()
+
+
+UTF8_BOM = b"\xef\xbb\xbf"
+
+
+def ps1_encoding_problems(data, label):
+    """Windows PowerShell 5.1 reads a BOM-less script as the ANSI code page.
+
+    UTF-8 Chinese is three bytes. Decoded as a double-byte code page, the
+    leftover byte pairs with the next ASCII character and can swallow a
+    quote. A UTF-8 BOM makes 5.1 decode the file as UTF-8. Pure ASCII is
+    safe without a BOM.
+    """
+    if data.startswith((b"\xff\xfe", b"\xfe\xff")):
+        return [f"{label} is UTF-16; save it as UTF-8 with BOM or pure ASCII"]
+    bom = data.startswith(UTF8_BOM)
+    body = data[len(UTF8_BOM):] if bom else data
+    try:
+        text = body.decode("utf-8")
+    except UnicodeDecodeError as e:
+        return [f"{label} is not valid UTF-8: {e}"]
+    if any(ord(ch) > 127 for ch in text) and not bom:
+        return [(
+            f"{label} has non-ASCII text but no UTF-8 BOM; "
+            "Windows PowerShell 5.1 would read it as ANSI and can swallow a quote"
+        )]
+    return []
+
+
+def powershell_encoding_problems(root):
+    """Every .ps1 with non-ASCII text must be UTF-8 with a BOM."""
+    bad = []
+    found = False
+    skip = {".git", ".venv", "node_modules", "__pycache__"}
+    for dirpath, dirnames, files in os.walk(root):
+        dirnames[:] = [name for name in dirnames if name not in skip]
+        for name in files:
+            if not name.lower().endswith(".ps1"):
+                continue
+            found = True
+            path = os.path.join(dirpath, name)
+            rel = os.path.relpath(path, root).replace("\\", "/")
+            with open(path, "rb") as handle:
+                bad.extend(ps1_encoding_problems(handle.read(), rel))
+    if not found:
+        bad.append("no .ps1 files found")
+    return bad
 
 
 def _git_files(root):
@@ -180,6 +230,47 @@ def _git_files(root):
         check=True, capture_output=True,
     )
     return [p.decode("utf-8") for p in out.stdout.split(b"\0") if p]
+
+
+PROJECT_XML_SUFFIXES = (".csproj", ".props", ".targets", ".xml")
+_XML_COMMENT = re.compile(r"<!--(.*?)-->", re.S)
+
+
+def xml_comment_problems(text):
+    """MSBuild MSB4025: a comment cannot contain '--' or end with '-'."""
+    bad = []
+    for match in _XML_COMMENT.finditer(text):
+        body = match.group(1)
+        if "--" in body:
+            bad.append("XML comment contains '--'")
+        if body.endswith("-"):
+            bad.append("XML comment ends with '-'")
+    return bad
+
+
+def packaging_project_xml_problems(root):
+    """Every packaging csproj/props/targets/xml file must load, comments included."""
+    packaging = os.path.join(root, "gui", "packaging")
+    bad = []
+    found = False
+    for dirpath, _dirs, files in os.walk(packaging):
+        for name in files:
+            if os.path.splitext(name)[1].lower() not in PROJECT_XML_SUFFIXES:
+                continue
+            found = True
+            path = os.path.join(dirpath, name)
+            rel = os.path.relpath(path, root).replace("\\", "/")
+            text = _read(path)
+            try:
+                ET.fromstring(text)
+            except ET.ParseError as e:
+                bad.append(f"packaging project XML is not loadable: {rel}: {e}")
+                continue
+            for item in xml_comment_problems(text):
+                bad.append(f"{item} (MSBuild MSB4025): {rel}")
+    if not found:
+        bad.append("no packaging csproj, props, targets, or xml files found")
+    return bad
 
 
 def check(root=None):
@@ -288,6 +379,8 @@ def check(root=None):
             bad.append(f"staged path uses a forbidden folder: {rel}")
 
     bad.extend(_version_problems(root, build_text))
+    bad.extend(packaging_project_xml_problems(root))
+    bad.extend(powershell_encoding_problems(root))
     return bad
 
 

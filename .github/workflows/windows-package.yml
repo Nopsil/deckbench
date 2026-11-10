@@ -80,7 +80,10 @@ jobs:
           }
           $decompiler = Join-Path $Work "decompiler"
           $csproj = Join-Path $env:GITHUB_WORKSPACE "gui\packaging\decompiler\ilspycmd-host.csproj"
-          dotnet publish $csproj -c Release -r win-x64 --self-contained -o $decompiler "-p:IlspyToolDir=$($dll.DirectoryName)"
+          # The csproj Exclude globs use '/'. A backslash here can miss those two framework DLLs.
+          $toolDir = $dll.DirectoryName -replace '\\', '/'
+          Write-Host "IlspyToolDir=$toolDir"
+          dotnet publish $csproj -c Release -r win-x64 --self-contained -o $decompiler "-p:IlspyToolDir=$toolDir"
           if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed ($LASTEXITCODE)" }
           if (-not (Test-Path (Join-Path $decompiler "ilspycmd-host.exe"))) {
             throw "published decompiler is missing ilspycmd-host.exe"
@@ -129,7 +132,8 @@ jobs:
           $packed = Join-Path $extract "DeckBench"
           $sim = Join-Path $packed "sim"
           if (-not (Test-Path (Join-Path $packed "DeckBench.exe"))) { throw "zip is missing DeckBench.exe" }
-          if (-not (Test-Path (Join-Path $sim "sts2sim\__main__.py"))) { throw "zip is missing sim/sts2sim" }
+          $entry = Join-Path (Join-Path $sim "sts2sim") "__main__.py"
+          if (-not (Test-Path $entry)) { throw "zip is missing sim/sts2sim" }
           Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue
           Remove-Item Env:DECKBENCH_EXPLAIN -ErrorAction SilentlyContinue
           Remove-Item Env:DECKBENCH_CODEX_DIR -ErrorAction SilentlyContinue

@@ -1,4 +1,4 @@
-# DeckBench Windows 打包（PyInstaller onedir + 自带反编译器）。在仓库根目录或任意位置运行：
+﻿# DeckBench Windows 打包（PyInstaller onedir + 自带反编译器）。在仓库根目录或任意位置运行：
 #   powershell -ExecutionPolicy Bypass -File gui\packaging\build.ps1 -Work "D:\build\deckbench" -Py "<venv>\Scripts\python.exe" -Decompiler "<ilspycmd-host 发布目录>"
 # 只打包 git 跟踪的文件（不会带上本机生成的游戏数据，也不会带上 mentor.local.json / mentor/）。
 # sim/gui 会一并放进 zip，供玩家自己的 Python 跑 mentor-full。
