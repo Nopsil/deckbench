@@ -8,7 +8,7 @@
 
 | 文档 | 语言 | 内容 |
 | --- | --- | --- |
-| [RELEASE_0.1.5.md](RELEASE_0.1.5.md) | 中文、English | 0.1.5 发布说明，可作 GitHub Release 正文。覆盖已合并的 #4 与 #6–#67（#40 对齐到 #39，#53 对齐到 #52，#59 对齐到 #58 并在浏览器冒烟结束时放开事件循环；#60–#67：组牌对打、测试进度和取消、单卡贡献、Windows 版本号与手动检查更新、战斗 workers、本版更新、简体中文 / English 切换、结果包）。这一分支另有空历史页的示例数据 |
+| [RELEASE_0.1.5.md](RELEASE_0.1.5.md) | 中文、English | 0.1.5 发布说明（2026-11-11），可作 GitHub Release 正文。包括只读导入、种子预览、DLL→YAML、mentor-full、组牌和遭遇、对打、进度和取消、单卡贡献、战斗 workers、本版更新、简体中文 / English 切换、`.deckbench.zip`、空历史页的示例数据，以及最近的修复。Windows 下载是 `DeckBench-0.1.5-win64.zip` |
 | [MOD_AUTHORS.md](MOD_AUTHORS.md) | English | mod 作者入门。示例 `examples/spark/`（Arc、Lantern）。内部 Python 引擎，不需要游戏安装 |
 | [MOD_AUTHORS.zh-CN.md](MOD_AUTHORS.zh-CN.md) | 简体中文 | 同一份入门的简体中文 |
 | [MODDING.md](MODDING.md) | 中文 + English | YAML mod 的格式：整局，以及旧版战斗模拟器 |
@@ -30,7 +30,7 @@
 
 | 文档 | 语言 | 内容 |
 | --- | --- | --- |
-| [CHANGELOG.md](../CHANGELOG.md) | 中文 + English | 更新日志。0.1.5 一节对齐 `main` 上的 #4 与 #6–#67（含简体中文 / English 切换和结果包），并记下空历史页的示例数据。界面「本版更新」（`#/whatsnew`，`GET /api/changelog`）读这一节 |
+| [CHANGELOG.md](../CHANGELOG.md) | 中文 + English | 更新日志。0.1.5（2026-11-11）一节是界面「本版更新」（`#/whatsnew`，`GET /api/changelog`）读的那一节，含示例数据和最近的修复 |
 | [README.md](../README.md) | 中文为主，段落附 English | 安装和使用 |
 | [README.en.md](../README.en.md) | English | 同一份说明的英文 |
 | [README.ja.md](../README.ja.md) | 日本語 | 同一份说明的日文 |
