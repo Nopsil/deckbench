@@ -19,6 +19,7 @@ import hashlib
 import json
 import os
 import sys
+import time
 
 from sts2sim.engine.seed import SEED_CHARS, SEED_LEN, canonicalize
 
@@ -518,10 +519,103 @@ def _cache_complete(preview, spec):
     return True
 
 
+# Win32 constants _winapi does not export. A file opened without
+# FILE_SHARE_DELETE cannot be os.replace'd; Python's open() on 3.11 and 3.12
+# does not pass that flag, so a reader produces PermissionError(13).
+_SHARE_READ = 0x00000001
+_SHARE_WRITE = 0x00000002
+_SHARE_DELETE = 0x00000004
+_CREATE_ALWAYS = 2
+_FILE_ATTRIBUTE_NORMAL = 0x80
+_REPLACE_TRIES = 8
+
+
+def _windows():
+    return os.name == "nt"
+
+
+def _pause_retry(attempt):
+    time.sleep(0.01 * (attempt + 1))
+
+
+def _open_windows_shared(path, mode):
+    """Open a cache file with FILE_SHARE_DELETE so os.replace can swap it."""
+    import _winapi
+    import msvcrt
+
+    writing = "w" in mode
+    access = _winapi.GENERIC_WRITE if writing else _winapi.GENERIC_READ
+    disposition = _CREATE_ALWAYS if writing else _winapi.OPEN_EXISTING
+    handle = _winapi.CreateFile(
+        path,
+        access,
+        _SHARE_READ | _SHARE_WRITE | _SHARE_DELETE,
+        _winapi.NULL,
+        disposition,
+        _FILE_ATTRIBUTE_NORMAL,
+        _winapi.NULL,
+    )
+    flags = os.O_BINARY | (os.O_WRONLY if writing else os.O_RDONLY)
+    try:
+        fd = msvcrt.open_osfhandle(handle, flags)
+    except OSError:
+        _winapi.CloseHandle(handle)
+        raise
+    try:
+        return open(fd, mode, encoding="utf-8", closefd=True)
+    except OSError:
+        os.close(fd)
+        raise
+
+
+def _open_text(path, mode):
+    """Open cache JSON. On Windows, retry a sharing violation briefly."""
+    tries = _REPLACE_TRIES if _windows() else 1
+    for attempt in range(tries):
+        try:
+            if _windows():
+                return _open_windows_shared(path, mode)
+            return open(path, mode, encoding="utf-8")
+        except PermissionError:
+            if attempt + 1 == tries:
+                raise
+            _pause_retry(attempt)
+    raise PermissionError(13, "Access is denied", path)
+
+
+def _replace_cache(src, dst):
+    """Atomic replace. Windows denies it while a reader holds the destination."""
+    tries = _REPLACE_TRIES if _windows() else 1
+    for attempt in range(tries):
+        try:
+            os.replace(src, dst)
+            return
+        except PermissionError:
+            if attempt + 1 == tries:
+                raise
+            _pause_retry(attempt)
+
+
+def _unlink_quiet(path):
+    tries = _REPLACE_TRIES if _windows() else 1
+    for attempt in range(tries):
+        try:
+            os.unlink(path)
+            return
+        except FileNotFoundError:
+            return
+        except PermissionError:
+            if attempt + 1 == tries:
+                return
+            _pause_retry(attempt)
+        except OSError:
+            return
+
+
 def cache_load(spec, cache_dir):
     path = _cache_file(spec, cache_dir)
     try:
-        with open(path, encoding="utf-8") as f:
+        with _open_text(path, "r") as f:
             payload = json.load(f)
     except (OSError, json.JSONDecodeError, UnicodeError):
         return None
@@ -544,17 +638,15 @@ def cache_store(spec, doc, cache_dir):
     path = _cache_file(spec, cache_dir)
     payload = {"cache_v": CACHE_FORMAT, "key": _cache_key(spec), "preview": public_document(doc)}
     # 临时名每次不同，同进程多线程不会截断同一个文件；替换是原子的，读者看到旧文件或新文件。
+    # Windows 上对方开着文件时 os.replace 会 PermissionError(13)。共享删除加上短重试。
     tmp = path + "." + os.urandom(8).hex() + ".tmp"
     try:
-        with open(tmp, "w", encoding="utf-8") as f:
+        with _open_text(tmp, "w") as f:
             json.dump(payload, f, ensure_ascii=False, indent=1)
             f.write("\n")
-        os.replace(tmp, path)
+        _replace_cache(tmp, path)
     finally:
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass
+        _unlink_quiet(tmp)
 
 
 def _bind_seed(doc, raw, canon):

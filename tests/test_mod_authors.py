@@ -11,6 +11,8 @@ import re
 import subprocess
 import sys
 
+import pytest
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EN = os.path.join(ROOT, "docs", "MOD_AUTHORS.md")
 ZH = os.path.join(ROOT, "docs", "MOD_AUTHORS.zh-CN.md")
@@ -62,6 +64,44 @@ def test_readme_links_the_guide():
         assert "MOD_AUTHORS.zh-CN.md" in text
 
 
+def _bash_executable():
+    """Interpreter for the guide's bash blocks.
+
+    On Windows, ``bash`` on PATH is the WSL stub. It exits with
+    "Windows Subsystem for Linux has no installed distributions" and does
+    not run the script. Git Bash does. Return None when that install is
+    missing so the caller can skip instead of calling the stub.
+    """
+    if os.name != "nt":
+        return "bash"
+    candidates = []
+    for key in ("ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"):
+        root = os.environ.get(key)
+        if not root:
+            continue
+        candidates.append(os.path.join(root, "Git", "bin", "bash.exe"))
+        candidates.append(os.path.join(root, "Git", "usr", "bin", "bash.exe"))
+    for directory in os.environ.get("PATH", "").split(os.pathsep):
+        if not directory:
+            continue
+        lowered = directory.replace("/", "\\").lower()
+        if lowered.endswith(("\\system32", "\\syswow64")):
+            continue
+        if "\\windowsapps" in lowered:
+            continue
+        for name in ("bash.exe", "bash"):
+            candidates.append(os.path.join(directory, name))
+    seen = set()
+    for path in candidates:
+        key = os.path.normcase(os.path.abspath(path))
+        if key in seen:
+            continue
+        seen.add(key)
+        if os.path.isfile(path):
+            return path
+    return None
+
+
 def test_guide_commands_run_with_tiny_samples(tmp_path):
     blocks = fences(EN)
     skipped = [body for info, body in blocks if "needs-game" in info.split()]
@@ -75,18 +115,31 @@ def test_guide_commands_run_with_tiny_samples(tmp_path):
         for token in GAME_ONLY:
             assert token not in body
 
+    bash = _bash_executable()
+    if bash is None:
+        pytest.skip(
+            "Git Bash was not found. On Windows, `bash` is the WSL stub "
+            "and reports that Windows Subsystem for Linux has no installed "
+            "distributions, so it cannot run this guide script."
+        )
     bindir = tmp_path / "bin"
     bindir.mkdir()
     os.symlink(sys.executable, bindir / "python")
+    if os.name == "nt":
+        os.symlink(sys.executable, bindir / "python.exe")
     out = tmp_path / "out"
     out.mkdir()
     env = os.environ.copy()
     env["PATH"] = str(bindir) + os.pathsep + env.get("PATH", "")
-    env["OUT"] = str(out)
+    env["OUT"] = str(out).replace("\\", "/")
     env.pop("DECKBENCH_EXPLAIN", None)
     env.pop("STS2SIM_USER_MODS", None)
+    if os.name == "nt":
+        # Git Bash would rewrite arguments that contain a slash.
+        env["MSYS_NO_PATHCONV"] = "1"
+        env["MSYS2_ARG_CONV_EXCL"] = "*"
     script = "set -e\n" + "\n".join(runnable)
-    proc = subprocess.run(["bash", "-c", script], cwd=ROOT, env=env, capture_output=True, text=True)
+    proc = subprocess.run([bash, "-c", script], cwd=ROOT, env=env, capture_output=True, text=True)
     assert proc.returncode == 0, (proc.stdout[-2000:] + "\n" + proc.stderr[-4000:])
     text = proc.stdout
     for phrase in (

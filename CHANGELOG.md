@@ -6,6 +6,8 @@
 
 *These features are on `main` (PR #4, then #6–#39). The version is `0.1.5` (`sts2sim.__version__`, the GUI `package.json`, and the default `-Version` in the Windows packager). Release notes: `docs/RELEASE_0.1.5.md`. Documentation index: `docs/INDEX.md`.*
 
+- **Windows 上种子预览缓存可以在别人正在读的时候换上新文件**。读和写都允许共享删除，`os.replace` 遇到拒绝访问会短暂停一下再试。读者仍只看到完整的旧文件或完整的新文件。mod 作者指南的 bash 示例在 Windows 上改用 Git Bash；没装就跳过，不再调用没有发行版的 WSL `bash`。`python -m sts2sim --workers` 的工作进程不会再次进入入口。
+  *On Windows the seed-preview cache can be replaced while another reader has it open. Reads and writes allow shared delete, and `os.replace` waits briefly and retries on access denied. A reader still sees a complete old file or a complete new file. The mod-author guide's bash samples use Git Bash on Windows, and skip with a clear reason when it is missing, instead of calling the WSL `bash` stub. A worker for `python -m sts2sim --workers` does not enter the entry point again.*
 - **持续集成**。GitHub Actions 在 Ubuntu 和 Windows 上用 Python 3.11 与 3.12 跑完整的 pytest（安装 fastapi、httpx 和 python-multipart，图形界面测试会执行），把 pytest-cov 的覆盖率写进作业摘要，并用 ruff 检查。需要本机游戏安装的测试仍然跳过。
   *Continuous integration. GitHub Actions runs the full pytest suite on Ubuntu and Windows with Python 3.11 and 3.12 (fastapi, httpx, and python-multipart installed so the GUI tests run), writes a pytest-cov summary on the job, and runs ruff. Tests that need a local game install still skip.*
 - **接口和 MCP 碰到坏输入时返回说得清的错误**。`POST /api/import/batch`、`POST /api/calibrate`、`POST /api/calibrate/upload` 以及只读 MCP 工具：目录外的路径、符号链接跳出去、超过 32MB 的上传、坏掉的 JSONL 行、缺字段、类型不对，都是 4xx 或 `{"ok": false, "error": ...}`，正文里没有堆栈。不改模拟、种子和 AI。

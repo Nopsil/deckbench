@@ -740,6 +740,49 @@ def test_concurrent_cache_readers_do_not_crash(tmp_path, monkeypatch):
     assert not any(p.name.endswith(".tmp") for p in cold.iterdir())
 
 
+def test_cache_store_retries_windows_access_denied(tmp_path, monkeypatch):
+    """Windows os.replace raises PermissionError(13) while a reader holds the file.
+
+    The retry loop is forced on here. The real sharing flags run on Windows CI.
+    """
+    from sts2sim.engine import seedpreview as sp
+
+    _stub_generate(monkeypatch)
+    doc = preview("ABCDEFGHJKLM", "Ironclad", 0, neow="none")
+    spec = _request("ABCDEFGHJKLM", "Ironclad", 0, "none")
+    cache = tmp_path / "retry"
+    real_replace = os.replace
+    calls = {"n": 0}
+
+    def flaky(src, dst):
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise PermissionError(13, "Access is denied")
+        real_replace(src, dst)
+
+    def open_text(path, mode):
+        return open(path, mode, encoding="utf-8")
+
+    monkeypatch.setattr(sp, "_windows", lambda: True)
+    monkeypatch.setattr(sp, "_open_text", open_text)
+    monkeypatch.setattr(sp, "_pause_retry", lambda _attempt: None)
+    monkeypatch.setattr(os, "replace", flaky)
+    cache_store(spec, doc, str(cache))
+    assert calls["n"] == 3
+    assert cache_load(spec, str(cache)) == doc
+
+    calls["n"] = 0
+
+    def denied(src, dst):
+        calls["n"] += 1
+        raise PermissionError(13, "Access is denied")
+
+    monkeypatch.setattr(os, "replace", denied)
+    with pytest.raises(PermissionError):
+        cache_store(spec, doc, str(cache))
+    assert calls["n"] == sp._REPLACE_TRIES
+
+
 def test_non_ascii_ids_stay_whole_in_distribution_document_and_text():
     from sts2sim.engine.seedpreview import public_document
     dist = distribution([{"act": "第一幕", "normal": "遭遇甲", "elite": ["遭遇乙", "遭遇乙"]}])
