@@ -1,0 +1,9 @@
+[
+  {"id": "NIB_NORMAL", "name": "小钉巡逻"},
+  {"id": "NIB_ELITE_A", "name": "小钉精英甲"},
+  {"id": "NIB_ELITE_B", "name": "小钉精英乙"},
+  {"id": "NIB_BOSS", "name": "小钉首领"},
+  {"id": "NIB_WEAK", "name": "小钉弱"},
+  {"id": "NIB_ACT2", "name": "小钉二幕"},
+  {"id": "NIB_SKIP", "name": "小钉缺失"}
+]

@@ -1,0 +1,9 @@
+[
+  {"id": "NIB_NORMAL", "name": "Nib Patrol", "act": "Act 1", "room_type": "Monster", "is_weak": false, "monsters": [{"id": "NIB"}]},
+  {"id": "NIB_ELITE_A", "name": "Nib Elite A", "act": "Act 1", "room_type": "Elite", "is_weak": false, "monsters": [{"id": "NIB"}]},
+  {"id": "NIB_ELITE_B", "name": "Nib Elite B", "act": "Act 1", "room_type": "Elite", "is_weak": false, "monsters": [{"id": "NIB"}]},
+  {"id": "NIB_BOSS", "name": "Nib Boss", "act": "Act 1", "room_type": "Boss", "is_weak": false, "monsters": [{"id": "NIB"}]},
+  {"id": "NIB_WEAK", "name": "Nib Weak", "act": "Act 1", "room_type": "Monster", "is_weak": true, "monsters": [{"id": "NIB"}]},
+  {"id": "NIB_ACT2", "name": "Nib Act Two", "act": "Act 2", "room_type": "Elite", "is_weak": false, "monsters": [{"id": "NIB"}]},
+  {"id": "NIB_SKIP", "name": "Nib Missing", "act": "Act 1", "room_type": "Elite", "is_weak": false, "monsters": [{"id": "NO_SUCH"}]}
+]

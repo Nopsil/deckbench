@@ -1,14 +1,17 @@
-"""牌组构建：只读列出模拟器已经认识的牌，并把一套牌存成用户预设。
+"""牌组构建：只读列出模拟器已经认识的牌和遭遇，并把一套牌存成用户预设。
 
 预设的格式和 ``experiments/*.yaml`` 一样，另外带一份 ``user_deck``，
-界面开跑时才在这次测试自己的目录里生成一个临时 mod。不改模拟器的出牌、
-种子和 AI，也不写入 ``experiments/``、``mods/`` 或已有的种子和配置。
+界面开跑时才在这次测试自己的目录里生成一个临时 mod。``extra`` 里每一行是
+一场要打的遭遇。没选遭遇时仍是一场训练木桩。不改模拟器的出牌、种子和 AI，
+也不写入 ``experiments/``、``mods/`` 或已有的种子和配置。
 
-*Deck builder. Lists cards the simulator already loads, and saves a deck as a
-user preset in the same shape as ``experiments/*.yaml``. A ``user_deck`` block
-is turned into a temporary mod inside that one test's folder when a run starts.
-Simulator play, seeds and AI stay as they are. Shipped presets, mods, seeds and
-configs are not written.*
+*Deck builder. Lists cards and encounters the simulator already loads, and
+saves a deck as a user preset in the same shape as ``experiments/*.yaml``.
+A ``user_deck`` block is turned into a temporary mod inside that one test's
+folder when a run starts. Each ``extra`` row is one encounter. With no
+encounter chosen, the preset is still one training-dummy fight. Simulator
+play, seeds and AI stay as they are. Shipped presets, mods, seeds and configs
+are not written.*
 """
 from __future__ import annotations
 
@@ -25,6 +28,9 @@ MAX_COPIES = 15
 MAX_ROWS = 40
 MAX_CARDS = 60
 MAX_FILE = 2_000_000
+MAX_ENCOUNTERS = 40
+MAX_FIGHTS_EACH = 100
+MAX_FIGHTS_TOTAL = 400
 _ID = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,31}$")
 _MOD = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,40}$")
 _CARD_ID = re.compile(r"^[A-Za-z0-9_]{1,80}$")
@@ -452,6 +458,351 @@ def list_cards(q="", character="", type_id="", cost="", rarity="", mod="", offse
     return {"total": len(matched), "offset": offset, "limit": limit, "cards": page, **_facets(pool)}
 
 
+_ROOM_QUERY = {
+    "normal": "normal", "monster": "normal", "普通": "normal",
+    "elite": "elite", "精英": "elite",
+    "boss": "boss", "首领": "boss",
+}
+_ROOM_YAML = {"normal": "普通", "elite": "精英", "boss": "首领", "probe": "probe"}
+_GAUNTLET_ROOMS = (("normal", "普通"), ("elite", "精英"), ("boss", "首领"))
+_ROOM_ORDER = {"normal": 0, "elite": 1, "boss": 2}
+_GAUNTLET_ID = re.compile(r"^act([123])_(normal|elite|boss)$")
+_ENC_CACHE = {"sig": None, "rows": None}
+_CODEX = {"path": None}
+
+
+def dummy_encounter():
+    """训练木桩。模拟器不读怪物数据也能打，所以名单里始终有它。"""
+    return {
+        "id": "DUMMY",
+        "name": "木桩",
+        "name_zh": "木桩",
+        "name_en": "Training dummy",
+        "act": None,
+        "room": "probe",
+        "room_id": "probe",
+        "weak": False,
+    }
+
+
+def _safe_id(value):
+    if not isinstance(value, str):
+        return ""
+    text = value.strip()
+    if not text or len(text) > 80:
+        return ""
+    if "\x00" in text or "/" in text or "\\" in text or ".." in text:
+        return ""
+    return text
+
+
+def _codex_sig():
+    from sts2sim.gamedata import codex_dir
+    root = codex_dir()
+    if not isinstance(root, str) or "\x00" in root:
+        return ("", ())
+    names = ("eng_monsters.json", "zhs_monsters.json", "eng_encounters.json", "zhs_encounters.json")
+    rows = []
+    for name in names:
+        path = os.path.join(root, name)
+        try:
+            stat = os.stat(path)
+        except OSError:
+            rows.append((name, 0, 0))
+            continue
+        rows.append((name, stat.st_size, getattr(stat, "st_mtime_ns", int(stat.st_mtime * 1e9))))
+    try:
+        real = os.path.realpath(root)
+    except OSError:
+        real = root
+    return (real, tuple(rows))
+
+
+def _sim_db():
+    """模拟器自己的遭遇库。没有本机怪物数据时返回 None，不把 SystemExit 抛出去。
+
+    ``enemies.DATA_DIR`` 在导入时记下目录。测试或界面如果之后才设置
+    ``DECKBENCH_CODEX_DIR``，这里把它指回 ``codex_dir()``，再交给 ``load_db``。
+    """
+    from sts2sim import enemies as EN
+    from sts2sim.gamedata import codex_dir
+    root = codex_dir()
+    try:
+        real = os.path.realpath(root) if isinstance(root, str) else ""
+    except OSError:
+        real = ""
+    try:
+        current = os.path.realpath(EN.DATA_DIR) if isinstance(EN.DATA_DIR, str) else ""
+    except OSError:
+        current = ""
+    if real and os.path.normcase(real) != os.path.normcase(current):
+        EN.DATA_DIR = real
+        EN._DB.clear()
+        _CODEX["path"] = None
+    if _CODEX["path"] != real:
+        EN._DB.clear()
+        _CODEX["path"] = real
+    try:
+        return EN.load_db()
+    except (SystemExit, OSError, ValueError, TypeError, KeyError):
+        return None
+
+
+def _encounter_record(enc, act, room):
+    eid = _safe_id(enc.get("id"))
+    if not eid:
+        return None
+    zh = _clean_name(enc.get("zh_name") or enc.get("name")) or eid
+    en = _clean_name(enc.get("name")) or eid
+    return {
+        "id": eid,
+        "name": zh,
+        "name_zh": zh,
+        "name_en": en,
+        "act": act,
+        "room": room,
+        "room_id": _ROOM_YAML[room],
+        "weak": bool(enc.get("is_weak")),
+    }
+
+
+def _scan_playable():
+    """只收 ``encounter_pool`` 会拿去打的遭遇。弱怪、缺怪物、缺血量的不进名单。"""
+    from sts2sim import enemies as EN
+    before = dict(EN.APPROX)
+    try:
+        if _sim_db() is None:
+            return []
+        rows = []
+        seen = set()
+        for act in (1, 2, 3):
+            for room, sim_room in _GAUNTLET_ROOMS:
+                try:
+                    pool = EN.encounter_pool(act, sim_room)
+                except (SystemExit, OSError, ValueError, TypeError, KeyError):
+                    continue
+                if not isinstance(pool, list):
+                    continue
+                for enc in pool:
+                    if not isinstance(enc, dict):
+                        continue
+                    row = _encounter_record(enc, act, room)
+                    if row is None or row["id"] in seen or row["id"] == "DUMMY":
+                        continue
+                    seen.add(row["id"])
+                    rows.append(row)
+        rows.sort(key=lambda row: (row["act"], _ROOM_ORDER.get(row["room"], 9), row["id"]))
+        return rows
+    finally:
+        EN.APPROX.clear()
+        EN.APPROX.update(before)
+
+
+def playable_encounters():
+    """模拟器按自己的规则会打的遭遇。不含训练木桩。"""
+    sig = _codex_sig()
+    if _ENC_CACHE["sig"] == sig and _ENC_CACHE["rows"] is not None:
+        return _ENC_CACHE["rows"]
+    from sts2sim import enemies as EN
+    EN._DB.clear()
+    _CODEX["path"] = None
+    rows = _scan_playable()
+    _ENC_CACHE["sig"] = sig
+    _ENC_CACHE["rows"] = rows
+    return rows
+
+
+def _gauntlet_list(rows):
+    out = []
+    for act in (1, 2, 3):
+        for room, _sim_room in _GAUNTLET_ROOMS:
+            members = [row for row in rows if row["act"] == act and row["room"] == room]
+            if not members:
+                continue
+            out.append({
+                "id": f"act{act}_{room}",
+                "act": act,
+                "room": room,
+                "encounters": members,
+            })
+    return out
+
+
+def _room_filter(value):
+    if value in _ROOM_QUERY:
+        return _ROOM_QUERY[value]
+    folded = value.casefold()
+    return _ROOM_QUERY.get(folded)
+
+
+def list_encounters(q="", act="", room="", offset=0, limit=40):
+    """分页、可按幕和房间筛选。名字同时给中文和英文。连战从同一份遭遇池拼出来。"""
+    q = _check_filter(q, "q", 80)
+    act = _check_filter(act, "act", 8)
+    room = _check_filter(room, "room", 16)
+    for value in (act, room, q):
+        if "/" in value or "\\" in value or ".." in value:
+            raise DeckPresetError("query")
+    if act and act not in ("1", "2", "3"):
+        raise DeckPresetError("query")
+    room_key = ""
+    if room:
+        room_key = _room_filter(room)
+        if not room_key:
+            raise DeckPresetError("query")
+    offset = _as_int(offset, "offset")
+    limit = _as_int(limit, "limit")
+    if offset < 0 or offset > 100_000 or limit < 1 or limit > 200:
+        raise DeckPresetError("query")
+    playable = playable_encounters()
+    pool = [dummy_encounter(), *playable]
+    needle = q.casefold()
+    matched = []
+    for row in pool:
+        if act and str(row["act"] or "") != act:
+            continue
+        if room_key and row["room"] != room_key:
+            continue
+        if needle:
+            blob = "\n".join((row["id"], row["name"], row["name_zh"], row["name_en"])).casefold()
+            if needle not in blob:
+                continue
+        matched.append(row)
+    page = matched[offset:offset + limit]
+    acts = sorted({row["act"] for row in playable if row["act"]})
+    rooms = [key for key in ("normal", "elite", "boss") if any(row["room"] == key for row in playable)]
+    return {
+        "total": len(matched),
+        "offset": offset,
+        "limit": limit,
+        "encounters": page,
+        "probe": dummy_encounter(),
+        "acts": acts,
+        "rooms": rooms,
+        "gauntlets": _gauntlet_list(playable),
+    }
+
+
+def _fight_count(value):
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise DeckPresetError("bad_type", field="fights", expected="integer")
+    if value < 1 or value > MAX_FIGHTS_EACH:
+        raise DeckPresetError("fights", n=MAX_FIGHTS_EACH)
+    return value
+
+
+def _known_encounters():
+    rows = [dummy_encounter(), *playable_encounters()]
+    return {row["id"]: row for row in rows}
+
+
+def _gauntlet_members(gid):
+    if not isinstance(gid, str):
+        raise DeckPresetError("bad_type", field="gauntlet", expected="string")
+    text = gid.strip()
+    if not text:
+        raise DeckPresetError("missing", field="gauntlet")
+    _reject_path(text)
+    match = _GAUNTLET_ID.match(text)
+    if not match:
+        raise DeckPresetError("gauntlet")
+    act = int(match.group(1))
+    room = match.group(2)
+    members = [row for row in playable_encounters() if row["act"] == act and row["room"] == room]
+    if not members:
+        raise DeckPresetError("gauntlet")
+    return members
+
+
+def resolve_encounters(payload, allow_default=True):
+    """校验要打的遭遇。没写 encounters / gauntlet 时，保存预设默认一场木桩。
+
+    返回的每一项都是模拟器名单里的副本，并带 ``fights``。空列表在
+    ``allow_default`` 为假时表示「这次不改房间抽取」。
+    """
+    if not isinstance(payload, dict):
+        raise DeckPresetError("bad_type", field="body", expected="object")
+    has_enc = "encounters" in payload and payload["encounters"] is not None
+    has_gauntlet = "gauntlet" in payload and payload["gauntlet"] not in (None, "")
+    if not has_enc and not has_gauntlet:
+        if allow_default:
+            return [dict(dummy_encounter(), fights=1)]
+        return []
+    if has_enc and payload["encounters"] == [] and not has_gauntlet:
+        if allow_default:
+            raise DeckPresetError("no_encounter")
+        return []
+    chosen = []
+    index = {}
+    if has_gauntlet:
+        each = 1
+        if payload.get("fights") is not None:
+            each = _fight_count(payload["fights"])
+        for row in _gauntlet_members(payload["gauntlet"]):
+            index[row["id"]] = len(chosen)
+            chosen.append(dict(row, fights=each))
+    if has_enc:
+        raw = payload["encounters"]
+        if not isinstance(raw, list):
+            raise DeckPresetError("bad_type", field="encounters", expected="array")
+        known = _known_encounters()
+        for entry in raw:
+            if isinstance(entry, str):
+                eid = entry.strip()
+                if not eid:
+                    raise DeckPresetError("missing", field="encounters.id")
+                fights = 1
+            elif isinstance(entry, dict):
+                if any(key in entry for key in _BANNED_FIELDS):
+                    raise DeckPresetError("path")
+                eid = entry.get("id")
+                if not isinstance(eid, str) or not eid.strip():
+                    raise DeckPresetError("missing", field="encounters.id")
+                eid = eid.strip()
+                if "fights" not in entry or entry["fights"] is None:
+                    fights = 1
+                else:
+                    fights = _fight_count(entry["fights"])
+            else:
+                raise DeckPresetError("bad_type", field="encounters", expected="object")
+            _reject_path(eid)
+            row = known.get(eid)
+            if row is None:
+                raise DeckPresetError("unknown_encounter")
+            if eid in index:
+                chosen[index[eid]]["fights"] = fights
+            else:
+                index[eid] = len(chosen)
+                chosen.append(dict(row, fights=fights))
+    if not chosen:
+        raise DeckPresetError("no_encounter")
+    if len(chosen) > MAX_ENCOUNTERS:
+        raise DeckPresetError("too_many_encounters", n=MAX_ENCOUNTERS)
+    total = sum(item["fights"] for item in chosen)
+    if total > MAX_FIGHTS_TOTAL:
+        raise DeckPresetError("too_many_fights", n=MAX_FIGHTS_TOTAL)
+    return chosen
+
+
+def fight_rows(deck_ids, chosen, max_turns=1):
+    """写成实验 YAML 的 ``extra`` 行。模拟器本来就会按 encounter 打这些行。"""
+    turns = max_turns if isinstance(max_turns, int) and not isinstance(max_turns, bool) else 1
+    if turns < 1 or turns > 200:
+        turns = 1
+    rows = []
+    for did in deck_ids:
+        for enc in chosen:
+            rows.append({
+                "deck": did,
+                "encounter": enc["id"],
+                "fights": enc["fights"],
+                "max_turns": turns,
+                "act": enc["act"] or 1,
+                "room": enc["room_id"],
+            })
+    return rows
+
+
 def _collides(pid):
     shipped = os.path.join(_sim_root(), "experiments", pid + ".yaml")
     if os.path.isfile(shipped):
@@ -682,6 +1033,7 @@ def save_preset(payload):
     else:
         raise DeckPresetError("missing", field="character")
     tokens = _tokens(modset, mod_name, rows)
+    chosen = resolve_encounters(payload)
     exp = {
         "name": pid,
         "title": name,
@@ -692,14 +1044,7 @@ def save_preset(payload):
         "agent": agent,
         "rooms": [],
         "decks": [pid],
-        "extra": [{
-            "deck": pid,
-            "encounter": "DUMMY",
-            "fights": 1,
-            "max_turns": 1,
-            "act": 1,
-            "room": "probe",
-        }],
+        "extra": fight_rows([pid], chosen, max_turns=1),
         "user_deck": {
             "id": pid,
             "name": name,
@@ -710,8 +1055,8 @@ def save_preset(payload):
         },
     }
     text = (
-        "# User deck preset. One training-dummy fight (encounter: DUMMY).\n"
-        "# The deck builder writes this file. It is not a shipped experiment.\n"
+        "# User deck preset. extra lists the encounters this deck runs against.\n"
+        "# Each fight is one turn. This file is not a shipped experiment.\n"
     )
     text += yaml.safe_dump(exp, allow_unicode=True, sort_keys=False)
     folder = presets_dir(create=True)
@@ -724,6 +1069,8 @@ def save_preset(payload):
         "cards": total,
         "mod": mod_name,
         "character": character,
+        "encounters": [enc["id"] for enc in chosen],
+        "fights": sum(enc["fights"] for enc in chosen),
     }
 
 
@@ -769,6 +1116,17 @@ def list_presets():
         rooms = exp.get("rooms") if isinstance(exp.get("rooms"), list) else []
         mods = exp.get("mods") if isinstance(exp.get("mods"), list) else []
         extra = exp.get("extra") if isinstance(exp.get("extra"), list) else []
+        encounters = []
+        for row in extra:
+            if not isinstance(row, dict):
+                continue
+            eid = _safe_id(row.get("encounter"))
+            if not eid:
+                continue
+            count = row.get("fights")
+            if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+                count = 1
+            encounters.append({"id": eid, "fights": count})
         out.append({
             "id": pid,
             "name": pid,
@@ -781,6 +1139,7 @@ def list_presets():
             "agent": exp.get("agent") if exp.get("agent") in ("heuristic", "beam") else "heuristic",
             "seed": exp.get("seed") if isinstance(exp.get("seed"), int) else 1,
             "n_extra": len(extra),
+            "encounters": encounters,
             "user": True,
         })
     return out

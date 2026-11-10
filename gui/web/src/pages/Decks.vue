@@ -77,6 +77,7 @@
             <button type="button" data-upgrade :class="{ on: row.upgrade }" :title="t('deck.upgrade')" @click="row.upgrade = !row.upgrade">+</button>
             <button type="button" data-remove :title="t('deck.remove')" @click="remove(row)">×</button>
           </div>
+          <encounter-picker v-model="encounters" scope="deck" />
           <div class="field" data-deck="id"><div class="label">{{ t('deck.id') }}</div>
             <n-input v-model:value="deckId" maxlength="32" /></div>
           <div class="field" data-deck="name"><div class="label">{{ t('deck.name') }}</div>
@@ -94,8 +95,9 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { NButton, NInput, NSelect, useMessage } from 'naive-ui'
+import EncounterPicker from '../components/EncounterPicker.vue'
 import { api, store } from '../api'
 import { t, tr, lang } from '../i18n'
 
@@ -117,9 +119,11 @@ const rows = ref([])
 const deckMod = ref('')
 const deckId = ref('')
 const deckName = ref('')
+const encounters = ref([{ id: 'DUMMY', fights: 1 }])
 const saving = ref(false)
 const savedId = ref('')
 let timer
+watch(encounters, () => { savedId.value = '' }, { deep: true })
 
 const any = () => ({ label: t('deck.any'), value: '' })
 function opt(list) { return [any(), ...(list || []).map((v) => ({ label: v, value: v }))] }
@@ -243,7 +247,7 @@ const splitSegs = computed(() => {
     return seg
   }).filter((seg) => seg.w > 0)
 })
-const canSave = computed(() => /^[A-Za-z][A-Za-z0-9_]{0,31}$/.test(deckId.value.trim()) && deckName.value.trim() && rows.value.length > 0 && !!deckMod.value && !saving.value)
+const canSave = computed(() => /^[A-Za-z][A-Za-z0-9_]{0,31}$/.test(deckId.value.trim()) && deckName.value.trim() && rows.value.length > 0 && !!deckMod.value && encounters.value.length > 0 && !saving.value)
 
 async function save() {
   if (!canSave.value) return
@@ -255,6 +259,7 @@ async function save() {
       name: deckName.value.trim(),
       mod: deckMod.value,
       cards: rows.value.map((row) => ({ id: row.id, count: row.count, upgrade: !!row.upgrade })),
+      encounters: encounters.value.map((row) => ({ id: row.id, fights: Number(row.fights) || 1 })),
     }
     const saved = await api.post('/api/decks', body)
     savedId.value = saved.id

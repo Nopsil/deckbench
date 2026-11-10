@@ -263,3 +263,328 @@ def test_mcp_list_and_save(allowed):
     typed = json.loads(mcp.save_deck(12))
     assert typed["ok"] is False and typed["error"] == "bad_type"
     assert "12" not in json.dumps(typed)
+
+
+CODEX = os.path.join(ROOT, "tests", "fixtures", "encounters_min")
+
+
+@pytest.fixture
+def codex(monkeypatch):
+    """合成遭遇，不是游戏数据。用来核对名单和连战都来自模拟器自己的 encounter_pool。"""
+    monkeypatch.setenv("DECKBENCH_CODEX_DIR", CODEX)
+    from sts2sim import deckpresets
+    from sts2sim import enemies as sim_enemies
+    sim_enemies._DB.clear()
+    deckpresets._CODEX["path"] = None
+    deckpresets._ENC_CACHE["sig"] = None
+    deckpresets._ENC_CACHE["rows"] = None
+    yield CODEX
+    sim_enemies._DB.clear()
+    deckpresets._CODEX["path"] = None
+    deckpresets._ENC_CACHE["sig"] = None
+    deckpresets._ENC_CACHE["rows"] = None
+
+
+def _encounters(body):
+    return [row["id"] for row in body["encounters"]]
+
+
+def test_encounters_without_a_codex_list_only_the_dummy(client, allowed, monkeypatch, tmp_path):
+    monkeypatch.setenv("DECKBENCH_CODEX_DIR", str(tmp_path / "no-codex"))
+    from sts2sim import deckpresets
+    from sts2sim import enemies as sim_enemies
+    sim_enemies._DB.clear()
+    deckpresets._ENC_CACHE["sig"] = None
+    deckpresets._ENC_CACHE["rows"] = None
+    before = _read(QUICK)
+    page = client.get("/api/encounters", headers=EN)
+    assert page.status_code == 200, page.text
+    body = page.json()
+    assert _encounters(body) == ["DUMMY"]
+    assert body["probe"]["id"] == "DUMMY"
+    assert body["probe"]["name_zh"] == "木桩"
+    assert body["probe"]["name_en"] == "Training dummy"
+    assert body["gauntlets"] == []
+    assert body["total"] == 1
+    assert not (allowed / "presets").exists()
+    assert _read(QUICK) == before
+    assert "Traceback" not in page.text
+
+
+def test_encounter_list_filters_names_and_builds_gauntlets_from_the_sim(client, codex):
+    from sts2sim import enemies as sim_enemies
+    page = client.get("/api/encounters", headers=EN, params={"limit": 2, "offset": 0})
+    assert page.status_code == 200, page.text
+    first = page.json()
+    assert first["limit"] == 2 and first["offset"] == 0 and first["total"] > 2
+    assert len(first["encounters"]) == 2
+    nxt = client.get("/api/encounters", headers=EN, params={"limit": 2, "offset": 2})
+    assert nxt.json()["encounters"][0]["id"] != first["encounters"][0]["id"]
+
+    elites = client.get("/api/encounters", headers=ZHS, params={"act": "1", "room": "elite", "limit": 50})
+    assert elites.status_code == 200
+    body = elites.json()
+    pool = [row["id"] for row in sim_enemies.encounter_pool(1, "精英")]
+    assert _encounters(body) == pool == ["NIB_ELITE_A", "NIB_ELITE_B"]
+    row = body["encounters"][0]
+    assert row["name_zh"] == "小钉精英甲" and row["name_en"] == "Nib Elite A"
+    assert row["act"] == 1 and row["room"] == "elite"
+    assert "NIB_WEAK" not in _encounters(body) and "NIB_SKIP" not in _encounters(body)
+
+    chinese = client.get("/api/encounters", params={"q": "精英乙", "limit": 20})
+    assert _encounters(chinese.json()) == ["NIB_ELITE_B"]
+    english = client.get("/api/encounters", params={"q": "Nib Patrol", "limit": 20})
+    assert _encounters(english.json()) == ["NIB_NORMAL"]
+    bosses = client.get("/api/encounters", params={"room": "首领", "limit": 20})
+    assert _encounters(bosses.json()) == ["NIB_BOSS"]
+    act2 = client.get("/api/encounters", params={"act": "2", "room": "Monster", "limit": 20})
+    assert act2.json()["encounters"] == []
+    act2_elite = client.get("/api/encounters", params={"act": 2, "room": "ELITE", "limit": 20})
+    assert _encounters(act2_elite.json()) == ["NIB_ACT2"]
+
+    gauntlet = next(item for item in body["gauntlets"] if item["id"] == "act1_elite")
+    assert [item["id"] for item in gauntlet["encounters"]] == pool
+    assert all(item["id"] != "act1_weak" for item in body["gauntlets"])
+    assert "NIB_SKIP" not in {row["id"] for item in body["gauntlets"] for row in item["encounters"]}
+    assert "NIB_WEAK" not in {row["id"] for item in body["gauntlets"] for row in item["encounters"]}
+
+
+def test_encounter_query_errors_are_400(client, codex):
+    bad = client.get("/api/encounters", headers=EN, params={"offset": "no"})
+    assert bad.status_code == 400
+    assert "offset" in _detail(bad) and "integer" in _detail(bad)
+    huge = client.get("/api/encounters", headers=EN, params={"limit": 0})
+    assert huge.status_code == 400
+    _detail(huge)
+    over = client.get("/api/encounters", headers=EN, params={"limit": 201})
+    assert over.status_code == 400
+    _detail(over)
+    act = client.get("/api/encounters", headers=EN, params={"act": "9"})
+    assert act.status_code == 400
+    _detail(act)
+    room = client.get("/api/encounters", headers=EN, params={"room": "weak"})
+    assert room.status_code == 400
+    _detail(room)
+    climbed = client.get("/api/encounters", headers=EN, params={"room": "../elite"})
+    assert climbed.status_code == 400
+    assert ".." not in climbed.text
+    _detail(climbed)
+    nul = client.get("/api/encounters", headers=EN, params={"q": "a\x00b"})
+    assert nul.status_code == 400
+    _detail(nul)
+    secret = client.get("/api/encounters", headers=EN, params={"act": SECRET})
+    assert secret.status_code == 400
+    assert SECRET not in secret.text
+    assert "Traceback" not in secret.text
+
+
+def test_save_two_encounters_and_run_them(client, allowed, codex):
+    before_quick = _read(QUICK)
+    before_decks = _read(SHIPPED_DECKS)
+    payload = _payload("twodeck")
+    payload["encounters"] = [
+        {"id": "NIB_ELITE_A", "fights": 1},
+        {"id": "NIB_ELITE_B", "fights": 2},
+    ]
+    res = client.post("/api/decks", headers=EN, json=payload)
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["encounters"] == ["NIB_ELITE_A", "NIB_ELITE_B"]
+    assert body["fights"] == 3
+    saved = (allowed / "presets" / "twodeck.yaml").read_text(encoding="utf-8")
+    assert "NIB_ELITE_A" in saved and "NIB_ELITE_B" in saved
+    assert "DUMMY" not in saved
+    assert "rooms: []" in saved
+    assert os.path.dirname(QUICK) not in res.text
+    assert _read(QUICK) == before_quick
+    assert _read(SHIPPED_DECKS) == before_decks
+
+    from gui.backend import LocalPythonBackend
+    run = allowed / "run-two"
+    run.mkdir()
+    argv, env, cwd = LocalPythonBackend().build_command(
+        "combat",
+        {"preset": "twodeck", "fights": 1, "seed": 1, "agent": "heuristic", "procs": 1},
+        str(run),
+    )
+    experiment = (run / "experiment.yaml").read_text(encoding="utf-8")
+    assert "user_deck" not in experiment
+    assert "NIB_ELITE_A" in experiment and "NIB_ELITE_B" in experiment
+    proc = subprocess.run(argv, cwd=cwd, env=env, capture_output=True, text=True, timeout=180, check=False)
+    assert proc.returncode == 0, proc.stdout[-2000:] + proc.stderr[-2000:]
+    fights = [json.loads(line) for line in (run / "out" / "raw.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert [row["encounter"] for row in fights] == ["NIB_ELITE_A", "NIB_ELITE_B", "NIB_ELITE_B"]
+    assert fights[0]["enc_name"] == "小钉精英甲"
+    assert fights[0]["deck"] == "twodeck"
+    assert _read(QUICK) == before_quick
+
+
+def test_gauntlet_save_and_custom_run_use_the_sim_pool(client, allowed, codex):
+    payload = _payload("gauntlet")
+    payload["gauntlet"] = "act1_elite"
+    payload["fights"] = 1
+    res = client.post("/api/decks", headers=ZHS, json=payload)
+    assert res.status_code == 200, res.text
+    assert res.json()["encounters"] == ["NIB_ELITE_A", "NIB_ELITE_B"]
+    text = (allowed / "presets" / "gauntlet.yaml").read_text(encoding="utf-8")
+    assert text.index("NIB_ELITE_A") < text.index("NIB_ELITE_B")
+    assert "DUMMY" not in text
+
+    from gui.backend import LocalPythonBackend
+    run = allowed / "custom-two"
+    run.mkdir()
+    argv, env, cwd = LocalPythonBackend().build_command(
+        "combat",
+        {
+            "mods": ["claude_v34"],
+            "decks": ["probe_noengine"],
+            "rooms": ["普通", "精英"],
+            "gauntlet": "act1_elite",
+            "max_turns": 1,
+            "fights": 1,
+            "seed": 1,
+            "agent": "heuristic",
+            "procs": 1,
+        },
+        str(run),
+    )
+    experiment = (run / "experiment.yaml").read_text(encoding="utf-8")
+    assert "rooms: []" in experiment or "rooms: []\n" in experiment
+    assert "NIB_ELITE_A" in experiment and "NIB_ELITE_B" in experiment
+    assert "普通" not in experiment.split("extra:", 1)[-1]
+    proc = subprocess.run(argv, cwd=cwd, env=env, capture_output=True, text=True, timeout=180, check=False)
+    assert proc.returncode == 0, proc.stdout[-2000:] + proc.stderr[-2000:]
+    fights = [json.loads(line) for line in (run / "out" / "raw.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert [row["encounter"] for row in fights] == ["NIB_ELITE_A", "NIB_ELITE_B"]
+    assert all(row["deck"] == "probe_noengine" for row in fights)
+
+
+def test_encounter_save_rejects_bad_input_without_echoing_it(client, allowed, codex, monkeypatch):
+    before_quick = _read(QUICK)
+    unknown = client.post("/api/decks", headers=EN, json=_payload(cards=[{"id": "YIHESHI", "count": 1, "upgrade": False}], pid="badenc") | {
+        "encounters": [{"id": SECRET, "fights": 1}],
+    })
+    assert unknown.status_code == 400
+    _detail(unknown)
+    assert SECRET not in unknown.text
+    assert not (allowed / "presets" / "badenc.yaml").exists()
+
+    climbed = client.post("/api/decks", headers=EN, json={
+        **_payload("climbenc"),
+        "encounters": [{"id": "../NIB_ELITE_A", "fights": 1}],
+    })
+    assert climbed.status_code == 400
+    _detail(climbed)
+    assert "NIB_ELITE_A" not in climbed.text
+
+    nul = client.post("/api/decks", headers=EN, json={
+        **_payload("nulenc"),
+        "encounters": [{"id": "NIB\x00ELITE", "fights": 1}],
+    })
+    assert nul.status_code == 400
+    _detail(nul)
+
+    typed = client.post("/api/decks", headers=EN, json={**_payload("typedenc"), "encounters": SECRET})
+    assert typed.status_code == 400
+    detail = _detail(typed)
+    assert "encounters" in detail
+    assert SECRET not in typed.text
+
+    flag = client.post("/api/decks", headers=EN, json={
+        **_payload("flagenc"),
+        "encounters": [{"id": "DUMMY", "fights": True}],
+    })
+    assert flag.status_code == 400
+    assert "integer" in _detail(flag)
+    assert "true" not in flag.text.lower()
+
+    zero = client.post("/api/decks", headers=EN, json={
+        **_payload("zeroenc"),
+        "encounters": [{"id": "DUMMY", "fights": 0}],
+    })
+    assert zero.status_code == 400
+    assert "1" in _detail(zero)
+
+    empty = client.post("/api/decks", headers=EN, json={**_payload("emptyenc"), "encounters": []})
+    assert empty.status_code == 400
+    _detail(empty)
+
+    missing_g = client.post("/api/decks", headers=EN, json={**_payload("gbad"), "gauntlet": "act1_weak"})
+    assert missing_g.status_code == 400
+    assert "act1_weak" not in missing_g.text
+    _detail(missing_g)
+
+    path_g = client.post("/api/decks", headers=EN, json={**_payload("gpath"), "gauntlet": "../act1_elite"})
+    assert path_g.status_code == 400
+    _detail(path_g)
+
+    monkeypatch.setattr("sts2sim.deckpresets.MAX_ENCOUNTERS", 1)
+    too_many = client.post("/api/decks", headers=EN, json={
+        **_payload("manyenc"),
+        "encounters": [{"id": "NIB_ELITE_A", "fights": 1}, {"id": "NIB_ELITE_B", "fights": 1}],
+    })
+    assert too_many.status_code == 400
+    assert "1" in _detail(too_many)
+    monkeypatch.setattr("sts2sim.deckpresets.MAX_ENCOUNTERS", 40)
+    monkeypatch.setattr("sts2sim.deckpresets.MAX_FIGHTS_TOTAL", 1)
+    too_fights = client.post("/api/decks", headers=EN, json={
+        **_payload("fightenc"),
+        "encounters": [{"id": "NIB_ELITE_A", "fights": 1}, {"id": "DUMMY", "fights": 1}],
+    })
+    assert too_fights.status_code == 400
+    assert "1" in _detail(too_fights)
+    assert not (allowed / "presets" / "fightenc.yaml").exists()
+    assert _read(QUICK) == before_quick
+
+    from gui.backend import LocalPythonBackend
+    run = allowed / "bad-custom"
+    run.mkdir()
+    try:
+        LocalPythonBackend().build_command(
+            "combat",
+            {
+                "mods": ["claude_v34"],
+                "decks": ["probe_noengine"],
+                "rooms": ["普通"],
+                "encounters": [{"id": SECRET, "fights": 1}],
+                "max_turns": 1,
+                "fights": 1,
+                "seed": 1,
+                "agent": "heuristic",
+                "procs": 1,
+            },
+            str(run),
+        )
+    except ValueError as exc:
+        assert SECRET not in str(exc)
+    else:
+        raise AssertionError("bad encounter was accepted")
+
+
+def test_mcp_lists_encounters_and_saves_them(allowed, codex):
+    from tools import mcp_server as mcp
+    listed = json.loads(mcp.list_encounters(q="精英甲", act="1", room="elite", limit=20))
+    assert listed["ok"] is True and listed["read_only"] is True
+    assert [row["id"] for row in listed["encounters"]] == ["NIB_ELITE_A"]
+    assert any(item["id"] == "act1_elite" for item in listed["gauntlets"])
+    bad = json.loads(mcp.list_encounters(offset="no"))
+    assert bad["ok"] is False and bad["read_only"] is True and bad["error"] == "bad_type"
+    assert "Traceback" not in json.dumps(bad)
+    refused = json.loads(mcp.list_encounters(room="../elite"))
+    assert refused["ok"] is False and refused["error"] == "query"
+    assert ".." not in json.dumps(refused)
+
+    payload = _payload("mcpenc")
+    payload["gauntlet"] = "act1_elite"
+    payload["encounters"] = [{"id": "DUMMY", "fights": 1}]
+    saved = json.loads(mcp.save_deck(json.dumps(payload)))
+    assert saved["ok"] is True
+    assert saved["encounters"] == ["NIB_ELITE_A", "NIB_ELITE_B", "DUMMY"]
+    text = (allowed / "presets" / "mcpenc.yaml").read_text(encoding="utf-8")
+    assert "NIB_ELITE_A" in text and "DUMMY" in text
+    assert SECRET not in json.dumps(saved)
+
+    missing = json.loads(mcp.save_deck(json.dumps({**_payload("mcpbad"), "encounters": [{"id": SECRET, "fights": 1}]})))
+    assert missing["ok"] is False and missing["error"] == "unknown_encounter"
+    assert SECRET not in json.dumps(missing)
+    assert not (allowed / "presets" / "mcpbad.yaml").exists()
