@@ -17,7 +17,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, ".."))
 
-from sts2sim.engine.seedpreview import CHARS, PreviewError, format_text, preview, public_document  # noqa: E402
+from sts2sim.engine.seedpreview import PreviewError, format_text, preview, public_document  # noqa: E402
 
 
 def _emit_json(doc, fp):
@@ -41,7 +41,8 @@ def main(argv=None):
     _configure_stdio()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("seed")
-    ap.add_argument("--char", default="Ironclad", choices=CHARS)
+    ap.add_argument("--char", default="Ironclad",
+                    help="本机安装里的可玩角色。没有生成数据时，预览会说明原因。")
     ap.add_argument("--asc", type=int, default=0)
     ap.add_argument("--neow", default="first", help="first（第一个没锁的）/ all / none / 选项序号")
     ap.add_argument("--json", metavar="FILE",
@@ -51,6 +52,10 @@ def main(argv=None):
                          "不写目录时用 DECKBENCH_CACHE/seed-preview。不要把缓存提交进仓库。")
     ap.add_argument("--lang", default="zhs", choices=["zhs", "en", "ja", "ko"])
     a = ap.parse_args(argv)
+    from sts2sim.engine.seedpreview import character_ids
+    if a.char not in character_ids():
+        print(f"invalid choice: {a.char!r} (choose from {', '.join(character_ids())})", file=sys.stderr)
+        raise SystemExit(2)
     try:
         res = preview(a.seed, a.char, a.asc, neow=a.neow,
                       use_cache=a.cache is not None, cache_dir=a.cache or None)

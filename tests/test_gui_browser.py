@@ -151,11 +151,12 @@ def _write_card_cache(data):
     cache = data / "cache" / "cards.json"
     cache.parent.mkdir(parents=True, exist_ok=True)
     cache.write_text(json.dumps({
-        "version": 2,
+        "version": 3,
         "cards": [],
         "variants": [],
         "starters": {},
         "characters": ["Ironclad", "Silent", "Defect", "Necrobinder", "Regent", "Claude"],
+        "base_characters": ["Ironclad", "Silent", "Defect", "Necrobinder", "Regent"],
     }), encoding="utf-8")
     stamp = time.time() + 30
     os.utime(cache, (stamp, stamp))

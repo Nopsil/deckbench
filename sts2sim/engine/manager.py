@@ -8,6 +8,16 @@ from ..rt.boot import game as G
 from ..rt.prelude import Dummy, _Event
 
 
+def ascension_manager(level, game_mode=None):
+    """v0.113.1 的构造是 (GameMode, level)。更早的生成代码只有 level。按形参个数调用，不改关卡含义。"""
+    ctor = G.AscensionManager.__init__
+    if getattr(ctor, "__code__", None) is not None and ctor.__code__.co_argcount >= 3:
+        if game_mode is None:
+            game_mode = G.GameMode.Standard
+        return G.AscensionManager(game_mode, level)
+    return G.AscensionManager(level)
+
+
 class NetService:
     """NetSingleplayerGameService 的最小替身。"""
     Type = G.NetGameType.Singleplayer
@@ -26,6 +36,35 @@ class NetService:
 
     def __getattr__(self, n):
         return Dummy("NetService." + n)
+
+
+class MerchantSync:
+    """单机商店库存。
+
+    v0.113.1 把库存从 MerchantRoom 挪到 MerchantSynchronizer，而那个类型在联机目录里，不在转译范围内。
+    这里只做它进店时的单机分支：普通局用 CreateForNormalMerchant，Blitz 用 CreateForBlitzMerchant。
+    """
+
+    def __init__(self):
+        self._inv = {}
+
+    def OnMerchantEntered(self, inventories=None):
+        if inventories is not None:
+            return
+        st = G.RunManager.Instance.State
+        blitz = getattr(st, "GameMode", None) == getattr(G.GameMode, "Blitz", None)
+        create = G.MerchantInventory.CreateForBlitzMerchant if blitz else G.MerchantInventory.CreateForNormalMerchant
+        for player in G._iter(st.Players):
+            self._inv[id(player)] = create(player)
+
+    def GetLocalInventory(self):
+        st = G.RunManager.Instance.State
+        me = G.LocalContext.GetMe(st)
+        return self._inv[id(me)]
+
+    def OnMerchantExited(self):
+        # 真游戏还会把没买的商品写进地图历史。整局结果用的是已经入手的牌和遗物，这里只清掉这一店的库存。
+        self._inv.clear()
 
 
 class SyncQueue:
@@ -96,13 +135,15 @@ class SimRunManager:
         self.RewardsSetSynchronizer = Dummy("RunManager.RewardsSetSynchronizer")
         self.OneOffSynchronizer = Dummy("RunManager.OneOffSynchronizer")
         self.TreasureRoomRelicSynchronizer = Dummy("RunManager.TreasureRoomRelicSynchronizer")
-        self.AscensionManager = G.AscensionManager(0)
+        self.MerchantSynchronizer = MerchantSync()
+        self.AscensionManager = ascension_manager(0)
         self.RunLobby = None
         self.RunStarted = _Event()
         self.RoomEntered = _Event()
         self.RoomExited = _Event()
         self.ActEntered = _Event()
         self.ended = None
+        self.HasRunEnded = False
         self.WinTime = 0
         self.RunTime = 0
         self.IsAbandoned = False
@@ -133,6 +174,13 @@ class SimRunManager:
         a = st.AscensionLevel if st is not None else self.ascension
         return int(a) >= int(level)
 
+    def IsDread(self):
+        """v0.113.1：部分怪物数值看是不是 Dread 模式。普通局不是。"""
+        st = self.State
+        if st is None:
+            return False
+        return getattr(st, "GameMode", None) == getattr(G.GameMode, "Dread", None)
+
     def DebugOnlyGetState(self):
         return self.State
 
@@ -144,6 +192,7 @@ class SimRunManager:
 
     def OnEnded(self, isVictory=False, *a, **k):
         self.ended = bool(isVictory)
+        self.HasRunEnded = True
         return None
 
     # ---- 建局（SetUpNewSinglePlayer + InitializeShared + InitializeNewRun + GenerateRooms）----
@@ -162,8 +211,21 @@ class SimRunManager:
         self.OneOffSynchronizer = G.OneOffSynchronizer(buf, net, state, 1)
         self.TreasureRoomRelicSynchronizer = G.TreasureRoomRelicSynchronizer(
             state, 1, self.ActionQueueSynchronizer, state.SharedRelicGrabBag, state.Rng.TreasureRoomRelics)
-        self.AscensionManager = G.AscensionManager(state.AscensionLevel)
+        self.AscensionManager = ascension_manager(state.AscensionLevel, getattr(state, "GameMode", None))
+        self._install_card_selector(state)
         self.InitializeNewRun()
+
+    def _install_card_selector(self, state):
+        """v0.113.1：选牌走 RunManager.CardSelectorStack。更早的生成代码没有这个类，静态栈已在建局时压好。"""
+        cls = getattr(G, "CardSelectorStack", None)
+        if not isinstance(cls, type):
+            return
+        self.CardSelectorStack = cls(state)
+        sel = getattr(self.driver, "selector", None)
+        if sel is None:
+            return
+        for player in G._iter(state.Players):
+            self.CardSelectorStack.PushSelector(player, sel)
         self.GenerateRooms()
 
     def InitializeNewRun(self):
@@ -174,6 +236,9 @@ class SimRunManager:
         st.ExtraFields.StartedWithNeow = st.UnlockState.IsEpochRevealed(_g=(G.NeowEpoch,))
         for modifier in G._iter(st.Modifiers):
             modifier.OnRunCreated(st)
+        # v0.113.1：RunState 自带 RunModel（例如多人缩放）。不调用 OnRunCreated 时 RunState 是空的。
+        for run_model in G._iter(getattr(st, "RunModels", None) or []):
+            run_model.OnRunCreated(st)
         for player in G._iter(st.Players):
             self.ApplyAscensionEffects(player)
 

@@ -256,7 +256,7 @@ class LocalPythonBackend(SimBackend):
                 "engine": i18n.t("backend.engine", lang)}
 
     # ---------------- 目录：角色、AI、变体、卡牌、实验预设、mod
-    CARDS_CACHE_VERSION = 2   # 2：卡牌带 rarity_id/type_id/own_name，名字按界面语言在 catalog() 里填
+    CARDS_CACHE_VERSION = 3   # 3：另给 base_characters（本机安装的可玩角色，不含后来加进 characters 的模组角色）
 
     def _cards(self, refresh=False):
         cache = os.path.join(paths.CACHE_DIR, "cards.json")
@@ -404,6 +404,8 @@ class LocalPythonBackend(SimBackend):
         lang = lang if lang in i18n.LANGS else i18n.current()
         c = self._cards(refresh)
         chars = [{"id": k, "name": char_name(k, lang)} for k in c.get("characters", [])]
+        base_ids = c.get("base_characters") or []
+        base_chars = [{"id": k, "name": char_name(k, lang)} for k in base_ids]
         names = self.card_names([x["id"] for x in c["cards"] if not x.get("own_name")], lang)
         cards = []
         for x in c["cards"]:
@@ -421,7 +423,8 @@ class LocalPythonBackend(SimBackend):
                     else (v if lang == "zhs" else dict(v, desc="")) for v in c["variants"]]
         return {"backend": {"id": self.id, "name": i18n.t("backend.name", lang), **self.capabilities(lang)},
                 "lang": lang, "game_langs": sorted(_game_langs()),
-                "characters": chars, "agents_batch": agents_batch(lang), "agents_combat": agents_combat(lang), "styles": styles(lang),
+                "characters": chars, "base_characters": base_chars,
+                "agents_batch": agents_batch(lang), "agents_combat": agents_combat(lang), "styles": styles(lang),
                 "variants": variants, "cards": cards, "starters": c["starters"], "rooms": ROOMS,
                 "experiments": self.experiments(lang), "mods": self.mods(), "cpu": os.cpu_count() or 1,
                 "worker_cap": worker_cap(),

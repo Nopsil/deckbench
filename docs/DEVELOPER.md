@@ -341,10 +341,10 @@ tests/               单元测试
 python gui/packaging/dry_check.py
 # 1) 自包含反编译器（只需一次；需要 .NET 9 SDK，可以在任何系统上交叉发布 win-x64）
 dotnet tool install -g ilspycmd --version 9.1.0.7988
-$ver = (python gui\packaging\read_version.py).Trim()   # sts2sim.__version__，现在是 0.1.5
-dotnet publish gui\packaging\decompiler\ilspycmd-host.csproj -c Release -r win-x64 --self-contained -o <decompiler 目录> -p:IlspyToolDir=<ilspycmd 工具目录 tools\net8.0\any> -p:Version=$ver -p:FileVersion=0.1.5.0 -p:AssemblyVersion=0.1.5.0 -p:InformationalVersion=$ver -p:IncludeSourceRevisionInInformationalVersion=false
+$ver = (python gui\packaging\read_version.py).Trim()   # sts2sim.__version__，现在是 0.1.6
+dotnet publish gui\packaging\decompiler\ilspycmd-host.csproj -c Release -r win-x64 --self-contained -o <decompiler 目录> -p:IlspyToolDir=<ilspycmd 工具目录 tools\net8.0\any> -p:Version=$ver -p:FileVersion=0.1.6.0 -p:AssemblyVersion=0.1.6.0 -p:InformationalVersion=$ver -p:IncludeSourceRevisionInInformationalVersion=false
 # 2) 打包（Python 3.12 venv 里装 requirements-gui.txt + pyinstaller；需要 Node.js）
-#    不写 -Version 时，build.ps1 自己读 sts2sim.__version__。zip 是 DeckBench-0.1.5-win64.zip。
+#    不写 -Version 时，build.ps1 自己读 sts2sim.__version__。zip 是 DeckBench-0.1.6-win64.zip。
 powershell -ExecutionPolicy Bypass -File gui\packaging\build.ps1 -Work <工作目录> -Py <venv>\Scripts\python.exe -Decompiler <decompiler 目录>
 # 3) 审计：确认包里没有任何游戏文件/数据/生成代码（可选：与游戏安装、本机缓存逐文件比对哈希）
 powershell -ExecutionPolicy Bypass -File gui\packaging\audit.ps1 -Path <工作目录>\DeckBench-0.1.5-win64.zip -GameDir "<游戏目录>" -Cache "$env:LOCALAPPDATA\deckbench"
@@ -391,7 +391,8 @@ powershell -ExecutionPolicy Bypass -File gui\packaging\build.ps1 -Work <运行�
 - 模拟结果只适合在同一套假设下横向比较，不是真实胜率。
 - 作者自己的游戏 mod DLL 可以导入成 YAML（[DLL_MODS.md](DLL_MODS.md)），不能在模拟器里直接执行：模拟器是本机转译的 Python，不是游戏的 .NET + Godot 宿主，Harmony 补丁不会打到 Python 上。
   *An author's game mod DLL can be imported as YAML ([DLL_MODS.md](DLL_MODS.md)). It cannot be executed inside the simulator: the simulator is the local Python translation, not the game's .NET + Godot host, so Harmony patches do not apply.*
-- 首次生成需要 .NET 9 SDK + ilspycmd；转译器针对 v0.111 系列验证过，游戏大版本更新后可能需要更新转译器/补丁（`tools/cs2py_*.py`、`tools/cs_patches.py`、`sts2sim/rt/patches.py`）。
+- 首次生成需要 .NET 9 SDK + ilspycmd 9.1.0.7988。缓存按 `sts2.dll` 的 SHA-256 分目录，并要求 `translator_rev` 与当前代码一致（现在是 3）；对不上就重新 `python -m sts2sim.gamedata setup`。这一版转译器在一台 Mac 的 v0.113.1 公开测试包上跑通过整局（见 [GAME_SUPPORT.md](GAME_SUPPORT.md)）。没有在这里重跑 v0.111 的 DLL。游戏再更新后，仍可能要改 `tools/cs2py_*.py`、`tools/cs_patches.py`、`sts2sim/rt/patches.py`。
+  *First-time generation needs the .NET 9 SDK and ilspycmd 9.1.0.7988. The cache directory is the SHA-256 of `sts2.dll`, and `translator_rev` must match the current code (3 today). A mismatch means `python -m sts2sim.gamedata setup` again. This translator revision completed full runs against one Mac v0.113.1 public-beta install (see [GAME_SUPPORT.md](GAME_SUPPORT.md)). A v0.111 DLL was not re-run here. A later game update can still require changes in `tools/cs2py_*.py`, `tools/cs_patches.py` and `sts2sim/rt/patches.py`.*
 - Windows 上没有 fork，带搜索的 AI 不可用；`tools/batch.py` 命令行只支持 Linux/macOS。
 - 图形界面第一次生成数据时（1–2 分钟）只有一个「请稍候」提示框，没有进度条。
 - 和真实游戏 DLL 的对拍（第三方无头工具 sts2-cli，100 场幕 1 战斗逐步对照）：0.1.1 里 97 场完全一致。剩下 3 场都是储君的 Tyranny / Foregone Conclusion：

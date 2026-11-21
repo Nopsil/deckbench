@@ -862,7 +862,7 @@
  "prev.confidence.failed": "이 막의 맵을 만들지 못했습니다",
  "prev.err.need_seed": "먼저 시드를 입력하세요.",
  "prev.err.bad_asc": "승천은 0에서 10 사이여야 합니다.",
- "prev.err.bad_char": "시드 미리보기는 기본 캐릭터 다섯 명만 지원하며 {char}은(는) 지원하지 않습니다.",
+ "prev.err.bad_char": "시드 미리보기에 {char} 이(가) 없습니다. 목록은 이 설치의 플레이 가능 캐릭터입니다.",
  "prev.err.bad_neow": "시작 선택지는 first, all, none 또는 번호여야 합니다.",
  "prev.err.no_engine": "로컬 게임 로직이 아직 없어 맵을 만들 수 없습니다. 먼저 설치된 게임에서 데이터를 생성하세요. {err}",
  "prev.err.failed": "미리보기 실패: {err}",

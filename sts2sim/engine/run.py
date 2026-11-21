@@ -10,10 +10,48 @@ import time
 from ..rt.boot import game as G
 from ..rt.prelude import Dummy
 from . import combat as C
+from .characters import map_from_models
 from .manager import SimRunManager, RunOver
 
-CHARACTERS = {"Ironclad": G.Ironclad, "Silent": G.Silent, "Defect": G.Defect,
-              "Necrobinder": G.Necrobinder, "Regent": G.Regent}
+
+def _fallback_characters():
+    """生成代码没有 AllCharacters 时，沿用这份安装里仍能按类名找到的角色。"""
+    out = {}
+    for name in ("Ironclad", "Silent", "Defect", "Necrobinder", "Regent"):
+        cls = getattr(G, name, None)
+        if isinstance(cls, type):
+            out[name] = cls
+    return out
+
+
+def _character_models():
+    seq = getattr(G.ModelDb, "AllCharacters", None)
+    if seq is None:
+        return None
+    try:
+        return list(G._iter(seq))
+    except TypeError:
+        return None
+
+
+# 键是生成类的名字（Ironclad、Fool…）。模组可以再往这个字典里加角色。
+CHARACTERS = map_from_models(_character_models(), _fallback_characters)
+# 导入完成时的原版名单。后面模组写入 CHARACTERS 不会改这张快照。
+BASE_CHARACTERS = list(CHARACTERS)
+
+
+def _param_count(fn):
+    target = getattr(fn, "__func__", fn)
+    code = getattr(target, "__code__", None)
+    return code.co_argcount if code is not None else 0
+
+
+def _create_run_state(players, acts, modifiers, game_mode, ascension, seed):
+    """v0.113.1 在进阶前多了 isCustom。普通一局不是自定义局。旧生成代码没有这个参数。"""
+    fn = G.RunState.CreateForNewRun
+    if _param_count(fn) >= 7:
+        return fn(players, acts, modifiers, game_mode, False, ascension, seed)
+    return fn(players, acts, modifiers, game_mode, ascension, seed)
 
 
 class Selector(G.CsObject):
@@ -84,8 +122,12 @@ class RunDriver:
         G.LocalContext.NetId = 1
         G.CombatManager.Instance = G.CombatManager()
         sel = Selector(self.agent)
-        G.CardSelectCmd._selectorStack.Clear()
-        G.CardSelectCmd._selectorStack.Push(sel)
+        self.selector = sel
+        # v0.111 及更早：选牌器在 CardSelectCmd 的静态栈上。v0.113.1 改到 RunManager.CardSelectorStack，在建局时压入。
+        stack = getattr(G.CardSelectCmd, "_selectorStack", None)
+        if stack is not None:
+            stack.Clear()
+            stack.Push(sel)
         ch_cls = CHARACTERS.get(self.character) if isinstance(self.character, str) else self.character
         ch = G.ModelDb.Character(_g=(ch_cls,))
         player = G.Player.CreateForNewRun(ch, G.UnlockState.all_, 1)
@@ -96,8 +138,8 @@ class RunDriver:
         for group in G.ModelDb.ActsByIndex:
             cands = G.Seq([a for a in group if a.IsUnlocked(G.UnlockState.all_)])
             acts.append(rng.NextItem(cands))
-        state = G.RunState.CreateForNewRun(G.Seq([player]), G.Seq([a.ToMutable() for a in acts]), G.Seq(),
-                                           G.GameMode.Standard, self.ascension, self.seed)
+        state = _create_run_state(G.Seq([player]), G.Seq([a.ToMutable() for a in acts]), G.Seq(),
+                                  G.GameMode.Standard, self.ascension, self.seed)
         for h in self.setup_hooks:
             h(state, player)
         mgr.SetUpNewSinglePlayer(state)
@@ -234,12 +276,19 @@ class RunDriver:
                 break
 
     def _shop(self, room):
-        inv = room.GetLocalInventory()   # v0.111：每个玩家一份商店库存
+        # v0.111：库存在房间上。v0.113.1：进房时 MerchantSynchronizer 已经建好库存。
+        if hasattr(type(room), "GetLocalInventory"):
+            inv = room.GetLocalInventory()
+        else:
+            inv = self.mgr.MerchantSynchronizer.GetLocalInventory()
         for _ in range(12):
             bought = False
             for e in self.agent.shop(inv, self):
                 if e.IsStocked and e.EnoughGold:
-                    if e.OnTryPurchaseWrapper(inv):
+                    buy = getattr(e, "OnTryPurchaseWrapper", None)
+                    if buy is None:
+                        buy = getattr(e, "OnTryPurchaseUnsynchronized", None)
+                    if buy is not None and buy(inv):
                         bought = True
             if not bought:
                 break

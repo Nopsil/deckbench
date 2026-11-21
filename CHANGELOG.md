@@ -1,10 +1,19 @@
 # 更新日志 / Changelog
 
-## 未发布 / Unreleased
+## 0.1.6（2026-11-21） / 0.1.6 (2026-11-21)
 
-版本号仍是 `0.1.5`，没有打标签，也没有发布。这一节是卡牌编辑器和失败回放，还在 `main` 之外。
+0.1.6 于 2026-11-21 发布。它带上 0.1.5 之后的两块：界面里的自定义卡牌编辑器和失败回放，以及整局模拟对本机当前游戏安装的适配。版本号写在 `sts2sim.__version__`。Windows 安装包的文件名是 `DeckBench-0.1.6-win64.zip`。发布说明在 `docs/RELEASE_0.1.6.md`。
 
-*The version is still `0.1.5`. There is no tag and no release. This section is the card editor and the loss replay, and it is not on `main` yet.*
+这一版不是真机通关，也不是游戏全部内容都已支持。Mac 上用真实 v0.113.1 public-beta（Steam build 26660232，commit `d09d48e5`，osx-arm64 `sts2.dll` SHA-256 `a671e9efb86a7b80405133105665867b053c787670d475b4347cf5ccc15cb5fb`）生成过缓存，并用生成出来的代码跑过整局模拟，六个可玩角色的进阶 10 测试通过。Windows 上的 GitHub CI（pytest）通过；同一次 Steam build 的 Windows `sts2.dll`（SHA-256 `62ecbe91093e1fa862de4329aac865209dcb297804caf0f0520d92d8c0b4a9c3`）没有拿到，没有用它生成或开局。旧的 YAML 战斗模拟器仍然需要一份当前的 spire-codex。mentor 的网络仍只覆盖原来的五个角色。事件、卡牌、遗物和药水没有逐项和客户端对齐。旧的 DeckBench 缓存没有 `translator_rev` 3，要用你自己的安装重新运行 `python -m sts2sim.gamedata setup`。仓库和安装包不含游戏 DLL、完整本地化或反编译正文。
+
+*0.1.6 was released on 2026-11-21. It includes the two pieces that followed 0.1.5: the GUI custom-card editor and loss replay, and full-run adaptation to the game install on your machine. The version is `sts2sim.__version__`. The Windows package file is `DeckBench-0.1.6-win64.zip`. Notes: `docs/RELEASE_0.1.6.md`.*
+
+*This release is not a cleared run in the real game, and it is not support for every piece of game content. A real Mac v0.113.1 public-beta install (Steam build 26660232, commit `d09d48e5`, osx-arm64 `sts2.dll` SHA-256 `a671e9efb86a7b80405133105665867b053c787670d475b4347cf5ccc15cb5fb`) was used to generate a cache, and full-run simulations from that generated code passed, including ascension 10 for each of the six playable characters. Windows GitHub CI (pytest) passed. The Windows `sts2.dll` for that same Steam build (SHA-256 `62ecbe91093e1fa862de4329aac865209dcb297804caf0f0520d92d8c0b4a9c3`) was not available and was not used to generate or play a run. The legacy YAML combat simulator still needs a current spire-codex. Mentor networks still cover only the previous five characters. Events, cards, relics and potions were not checked one by one against the client. An older DeckBench cache without `translator_rev` 3 must be regenerated with `python -m sts2sim.gamedata setup` from your own install. The repository and the package do not contain the game DLL, full localization, or decompiled bodies.*
+
+### 当前游戏安装
+
+- **整局模拟从本机 `sts2.dll` 生成，角色名单跟着这份安装走。** 缓存仍按 DLL 的 SHA-256 分目录，并记下 `release_info`。转译器修订号是 `translator_rev` 3；旧缓存没有这个字段，或数字不同，就拒绝加载，要用同一台机器上的安装重新 `python -m sts2sim.gamedata setup`。可玩角色读生成代码里的 `ModelDb.AllCharacters`，`IsPlayable` 为假的不收。没有这份属性时，才退回安装里仍能按类名找到的 Ironclad、Silent、Defect、Necrobinder、Regent。种子预览、批量跑和 MCP 开局用的是这张名单，不把安装里没有的角色写死进去。图形界面的种子预览在目录提供 `base_characters` 时用它，否则仍是原来的五个。见 [docs/GAME_SUPPORT.md](docs/GAME_SUPPORT.md)。
+  *A full run is generated from the local `sts2.dll`. The cache directory is still the DLL's SHA-256, and the manifest still stores `release_info`. Translator revision `translator_rev` is 3. A cache without that field, or with a different number, is refused; regenerate with `python -m sts2sim.gamedata setup` from the install on that machine. Playable characters are `ModelDb.AllCharacters` in the generated code. A model with `IsPlayable` false is left out. If that property is absent, the fallback is whichever of Ironclad, Silent, Defect, Necrobinder and Regent that install still defines by class name. Seed preview, batch and MCP new-run use that list. They do not hard-code a character the install does not have. The seed-preview page uses `base_characters` when the catalog sends it, and otherwise keeps the previous five. See [docs/GAME_SUPPORT.md](docs/GAME_SUPPORT.md).*
 
 ### 自定义卡牌
 

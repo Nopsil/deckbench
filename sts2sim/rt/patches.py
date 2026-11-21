@@ -248,8 +248,17 @@ def _cs_iter_hook_listeners(self):
                     if e is not None:
                         app(e)
         ext(self.Modifiers)
-        if self.MultiplayerScalingModel is not None:
-            app(self.MultiplayerScalingModel)
+        # v0.111 把多人缩放模型放在战斗状态上。v0.113.1 改成徽章、RunModel 和 Dominion，旧字段没有了。
+        scaling = getattr(self, "MultiplayerScalingModel", None)
+        if scaling is not None:
+            app(scaling)
+        for name in ("BadgeModels", "RunModels"):
+            extra = getattr(self, name, None)
+            if extra:
+                ext(extra)
+        dominion = getattr(self, "Dominion", None)
+        if dominion is not None:
+            app(dominion)
         for item in lst:
             if _cs_contains(self, item):
                 yield item
@@ -260,6 +269,19 @@ def _cs_iter_hook_listeners(self):
 
 game.CombatState.Contains = _cs_contains
 game.CombatState.IterateHookListeners = _cs_iter_hook_listeners
+
+
+# 空的目标列表看不出元素类型。Creature 和 DamageTargetData 两个重载分数相同，
+# 先列出的 Creature 重载会把空列表再包一层然后调回自己。没有目标就没有伤害结果。
+_damage_list = getattr(game.CreatureCmd, "Damage__PlayerChoiceContext_IEnumerableOfCreature_decimal_ValueProp_Creature_CardModel_CardPlay_ModifyDamageHookType", None)
+if _damage_list is not None:
+    def _damage_list_guard(choiceContext, targets, amount, props, dealer, cardSource, cardPlay, modifyDamageHookType=None):
+        if targets is None or (hasattr(targets, "__len__") and len(targets) == 0):
+            return game.Seq()
+        if modifyDamageHookType is None:
+            return _damage_list(choiceContext, targets, amount, props, dealer, cardSource, cardPlay)
+        return _damage_list(choiceContext, targets, amount, props, dealer, cardSource, cardPlay, modifyDamageHookType)
+    game.CreatureCmd.Damage__PlayerChoiceContext_IEnumerableOfCreature_decimal_ValueProp_Creature_CardModel_CardPlay_ModifyDamageHookType = _damage_list_guard
 
 
 # ---- 重载分派：PowerCmd.Remove(null) ----

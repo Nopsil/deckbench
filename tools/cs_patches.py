@@ -42,6 +42,18 @@ PATCHES = [
      r"\t\tif \(localTask == null\)\n\t\t\{\n\t\t\tthrow new InvalidOperationException\([^\n]*\);\n\t\t\}\n", ""),
     # v0.111 CardModel.CardScope：((ICardScope)(expr)) 接口强转被误转成调用
     ("Models/CardModel.cs", r"\(\(ICardScope\)\(_owner\?\.Creature\.CombatState\)\)", "(_owner?.Creature.CombatState)"),
+    # v0.113.1 FromMutableDeckCard：反编译把“空牌或已在牌组”收成 goto。flag 为真才抛。
+    # 只替换跳转阶梯，留下后面的 throw 和构造结果。末尾的 IL_0025 标签单独删掉。
+    ("GameActions/PlayerChoiceResult.cs",
+     r"\t\tif \(deckCard == null\)\n\t\t\{\n\t\t\tgoto IL_0025;\n\t\t\}\n"
+     r"\t\tCardPile pile = deckCard\.Pile;\n"
+     r"\t\tif \(pile != null\)\n\t\t\{\n\t\t\tPileType type = pile\.Type;\n"
+     r"\t\t\tif \(type == PileType\.Deck\)\n\t\t\t\{\n\t\t\t\tgoto IL_0025;\n\t\t\t\}\n\t\t\}\n"
+     r"\t\tbool flag = true;\n\t\tgoto IL_0027;\n\t\tIL_0027:\n",
+     "\t\tbool flag = deckCard != null && (deckCard.Pile == null || deckCard.Pile.Type != PileType.Deck);\n"),
+    ("GameActions/PlayerChoiceResult.cs",
+     r"\t\tIL_0025:\n\t\tflag = false;\n\t\tgoto IL_0027;\n",
+     ""),
 ]
 
 

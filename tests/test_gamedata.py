@@ -22,7 +22,8 @@ def env(tmp_path, monkeypatch):
 def _fake_cache(dll, cache):
     d = cache / "x"
     d.mkdir(parents=True)
-    json.dump({"format": gd.FORMAT, "dll_path": str(dll), "dll_sha256": gd.sha256(str(dll))}, open(d / "manifest.json", "w"))
+    json.dump({"format": gd.FORMAT, "translator_rev": gd.TRANSLATOR_REV, "dll_path": str(dll),
+               "dll_sha256": gd.sha256(str(dll))}, open(d / "manifest.json", "w"))
     json.dump({"cache_dir": str(d)}, open(cache / "current.json", "w"))
     return str(d)
 
@@ -54,6 +55,16 @@ def test_cache_bound_to_install_hash(env):
     assert gd.verify() == d
     dll.write_bytes(b"fake dll v2")           # 游戏更新 / 换了文件 → 拒绝加载
     with pytest.raises(gd.GameDataError, match="refusing"):
+        gd.verify()
+
+
+def test_cache_without_translator_rev_is_outdated(env):
+    game, dll, cache = env
+    d = _fake_cache(dll, cache)
+    m = json.load(open(os.path.join(d, "manifest.json")))
+    del m["translator_rev"]
+    json.dump(m, open(os.path.join(d, "manifest.json"), "w"))
+    with pytest.raises(gd.GameDataError, match="outdated"):
         gd.verify()
 
 

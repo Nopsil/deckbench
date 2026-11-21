@@ -48,6 +48,15 @@ from sts2sim.engine.seed import canonicalize, warnings as seed_warnings  # noqa:
 
 RUNS = os.environ.get("DECKBENCH_MCP_RUNS") or os.path.join(__import__("sts2sim.gamedata").gamedata.cache_root(), "mcp_runs")
 CHARS = ["Ironclad", "Silent", "Defect", "Necrobinder", "Regent"]
+
+
+def _playable_characters():
+    """本机生成代码里的可玩角色。没有缓存时退回 CHARS，不凭空加上安装里没有的角色。"""
+    try:
+        from sts2sim.engine.run import BASE_CHARACTERS
+    except (ModuleNotFoundError, ImportError):
+        return list(CHARS)
+    return list(BASE_CHARACTERS) or list(CHARS)
 PERSONAS = {
     "qianwen": "千问娘：国风元气大小姐，爱冒险、嘴硬，理由用一句不超过 30 字的俏皮中文台词。",
     "juggler": ("杂耍流铁甲战士：优先拿杂耍（JUGGLING），偏好多段攻击和反直觉的组合。JUGGLING 见到就拿、商店必买、火堆先升级 JUGGLING 拿固有；"
@@ -381,6 +390,7 @@ def seed_preview_schema() -> str:
         "keys": list(PUBLIC_KEYS),
         "neow": ["first", "all", "none", "<index>"],
         "character": list(CHARS),
+        "character_source": "ModelDb.AllCharacters on the local install; this list is only the fallback when no cache is loaded",
         "ascension": {"min": 0, "max": 10},
     }
     return json.dumps(body, ensure_ascii=False, indent=1) + "\n"
@@ -881,14 +891,15 @@ def build(host="127.0.0.1", port=8765, host_check=True):
 
     @mcp.tool()
     def new_run(seed: str, character: str = "Ironclad", ascension: int = 0, persona: str = "", style: str = "") -> str:
-        """开新的一局。seed：游戏里的种子（自动按游戏规则规范化：大写、O→0、I→1）；character：Ironclad/Silent/Defect/Necrobinder/Regent；
+        """开新的一局。seed：游戏里的种子（自动按游戏规则规范化：大写、O→0、I→1）；character：本机安装的可玩角色（没有缓存时是 Ironclad/Silent/Defect/Necrobinder/Regent）；
         ascension：0-10；persona：可选的说话/思路人设，qianwen（千问娘）/ juggler（杂耍流说明，同时把 style 设成 juggler）/ 或直接写一段风格说明；
         style：auto 代打用的打法风格，standard（标准，默认）/ juggler（杂耍流：优先拿 JUGGLING，偏好多段攻击和反直觉的组合，攻击优先、冲精英）。
         list_styles 列出全部打法风格。返回第一个决策。"""
         from sts2sim.engine import style as ST
         with LOCK:
-            if character not in CHARS:
-                return f"角色只能是 {CHARS}"
+            allowed = _playable_characters()
+            if character not in allowed:
+                return f"角色只能是 {allowed}"
             try:
                 sid = ST.resolve(style or (persona if persona in ST.STYLES else ""))
             except ValueError:

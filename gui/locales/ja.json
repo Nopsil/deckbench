@@ -862,7 +862,7 @@
  "prev.confidence.failed": "このアクトのマップは生成できませんでした",
  "prev.err.need_seed": "先にシードを入力してください。",
  "prev.err.bad_asc": "アセンションは 0 から 10 です。",
- "prev.err.bad_char": "シードプレビューはベースの5キャラのみです。{char} は対象外です。",
+ "prev.err.bad_char": "シードプレビューに {char} はありません。一覧はこの環境のプレイ可能キャラクターです。",
  "prev.err.bad_neow": "開始時の選択肢は first、all、none、または番号です。",
  "prev.err.no_engine": "ローカルのゲームロジックがまだ無いのでマップを作れません。先に自分のインストールからデータを生成してください。{err}",
  "prev.err.failed": "プレビューに失敗しました：{err}",

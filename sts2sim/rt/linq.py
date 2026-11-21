@@ -114,6 +114,19 @@ class _Linq:
             raise InvalidOperationException("more than one")
         return r[0] if r else default
 
+    def Order(self, comparer=None, *a, **k):
+        """Enumerable.Order（.NET 7+）。没有比较器时按元素自身排序，和 StringComparer.Ordinal 一样。"""
+        items = list(self)
+        if comparer is None or comparer == 4:
+            items.sort()
+        elif comparer == 5:
+            items.sort(key=lambda s: s.casefold() if isinstance(s, str) else s)
+        elif hasattr(comparer, "Compare"):
+            items.sort(key=functools.cmp_to_key(comparer.Compare))
+        else:
+            items.sort(key=functools.cmp_to_key(comparer))
+        return Seq(items)
+
     def OrderBy(self, f, comparer=None):
         return _Ordered(list(self), [(f, False)])
 

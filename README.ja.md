@@ -121,6 +121,10 @@ Linux/macOS の場合は [docs/DEVELOPER.md](docs/DEVELOPER.md) を参照して�
 - 旧戦闘実験：`python -m sts2sim experiments/quick.yaml --explain`、または実験 YAML の `explain: true` → レポートディレクトリの `explain.jsonl`
 - 1 戦闘を読む：`python tools/explain_fight.py runs.explain.jsonl --fight 0`
 
+## 0.1.6
+
+2026-11-21。リリースノートは [docs/RELEASE_0.1.6.md](docs/RELEASE_0.1.6.md)（中国語・英語。GitHub Release の本文に使えます）。カスタムカード、敗北リプレイ、そして手元のゲームインストールへのラン全体の適応が入ります。実機のクリアではなく、ゲーム内容のすべてに対応したわけでもありません。範囲はノートに書いてあります。
+
 ## 0.1.5 の機能を試す / Try 0.1.5 features
 
 リポジトリのルートで実行します。リリースノートは [docs/RELEASE_0.1.5.md](docs/RELEASE_0.1.5.md)（中国語・英語。GitHub Release の本文にそのまま使えます）。

@@ -23,7 +23,22 @@ import time
 
 from sts2sim.engine.seed import SEED_CHARS, SEED_LEN, canonicalize
 
+# 没有本机游戏数据时，种子预览的说明仍列出这五个旧角色。真正开预览时用安装里的 AllCharacters。
 CHARS = ["Ironclad", "Silent", "Defect", "Necrobinder", "Regent"]
+
+
+def character_ids():
+    """本机生成代码里的可玩角色。游戏模块载入不了，或测试换成了空的 boot 时，退回 CHARS。"""
+    import sys
+    boot = sys.modules.get("sts2sim.rt.boot")
+    game = getattr(boot, "game", None) if boot is not None else None
+    if game is None or not hasattr(game, "ModelDb"):
+        return list(CHARS)
+    try:
+        from sts2sim.engine.run import BASE_CHARACTERS
+    except (ModuleNotFoundError, ImportError, AttributeError):
+        return list(CHARS)
+    return list(BASE_CHARACTERS) or list(CHARS)
 
 LIMITS = (
     "full_unlocks",
@@ -427,7 +442,7 @@ def _fresh(char, asc, seed):
 
 
 def _request(seed, char, asc, neow):
-    if char not in CHARS:
+    if char not in character_ids():
         raise PreviewError("bad_char", char=str(char))
     try:
         asc = int(asc)

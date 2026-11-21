@@ -121,6 +121,10 @@ Linux/macOS는 [docs/DEVELOPER.md](docs/DEVELOPER.md)를 참고하세요.
 - 옛 전투 실험: `python -m sts2sim experiments/quick.yaml --explain`, 또는 실험 YAML의 `explain: true` → 보고서 디렉터리의 `explain.jsonl`
 - 전투 하나 읽기: `python tools/explain_fight.py runs.explain.jsonl --fight 0`
 
+## 0.1.6
+
+2026-11-21. 릴리스 노트는 [docs/RELEASE_0.1.6.md](docs/RELEASE_0.1.6.md)입니다 (중국어·영어. GitHub Release 본문으로 쓸 수 있습니다). 사용자 카드, 패배 리플레이, 그리고 이 컴퓨터의 게임 설치에 맞춘 런 전체가 들어 있습니다. 실제 게임 클리어가 아니고, 게임 내용 전부를 지원한다는 뜻도 아닙니다. 범위는 그 노트에 있습니다.
+
 ## 0.1.5 기능 써 보기 / Try 0.1.5 features
 
 저장소 루트에서 실행합니다. 릴리스 노트는 [docs/RELEASE_0.1.5.md](docs/RELEASE_0.1.5.md)입니다 (중국어·영어. GitHub Release 본문으로 그대로 쓸 수 있습니다).

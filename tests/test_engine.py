@@ -3,10 +3,10 @@ import pytest
 
 pytest.importorskip("sts2sim.gen.game")
 
-from sts2sim.engine.run import play_run  # noqa: E402
+from sts2sim.engine.run import BASE_CHARACTERS, play_run  # noqa: E402
 from sts2sim.engine.gym import Sts2Env  # noqa: E402
 
-CHARS = ["Ironclad", "Silent", "Defect", "Necrobinder", "Regent"]
+CHARS = list(BASE_CHARACTERS)
 
 
 @pytest.mark.parametrize("char", CHARS)

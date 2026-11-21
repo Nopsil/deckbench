@@ -8,6 +8,7 @@
 
 | 文档 | 语言 | 内容 |
 | --- | --- | --- |
+| [RELEASE_0.1.6.md](RELEASE_0.1.6.md) | 中文、English | 0.1.6 发布说明（2026-11-21），可作 GitHub Release 正文。含自定义卡牌、失败回放，以及本机 v0.113.1 整局适配的范围和未验证项。Windows 下载名是 `DeckBench-0.1.6-win64.zip` |
 | [RELEASE_0.1.5.md](RELEASE_0.1.5.md) | 中文、English | 0.1.5 发布说明（2026-11-11），可作 GitHub Release 正文。包括只读导入、种子预览、DLL→YAML、mentor-full、组牌和遭遇、对打、进度和取消、单卡贡献、战斗 workers、本版更新、简体中文 / English 切换、`.deckbench.zip`、空历史页的示例数据，以及最近的修复。Windows 下载是 `DeckBench-0.1.5-win64.zip` |
 | [MOD_AUTHORS.md](MOD_AUTHORS.md) | English | mod 作者入门。示例 `examples/spark/`（Arc、Lantern）。内部 Python 引擎，不需要游戏安装 |
 | [MOD_AUTHORS.zh-CN.md](MOD_AUTHORS.zh-CN.md) | 简体中文 | 同一份入门的简体中文 |
@@ -25,6 +26,7 @@
 | [PERFORMANCE.md](PERFORMANCE.md) | 中文 + English | `python tools/bench.py` 的样本、场/秒和内部战斗引擎改了什么 |
 | [COVERAGE.md](COVERAGE.md) | 中文 + English | 补测试那一次的语句覆盖率快照，以及当时修的五处边界 |
 | [CI.md](CI.md) | 中文 + English | GitHub Actions：Ubuntu / Windows、Python 3.11 与 3.12、pytest-cov 作业摘要、ruff 0.17.4；Ubuntu 上单独的 Playwright 界面冒烟（模块结束时放开事件循环，后面的 asyncio 测试仍能跑）；Windows 安装包工作流、接口冒烟，以及响应的 `charset=utf-8` |
+| [GAME_SUPPORT.md](GAME_SUPPORT.md) | 中文 + English | 本机 `sts2.dll` 生成后实际跑过的版本、角色、模型数量，以及没测或转译失败的部分 |
 | [DEVELOPER.md](DEVELOPER.md) | 中文 + English | 命令行、首次生成、spire-mentor、旧版战斗模拟器、目录、测试。[Windows 打包](DEVELOPER.md#windows-打包版--building-the-windows-package) 含 `dry_check.py`、带 BOM 的 `.ps1`、csproj 注释、从 `sts2sim.__version__` 读取的版本号，和 Actions 工作流。持续集成的说明在 [CI.md](CI.md) |
 | [patches/spire-mentor-v0111-cards.patch](patches/spire-mentor-v0111-cards.patch) | — | 打在你自己的 spire-mentor 克隆上的代码补丁。不含游戏文本或数据 |
 
@@ -32,7 +34,7 @@
 
 | 文档 | 语言 | 内容 |
 | --- | --- | --- |
-| [CHANGELOG.md](../CHANGELOG.md) | 中文 + English | 更新日志。0.1.5（2026-11-11）一节是界面「本版更新」（`#/whatsnew`，`GET /api/changelog`）读的那一节，含示例数据和最近的修复 |
+| [CHANGELOG.md](../CHANGELOG.md) | 中文 + English | 更新日志。界面「本版更新」（`#/whatsnew`，`GET /api/changelog`）读最前面的一节，现在是 0.1.6（2026-11-21） |
 | [README.md](../README.md) | 中文为主，段落附 English | 安装和使用 |
 | [README.en.md](../README.en.md) | English | 同一份说明的英文 |
 | [README.ja.md](../README.ja.md) | 日本語 | 同一份说明的日文 |

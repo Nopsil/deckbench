@@ -391,6 +391,15 @@ def _eq(a, b):
     return a == b
 
 
+def _with(obj, **fields):
+    """C# record 的 with 表达式：浅复制后覆盖列出的字段。"""
+    import copy
+    out = copy.copy(obj)
+    for key, value in fields.items():
+        setattr(out, key, value)
+    return out
+
+
 def _str(x, *fmt):
     if x is None:
         return ""
