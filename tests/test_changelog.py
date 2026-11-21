@@ -63,7 +63,7 @@ def test_latest_section_is_unreleased_card_editor_and_replay():
         for block in blocks
         if block.get("kind") == "h" and block.get("level") == 3
     ]
-    assert headings[:2] == ["自定义卡牌", "失败回放"]
+    assert headings[:3] == ["当前游戏安装", "自定义卡牌", "失败回放"]
     assert "SYN_BRUTE" in text
     assert "raw.jsonl" in text
     assert "界面多语言" not in text
