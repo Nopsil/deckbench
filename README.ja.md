@@ -172,6 +172,8 @@ python tools/calibrate.py path/to/history/123.run path/to/runs.jsonl --json -
 
 ゲームに入っている MOD を、先に YAML で書き直す必要はありません。**MODエディター**の **「ゲームMODを読み込む」** で、その MOD の zip（マニフェスト JSON + DLL）を選ぶか、ゲームの `mods/` にある一覧から選びます。読めたカードはフォームになります。DLL は実行しません。制限は [docs/DLL_MODS.md](docs/DLL_MODS.md)。
 
+1 枚の数値と、戦闘エンジンが既に実行できる効果だけを直して、そのカードを含むデッキをすぐ試すには **カスタムカード**（`#/cards`）です。DLL は作らず、読み込んだファイルのコードも実行しません。説明は [docs/CUSTOM_CARDS.md](docs/CUSTOM_CARDS.md)。敗北で終わった戦闘は **敗北リプレイ**（`#/replay`）で、そのとき記録されたプレイと HP を見られます。[docs/REPLAY.md](docs/REPLAY.md)。
+
 ## AI アシスタントに 1 手ずつプレイさせる（MCP）
 
 Claude や Cursor など MCP に対応した AI アシスタントを使っているなら、シミュレーターの中で実際に 1 ラン遊ばせることができます。盤面を見て、選択肢を選び、理由を書き、やり直しもできます。最後に操作リストを書き出せるので、同じシードで実際のゲームをその通りにプレイできます。

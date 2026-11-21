@@ -23,16 +23,20 @@ from fastapi.responses import (
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict
 
+from . import customcards as customcards_api
 from . import i18n, paths
 from .backend import get_backend
 from .changelog import ChangelogError, load_changelog
 from .jobs import JobManager
 from .modeditor import router as modeditor_router
+from .replay import ReplayError, list_fights, load_trace
 
 backend = get_backend()
 jobs = JobManager(backend)
 app = FastAPI(title="DeckBench GUI")
 app.include_router(modeditor_router)
+app.include_router(customcards_api.router)
+customcards_api.set_starter(lambda kind, params, title, lang=None: jobs.start(kind, params, title, lang=lang))
 T = i18n.t
 
 _VALIDATION_TYPES = {
@@ -626,6 +630,48 @@ def rerun(rid: str):
             raise HTTPException(400, _deck_http(err)) from err
     t = m.get("title") or ""
     return jobs.start(m["kind"], m["params"], (t + T("err.rerunSuffix")) if t else None, lang=i18n.current())
+
+
+def _replay_http(exc):
+    key = {"nofile": "replay.err.noFile", "fight": "replay.err.fight", "read": "replay.err.read",
+           "big": "replay.err.big"}.get(exc.code, "replay.err.read")
+    return T(key)
+
+
+@app.get("/api/runs/{rid}/fights")
+def run_fights(rid: str):
+    """这一次战斗测试的逐场结果，以及有没有记下失败时间线。不重新模拟。"""
+    meta = _need(rid)
+    if meta.get("kind") != "combat":
+        raise HTTPException(400, T("replay.err.notCombat"))
+    if not _settled(meta):
+        raise HTTPException(409, T("replay.err.running"))
+    folder = jobs.run_dir(rid)
+    if not folder:
+        raise HTTPException(404, T("replay.err.noFile"))
+    try:
+        return list_fights(folder)
+    except ReplayError as exc:
+        status = 404 if exc.code == "nofile" else 400
+        raise HTTPException(status, _replay_http(exc)) from None
+
+
+@app.get("/api/runs/{rid}/trace/{index}")
+def run_trace(rid: str, index: int):
+    """一场战斗记下的时间线。旧结果、没输掉的场、超出保存上限的场会说明原因。"""
+    meta = _need(rid)
+    if meta.get("kind") != "combat":
+        raise HTTPException(400, T("replay.err.notCombat"))
+    if not _settled(meta):
+        raise HTTPException(409, T("replay.err.running"))
+    folder = jobs.run_dir(rid)
+    if not folder:
+        raise HTTPException(404, T("replay.err.noFile"))
+    try:
+        return load_trace(folder, index)
+    except ReplayError as exc:
+        status = 404 if exc.code in ("nofile", "fight") else 400
+        raise HTTPException(status, _replay_http(exc)) from None
 
 
 @app.get("/api/runs/{rid}/summary")

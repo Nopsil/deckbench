@@ -51,12 +51,10 @@ def _hrefs(node, out):
             _hrefs(value, out)
 
 
-def test_latest_section_is_015_and_stops_before_014():
+def test_latest_section_is_unreleased_card_editor_and_replay():
     parsed = load_changelog("0.1.5", CHANGELOG)
     assert parsed["version"] == "0.1.5"
-    assert parsed["heading"] == "0.1.5（2026-11-11） / 0.1.5 (2026-11-11)"
-    assert "未发布" not in parsed["heading"]
-    assert "Unreleased" not in parsed["heading"]
+    assert parsed["heading"] == "未发布 / Unreleased"
     blocks = []
     _walk(parsed["blocks"], blocks)
     text = json.dumps(parsed, ensure_ascii=False)
@@ -65,21 +63,16 @@ def test_latest_section_is_015_and_stops_before_014():
         for block in blocks
         if block.get("kind") == "h" and block.get("level") == 3
     ]
-    assert headings[0] == "修复"
-    assert "示例数据" in headings
-    for title in ("结果包", "中英切换", "战斗进程", "版本号和检查更新", "单卡贡献", "测试进度和取消", "组牌对打"):
-        assert title in headings
+    assert headings[:2] == ["自定义卡牌", "失败回放"]
+    assert "SYN_BRUTE" in text
+    assert "raw.jsonl" in text
     assert "界面多语言" not in text
     assert "未发布（0.1.4）" not in text
     assert "未发布（0.1.5）" not in text
-    assert "Unreleased (0.1.5)" not in text
-    assert "载入示例数据" in text
-    assert "sample.deckbench.zip" in text
-    assert "BCP-47" in text
-    assert "部分结果" in text
-    assert "preset.yaml" in text
-    assert "raw.jsonl" in text
-    assert "<id>" in text
+    with open(CHANGELOG, encoding="utf-8") as handle:
+        full = handle.read()
+    assert "0.1.5（2026-11-11）" in full
+    assert "战斗进程" in full
     assert all(not str(href).lower().startswith("javascript:") for href in _collect(parsed))
 
 
@@ -163,7 +156,8 @@ def test_api_changelog_is_json_without_a_stack():
     assert "text/html" not in res.headers["content-type"]
     body = res.json()
     assert body["version"] == "0.1.5"
-    assert "战斗进程" in json.dumps(body, ensure_ascii=False)
+    assert body["heading"] == "未发布 / Unreleased"
+    assert "自定义卡牌" in json.dumps(body, ensure_ascii=False)
     raw = res.text.lower()
     assert "<script" not in raw
     assert "traceback" not in raw

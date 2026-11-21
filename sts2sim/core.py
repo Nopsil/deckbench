@@ -29,6 +29,8 @@
 import random
 from types import FunctionType, ModuleType, SimpleNamespace
 
+from . import fighttrace
+
 ACTION_CAP_DEFAULT = 200
 
 
@@ -307,6 +309,9 @@ class Combat:
         self.result = None
         self._clone_n = 0
         self.log = None                   # list 时记录文字日志
+        self.trace = None                 # list 时记录结构化时间线；前瞻副本保持 None
+        self._trace_truncated = False
+        self._tracing_hit = False
         self.loop_alarm = None
 
     # ---------- 复制（AI 前瞻用）
@@ -322,6 +327,8 @@ class Combat:
         new.stats = None
         new.is_sim = True
         new.log = None
+        new.trace = None
+        new._tracing_hit = False
         new.cards_played_turn = list(self.cards_played_turn)
         new.play_stack = []
         new.attr = []
@@ -452,7 +459,13 @@ class Combat:
                 a = min(osty, unblocked)
                 self.data["osty_hp"] = osty - a
                 unblocked -= a
-        lost = self.lose_hp(target, unblocked, src, kind)
+        self._tracing_hit = True
+        try:
+            lost = self.lose_hp(target, unblocked, src, kind)
+        finally:
+            self._tracing_hit = False
+        if self.trace is not None and not self.is_sim and lost + blocked > 0:
+            fighttrace.note_damage(self, src, target, dmg, blocked, lost, kind)
         if kind == "attack" and src is not None:
             self.emit("attacked", attacker=src, target=target, damage=dmg, unblocked=unblocked, card=card)
         if src is not None and src.is_player and not target.is_player and self.stats is not None:
@@ -481,6 +494,8 @@ class Combat:
         target.hp = max(0, target.hp - lost)
         if lost > 0:
             self.emit("damage_taken", target=target, amount=lost, src=src, kind=kind)
+            if self.trace is not None and not self.is_sim and not self._tracing_hit:
+                fighttrace.note_hp_loss(self, target, lost, kind)
         if target.hp <= 0 and target.alive:
             self.kill(target)
         return lost
@@ -528,6 +543,8 @@ class Combat:
         if c.is_player and self.stats is not None:
             self.stats.rec(self.cur_attr(), blk=amount)
         self.emit("block_gained", creature=c, amount=amount)
+        if self.trace is not None and not self.is_sim:
+            fighttrace.note_block(self, c, amount)
         return amount
 
     # ---------- 能力
@@ -554,6 +571,8 @@ class Combat:
                 del target.powers["ARTIFACT"]
             self.emit("power_blocked", target=target, pid=pid, source=source)
             self.say(f"人工制品抵消了 {target.name} 的 {pid}")
+            if self.trace is not None and not self.is_sim:
+                fighttrace.note_power(self, target, pid, 0, target.amt("ARTIFACT"), blocked=True)
             return 0
         if not secondary:
             ev = self.emit("modify_apply", target=target, pid=pid, amount=amount, source=source,
@@ -578,6 +597,8 @@ class Combat:
             self.say(f"{target.name} +{delta} {pid}（共{p.amount}）")
             self.emit("power_applied", target=target, pid=pid, delta=delta, source=source,
                       active=active, secondary=secondary, multi=multi)
+        if self.trace is not None and not self.is_sim and delta:
+            fighttrace.note_power(self, target, pid, delta, p.amount if pid in target.powers else 0)
         return delta
 
     def remove_power(self, target, pid, n=None, source=None):
@@ -593,6 +614,9 @@ class Combat:
             self.say(f"{target.name} 清除 {removed} {pid}")
             self.emit("power_removed", target=target, pid=pid, removed=removed, source=source,
                       active=self.source_active(source))
+            if self.trace is not None and not self.is_sim:
+                left = target.powers[pid].amount if pid in target.powers else 0
+                fighttrace.note_power(self, target, pid, -removed, left)
         return removed
 
     def set_stacks(self, target, pid, value, op="set", artifact_blocks=False):
@@ -792,6 +816,8 @@ class Combat:
         self.draw(ev.n)
         self.data["_drawing_turn"] = False
         self.emit("after_draw_turn")
+        if self.trace is not None and not self.is_sim:
+            fighttrace.note_turn(self)
 
     def end_player_turn(self):
         P = self.player
@@ -890,4 +916,6 @@ class Combat:
                 break
             self.end_player_turn()
             self.enemy_phase()
+        if self.trace is not None and not self.is_sim:
+            fighttrace.note_end(self)
         return self.result

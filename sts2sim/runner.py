@@ -52,7 +52,7 @@ class Dummy(EN.Enemy):
 
 
 def run_fight(mod_names, deck_id, act, room, idx, seed, agent_name="heuristic", max_turns=30,
-              encounter_id=None, log=False, agent_kw=None, potions=None, explain=None):
+              encounter_id=None, log=False, agent_kw=None, potions=None, explain=None, record_trace=True):
     from . import explain as EX
     if explain is None:
         explain = EX.requested(False)
@@ -62,7 +62,7 @@ def run_fight(mod_names, deck_id, act, room, idx, seed, agent_name="heuristic", 
                    encounter=None if encounter_id is None else str(encounter_id))
     try:
         out = _run_fight(mod_names, deck_id, act, room, idx, seed, agent_name, max_turns,
-                         encounter_id, log, agent_kw, potions)
+                         encounter_id, log, agent_kw, potions, record_trace)
     finally:
         if explain:
             rows = EX.take()
@@ -75,7 +75,7 @@ def run_fight(mod_names, deck_id, act, room, idx, seed, agent_name="heuristic", 
 
 
 def _run_fight(mod_names, deck_id, act, room, idx, seed, agent_name="heuristic", max_turns=30,
-               encounter_id=None, log=False, agent_kw=None, potions=None):
+               encounter_id=None, log=False, agent_kw=None, potions=None, record_trace=False):
     # 牌的 uid 只在本场递增。否则同一进程里前面的场次会把计数器留到下一场，
     # 换 --workers / --jobs 就会改 uid 序列。
     Card._uid[0] = 0
@@ -87,6 +87,11 @@ def _run_fight(mod_names, deck_id, act, room, idx, seed, agent_name="heuristic",
     if encounter_id == "DUMMY":
         enemies = [Dummy()]
         enc_name = "木桩"
+    elif encounter_id == "SYN_BRUTE":
+        # 卡牌测试用的合成蛮兵，和 fightcheck 里的是同一只。不是游戏遭遇，也不进遭遇名单。
+        from .fightcheck import FOES
+        enemies = [EN.Enemy(FOES[0], rng)]
+        enc_name = FOES[0].name
     else:
         if encounter_id:
             enc = [e for e in EN.load_db()["encounters"] if e["id"] == encounter_id][0]
@@ -102,6 +107,8 @@ def _run_fight(mod_names, deck_id, act, room, idx, seed, agent_name="heuristic",
     C.data["_room"] = room
     if log:
         C.log = []
+    if record_trace:
+        C.trace = []
     start_hp = P.hp
     enemy_hp0 = sum(e.hp for e in enemies)
     t0 = time.perf_counter()
@@ -117,6 +124,11 @@ def _run_fight(mod_names, deck_id, act, room, idx, seed, agent_name="heuristic",
         out["extra"] = C.data["_extra"]   # mod 钩子自定义统计（可 JSON 序列化）
     if log:
         out["log"] = C.log
+    if record_trace:
+        from .fighttrace import pack
+        packed = pack(C, res)
+        if packed is not None:
+            out["trace"] = packed
     return out
 
 
@@ -201,6 +213,8 @@ def run_experiment(path, fights=None, jobs=None, seed=None, agent=None, out_dir=
     if explain:
         meta["explain"] = True
     explain_rows = []
+    from .fighttrace import cap_loss_traces
+    results = cap_loss_traces(results)
     with open(os.path.join(out_dir, "raw.jsonl"), "w", encoding="utf-8") as f:
         for r in results:
             r = dict(r)

@@ -53,6 +53,9 @@ def use_potion(C, idx, target=None):
     if C.stats is not None:
         C.stats.rec("药水：" + d.name, plays=1, energy=0)
     C.say(f"使用药水 {d.name}" + (f" → {target.name}" if target is not None else ""))
+    if C.trace is not None and not C.is_sim:
+        from . import fighttrace
+        fighttrace.note_potion(C, d.name, target)
     run_effects(ctx, d.effects)
     C.pop_attr()
     C.emit("potion_used", potion=pid)

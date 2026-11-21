@@ -4,6 +4,7 @@
       <n-select v-model:value="sel" :options="runOptions" filterable :placeholder="t('rep.pick')" style="max-width:560px" @update:value="(v) => $router.push('/report/' + v)" />
       <div v-if="meta" class="row">
         <n-button secondary size="small" @click="openFolder"><template #icon><n-icon :component="Folder" /></template>{{ t('common.openFolder') }}</n-button>
+        <n-button v-if="S && meta.kind === 'combat'" secondary size="small" data-testid="open-replay" @click="$router.push('/replay/' + id)">{{ t('replay.open') }}</n-button>
         <n-button v-if="S" secondary size="small" tag="a" download data-action="export" :href="exportHref"><template #icon><n-icon :component="FileExport" /></template>{{ t('export.button') }}</n-button>
         <n-button v-if="S" secondary size="small" tag="a" download data-action="bundle" :href="bundleHref"><template #icon><n-icon :component="Download" /></template>{{ t('bundle.download') }}</n-button>
         <n-button secondary size="small" tag="a" :href="`/api/runs/${id}/files/${meta.kind === 'batch' ? 'runs.jsonl' : 'cells.csv'}`"><template #icon><n-icon :component="Download" /></template>{{ meta.kind === 'batch' ? t('rep.rawData') : 'cells.csv' }}</n-button>

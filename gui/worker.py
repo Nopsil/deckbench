@@ -327,6 +327,8 @@ def cmd_combat(a):
     if explain_on:
         meta["explain"] = True
     explain_rows = []
+    from sts2sim.fighttrace import cap_loss_traces
+    results = cap_loss_traces(results)
     with open(os.path.join(a.out, "raw.jsonl"), "w", encoding="utf-8") as f:
         for r in results:
             r = dict(r)

@@ -33,6 +33,7 @@
               <n-button secondary @click="rerun"><template #icon><n-icon :component="Refresh" /></template>{{ t('common.rerun') }}</n-button>
               <n-button v-if="settled" secondary tag="a" download data-action="export" :href="exportHref"><template #icon><n-icon :component="FileExport" /></template>{{ t('export.button') }}</n-button>
               <n-button v-if="settled" secondary tag="a" download data-action="bundle" :href="bundleHref"><template #icon><n-icon :component="FileExport" /></template>{{ t('bundle.download') }}</n-button>
+              <n-button v-if="settled && meta.kind === 'combat'" secondary data-testid="open-replay" @click="$router.push('/replay/' + id)">{{ t('replay.open') }}</n-button>
               <n-button v-if="settled" type="primary" @click="$router.push('/report/' + id)"><template #icon><n-icon :component="ChartBar" /></template>{{ t('run.viewReport') }}</n-button>
             </template>
           </div>

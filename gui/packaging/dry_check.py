@@ -60,6 +60,8 @@ FRONTEND_PAGES = (
     "gui/web/src/pages/Compare.vue",
     "gui/web/src/pages/Decks.vue",
     "gui/web/src/pages/WhatsNew.vue",
+    "gui/web/src/pages/CustomCards.vue",
+    "gui/web/src/pages/Replay.vue",
 )
 DECOMPILER_SOURCES = (
     "gui/packaging/decompiler/Program.cs",

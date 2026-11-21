@@ -1,5 +1,21 @@
 # 更新日志 / Changelog
 
+## 未发布 / Unreleased
+
+版本号仍是 `0.1.5`，没有打标签，也没有发布。这一节是卡牌编辑器和失败回放，还在 `main` 之外。
+
+*The version is still `0.1.5`. There is no tag and no release. This section is the card editor and the loss replay, and it is not on `main` yet.*
+
+### 自定义卡牌
+
+- **可以在界面里编写战斗引擎能跑的牌，保存后再打开，并直接测试一套含这张牌的牌组。** 侧栏「自定义卡牌」（`#/cards`）。数值、费用、关键词和效果走 `sts2sim/modfmt/schema.py` 里已经有的卡牌字段。效果只列出战斗引擎会执行的 op 和模板。`py`、Python 钩子和属性访问表达式会被拒绝，导入的 zip 或 YAML 也不会被执行。模板在写给战斗引擎的 `cards.yaml` 里展开成 op，编辑器重新打开时仍是原来的模板。保存的是用户 mod 目录里的数据，不改 `mods/` 里的出厂 mod，也不改已有预设的种子。测试用现有的战斗预设和 `POST /api/runs`：训练木桩 `DUMMY`，或测试里已有的合成蛮兵 `SYN_BRUTE`（不是游戏遭遇，也不进遭遇名单）。木桩不攻击，所以只有牌组自己扣血才会在木桩上失败。一次测试最多 8 场、回合上限 30。`once` 会保存，但战斗测试不会按它少结算。没有实现的能力 id 只会记层数。见 `docs/CUSTOM_CARDS.md`。
+  *A card the combat engine can run can be written in the GUI, saved, opened again, and tested in a deck that contains it. **Custom cards** (`#/cards`) uses the card fields already in `sts2sim/modfmt/schema.py`. The effect list is the ops and templates the combat engine runs. `py`, Python hooks and expressions that read attributes are refused, and an imported zip or YAML is not executed. A template is expanded to ops in the `cards.yaml` the combat engine reads; reopening the editor still shows the template. The save is data under the user mods folder. Shipped mods and the seeds of existing presets stay as they are. The test uses the existing combat preset and `POST /api/runs`: the training dummy `DUMMY`, or the synthetic brute `SYN_BRUTE` the tests already use. That brute is not a game encounter and it is not added to the encounter list. The dummy does not attack, so a dummy fight is a loss only when the deck spends HP. One test is at most 8 fights and 30 turns. `once` is saved, but the combat test does not skip repeats. An unimplemented power id only stores stacks. See `docs/CUSTOM_CARDS.md`.*
+
+### 失败回放
+
+- **一场已经打完、并且以失败结束的战斗，可以看模拟器记下的回合时间线。** 出牌、伤害、格挡、能力层数、敌人招式和生命到 0 的那一下，都来自这场战斗当时写下的事件，不是事后猜的。侧栏「失败回放」（`#/replay`），运行页和报告页也能打开。`GET /api/runs/<id>/fights` 列出各场有没有时间线，`GET /api/runs/<id>/trace/<index>` 读一场。旧的结果没有这个字段，界面写明「开始记录之前保存的」。超时和胜利不保留时间线。一次测试只保留前 12 场失败的完整时间线，每场最多 240 条事件，再往后的失败标成省略。取消、对比、导出、结果包和导入的历史照旧读原来的文件；时间线若有，就在 `raw.jsonl` 的失败行里。整局没有这条时间线。它标出记录到的失败回合，以及生命记到 0 的那一下，并不据此说明原因。见 `docs/REPLAY.md`。
+  *A finished fight that ended in a loss can show the turn timeline the simulator recorded. Plays, damage, block, power stacks, enemy moves and the hit that set HP to 0 are events written during that fight, not a later guess. **Loss replay** (`#/replay`) is in the sidebar, and the run page and the report page open it too. `GET /api/runs/<id>/fights` says which fights have a timeline. `GET /api/runs/<id>/trace/<index>` reads one. An older result has no field, and the page says it was saved before recording started. Timeouts and wins do not keep a timeline. One test keeps full timelines for the first 12 losses, at most 240 events each; later losses are marked omitted. Cancel, compare, export, bundles and imported history still read the same files. When a timeline exists, it is on the loss row in `raw.jsonl`. A full run has no timeline. The page names the recorded loss turn and the hit that set HP to 0. It does not decide a cause. See `docs/REPLAY.md`.*
+
 ## 0.1.5（2026-11-11） / 0.1.5 (2026-11-11)
 
 0.1.5 于 2026-11-11 发布。可以只读导入真游戏的一局，预览种子，把已经写好的游戏 mod DLL 翻成 YAML，并在官方安装包里接上 `mentor-full`。组牌可以选择遭遇。两份保存的牌组可以对打同一份遭遇。长测试能看到进度，也能在两场之间取消。一份牌组可以看每张牌对胜率的影响。战斗可以同时开多个进程。界面有「本版更新」。侧栏可以在简体中文和 English 之间切换。跑完的结果可以打成 `.deckbench.zip`。没有游戏文件时，空的历史页可以载入一份自带的小样本。这一节开头的修复：`x-lang` 接受 BCP-47 别名；历史里未完成的测试，只要有打完的场次就显示胜率；导进来的结果再导出时，牌组预设还在；取消了的单卡贡献可以打包。版本号仍是 `0.1.5`，只写在 `sts2sim.__version__`。Windows 安装包的文件名是 `DeckBench-0.1.5-win64.zip`。发布说明在 `docs/RELEASE_0.1.5.md`。
