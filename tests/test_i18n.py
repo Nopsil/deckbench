@@ -110,8 +110,15 @@ def test_keys_used_in_code_exist():
     missing = sorted(k for k in used if k not in zh and not k.endswith("."))
     assert not missing, missing
     # 动态拼出来的键
-    dyn = [f"page.{p}.{x}" for p in ("new", "run", "report", "ab", "compare", "history", "import", "preview", "mods", "explain", "calibrate", "decks", "whatsnew") for x in ("title", "sub")]
+    dyn = [f"page.{p}.{x}" for p in ("new", "run", "report", "ab", "compare", "history", "import", "preview", "mods", "explain", "calibrate", "decks", "whatsnew", "cards", "replay") for x in ("title", "sub")]
     dyn.append("nav.decks")
+    dyn.append("nav.cards")
+    dyn.append("nav.replay")
+    dyn += [f"cc.enc.{s}" for s in ("DUMMY", "SYN_BRUTE")]
+    dyn += [f"replay.result.{s}" for s in ("win", "loss", "timeout", "loop", "unknown")]
+    dyn += [f"replay.trace.{s}" for s in ("ready", "no_trace", "not_a_loss", "omitted", "empty")]
+    dyn += [f"replay.why.{s}" for s in ("ready", "no_trace", "not_a_loss", "omitted", "empty")]
+    dyn += [f"replay.skip.{s}" for s in ("none", "asleep", "stunned", "no_move")]
     dyn += [f"imp.result.{s}" for s in ("won", "lost", "abandoned", "in_progress")]
     dyn += [f"imp.warn.{c}" for c in (
         "gzip", "utf16", "bom", "doubleEncoded", "seedFromRng", "seedMissing", "noRouteColumn",

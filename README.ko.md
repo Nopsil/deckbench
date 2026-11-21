@@ -172,6 +172,8 @@ python tools/calibrate.py path/to/history/123.run path/to/runs.jsonl --json -
 
 게임에 이미 설치된 모드를 먼저 YAML로 다시 쓸 필요는 없습니다. **모드 편집기**에서 **「게임 모드 가져오기」**로 그 모드의 zip(매니페스트 JSON + DLL)을 고르거나, 게임 `mods/`에 있는 목록에서 고르세요. 읽힌 카드는 양식이 됩니다. DLL은 실행하지 않습니다. 제한은 [docs/DLL_MODS.md](docs/DLL_MODS.md).
 
+카드 하나의 수치와 전투 엔진이 이미 실행하는 효과만 고친 뒤, 그 카드가 든 덱을 바로 시험하려면 **사용자 카드**(`#/cards`)를 씁니다. DLL을 만들지 않고, 가져온 파일의 코드도 실행하지 않습니다. 설명은 [docs/CUSTOM_CARDS.md](docs/CUSTOM_CARDS.md). 패배로 끝난 전투는 **패배 재생**(`#/replay`)에서 그때 기록된 플레이와 HP를 봅니다. [docs/REPLAY.md](docs/REPLAY.md).
+
 ## AI 비서에게 한 수씩 플레이시키기 (MCP)
 
 Claude나 Cursor처럼 MCP를 지원하는 AI 비서를 쓰고 있다면, 시뮬레이터 안에서 직접 한 판을 플레이하게 할 수 있습니다. 상황을 보고, 선택지를 고르고, 이유를 적고, 되돌려서 다시 할 수도 있습니다. 마지막에는 조작 목록을 내보낼 수 있어서, 같은 시드로 실제 게임에서 그대로 따라 할 수 있습니다.

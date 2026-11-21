@@ -192,6 +192,8 @@ python tools/calibrate.py path/to/history/123.run path/to/runs.jsonl --json -
 
 已经装在游戏里的 mod 不用先手写 YAML：**模组编辑器**里按 **「导入游戏 mod」**，选那个 mod 的 zip（清单 JSON + DLL），或从下拉框选游戏 `mods/` 里的一份。认得出的牌会变成表，DLL 不会被执行。限制见 [docs/DLL_MODS.md](docs/DLL_MODS.md)。
 
+只想改一张牌的数值和战斗引擎已经支持的效果、并且马上打一套含这张牌的牌组：**自定义卡牌**（`#/cards`）。不编译 DLL，也不运行导入文件里的代码。说明见 [docs/CUSTOM_CARDS.md](docs/CUSTOM_CARDS.md)。一场失败的战斗可以打开 **失败回放**（`#/replay`），看当时记下的出牌和生命，见 [docs/REPLAY.md](docs/REPLAY.md)。
+
 *The **Mod editor** page: build a character, cards (effects picked from a menu or templates), powers and relics (when → what) with forms; **Check** explains problems in plain language; **Test** runs a full-run batch or a one-card A/B with one click; import/export zip. The same YAML runs from the command line with `--mod`. Format: docs/MODDING.md. A mod already installed in the game can be imported with **Import game mod** (manifest JSON + DLL). The DLL is not executed. Limits: docs/DLL_MODS.md.*
 
 ## 让 AI 助手一步一步打（MCP） / Let an AI assistant play (MCP)

@@ -503,13 +503,25 @@ class Enemy(Creature):
     def take_turn(self, C):
         mv = self.intent
         if not self.m.ai and (self.has("ASLEEP") or self.has("SLUMBER")):
+            if C.trace is not None and not C.is_sim:
+                from . import fighttrace
+                fighttrace.note_enemy(C, self, "asleep")
             return
         if self.data.pop("stunned", False):
             # CreatureCmd.Stun：本回合不行动，之后接指定招式（没有指定则接原本要出的招）
+            if C.trace is not None and not C.is_sim:
+                from . import fighttrace
+                fighttrace.note_enemy(C, self, "stunned")
             self.data["_stun_resume"] = self.data.pop("after_stun", None) or self.cur or "__keep__"
             return
         if mv is None:
+            if C.trace is not None and not C.is_sim:
+                from . import fighttrace
+                fighttrace.note_enemy(C, self, "no_move")
             return
+        if C.trace is not None and not C.is_sim:
+            from . import fighttrace
+            fighttrace.note_enemy(C, self, None)
         self.last_move = mv.id
         self.used_once.add(mv.id)
         self.performed_first = True

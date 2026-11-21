@@ -67,7 +67,9 @@ PAGES = (
     ("/#/calibrate", "Calibration", "No comparison yet"),
     ("/#/mods", "Mod editor", "Open a mod or create a new one"),
     ("/#/decks", "Deck builder", "Card pool"),
-    ("/#/whatsnew", "What's new", "战斗进程"),
+    ("/#/cards", "Custom cards", "New library"),
+    ("/#/replay", "Loss replay", "No combat test selected"),
+    ("/#/whatsnew", "What's new", "自定义卡牌"),
 )
 
 
@@ -292,6 +294,16 @@ def gui(page, gui_server):
 
 def _assert_clean(gui, where):
     assert not gui.errors, f"{where}: {gui.errors}"
+
+
+def _shot_view(page, name):
+    targets = [ROOT / "test-results" / "gui-smoke" / name]
+    artifacts = Path("/opt/cursor/artifacts")
+    if artifacts.is_dir():
+        targets.append(artifacts / name)
+    for path in targets:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        page.screenshot(path=str(path))
 
 
 def _save_shot(page, name):
@@ -957,7 +969,7 @@ def test_whatsnew_panel_opens_dismisses_and_stays_dismissed(gui):
     panel = page.get_by_test_id("whatsnew-panel")
     gui.expect(panel).to_be_visible()
     gui.expect(panel).to_contain_text(f"What's new in {version}")
-    gui.expect(panel).to_contain_text("示例数据")
+    gui.expect(panel).to_contain_text("自定义卡牌")
     _save_shot(page, "whatsnew-panel.png")
     page.get_by_test_id("whatsnew-dismiss").click()
     gui.expect(panel).to_have_count(0)
@@ -972,8 +984,8 @@ def test_whatsnew_panel_opens_dismisses_and_stays_dismissed(gui):
     page.get_by_test_id("whatsnew-footer").click()
     gui.expect(page.locator("h1")).to_have_text("What's new")
     notes = page.get_by_test_id("whatsnew-notes")
-    gui.expect(notes).to_contain_text("战斗进程")
-    gui.expect(notes).to_contain_text("组牌对打")
+    gui.expect(notes).to_contain_text("自定义卡牌")
+    gui.expect(notes).to_contain_text("失败回放")
     html = notes.inner_html().lower()
     assert "<script" not in html
     assert "javascript:" not in html
@@ -1074,3 +1086,43 @@ def test_history_shows_partial_win_rate(gui):
     gui.expect(dash).to_have_text("—")
     gui.expect(page.locator("[data-result='partial']")).to_have_count(0)
     _assert_clean(gui, "history-partial")
+
+
+def test_custom_card_save_reopen_and_loss_replay(gui):
+    """新建一张牌，保存，重新打开，打合成蛮兵，再看记下的失败时间线。"""
+    page = gui.page
+    page.goto(gui.base + "/#/cards", wait_until="domcontentloaded")
+    gui.expect(page.locator("h1")).to_have_text("Custom cards")
+    gui.expect(page.get_by_test_id("card-name").locator("input")).to_have_value("Jab")
+    page.get_by_test_id("card-name").locator("input").fill("Test Jab")
+    hp = page.get_by_test_id("hero-hp").locator("input")
+    hp.click()
+    hp.fill("10")
+    page.get_by_test_id("encounter").click()
+    page.locator(".n-base-select-option").filter(has_text="Synthetic brute").click()
+    page.get_by_test_id("card-save").click()
+    gui.expect(page.get_by_text("Saved.", exact=True)).to_be_visible()
+    gui.expect(page.get_by_test_id("card-name").locator("input")).to_have_value("Test Jab")
+    dismiss = page.get_by_test_id("whatsnew-dismiss")
+    if dismiss.count():
+        dismiss.click()
+    page.evaluate("document.querySelector('[data-testid=card-name]').scrollIntoView({block:'center'})")
+    page.wait_for_timeout(300)
+    _shot_view(page, "custom-card-editor.png")
+
+    page.reload(wait_until="domcontentloaded")
+    gui.expect(page.get_by_test_id("card-name").locator("input")).to_have_value("Test Jab", timeout=20_000)
+    gui.expect(page.get_by_test_id("hero-hp").locator("input")).to_have_value("10")
+    page.get_by_test_id("card-test").click()
+    page.wait_for_url("**/#/run/*", timeout=60_000)
+    page.get_by_test_id("open-replay").wait_for(timeout=120_000)
+    _save_shot(page, "custom-card-run.png")
+    page.get_by_test_id("open-replay").click()
+    gui.expect(page.locator("h1")).to_have_text("Loss replay")
+    gui.expect(page.get_by_test_id("replay-loss")).to_be_visible(timeout=20_000)
+    gui.expect(page.locator("[data-kind='play']").first).to_be_visible()
+    gui.expect(page.locator("[data-kind='enemy']").first).to_be_visible()
+    gui.expect(page.locator("[data-hp-zero='1']").first).to_be_visible()
+    gui.expect(page.get_by_text("It does not establish why the fight was lost.")).to_be_visible()
+    _save_shot(page, "loss-replay.png")
+    _assert_clean(gui, "custom-card-replay")

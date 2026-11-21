@@ -38,7 +38,9 @@
   py            fn（hooks.py 里的函数名，签名 fn(ctx, **参数)）
 """
 from types import SimpleNamespace
+
 from . import expr
+from . import fighttrace
 
 KW_MAP = {"消耗": "exhaust", "虚无": "ethereal", "保留": "retain", "固有": "innate", "不能被打出": "unplayable"}
 
@@ -367,6 +369,8 @@ def play_card(C, card, target, free=False, from_hand=True):
     if C.stats is not None:
         C.stats.rec(card.base_name, plays=1, energy=paid)
     C.say(f"打出 {card.name}" + (f" → {target.name}" if target is not None else "") + f"（付{paid}，剩{P.energy}）")
+    if C.trace is not None and not C.is_sim:
+        fighttrace.note_play(C, card, target, paid)
     C.emit("before_play", card=card, ctx=ctx)
     ev = C.emit("modify_play_count", card=card, ctx=ctx, count=1)
     effects = card.d.effects_up if card.upgraded else card.d.effects

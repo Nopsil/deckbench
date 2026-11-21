@@ -146,6 +146,21 @@ def _deck_run_error(err):
     return ValueError(i18n.t("deck.err.preset"))
 
 
+def _apply_card_test_encounter(exp, params):
+    """卡牌测试可以改成合成蛮兵。只改这一次运行的实验，不改已保存的预设。"""
+    if not isinstance(params, dict) or "card_test_encounter" not in params:
+        return
+    choice = params.get("card_test_encounter")
+    if choice not in ("DUMMY", "SYN_BRUTE"):
+        raise ValueError(i18n.t("cc.err.encounter"))
+    extra = exp.get("extra")
+    if not isinstance(extra, list):
+        return
+    for row in extra:
+        if isinstance(row, dict) and "encounter" in row:
+            row["encounter"] = choice
+
+
 def _apply_run_encounters(exp, params):
     """自定义战斗如果点了遭遇，就写成 extra，不再从房间里抽。出厂预设不受影响。"""
     if not isinstance(params, dict) or params.get("preset"):
@@ -459,6 +474,7 @@ class LocalPythonBackend(SimBackend):
             exp["fights"] = int(p.get("fights", exp.get("fights", 50)))
             exp["agent"] = p.get("agent") or exp.get("agent", "heuristic")
             exp.pop("user_deck", None)
+            _apply_card_test_encounter(exp, p)
             _apply_run_encounters(exp, p)
             _apply_shared_plan(exp, p)
             ef = os.path.join(run_dir, "experiment.yaml")

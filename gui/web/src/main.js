@@ -15,6 +15,8 @@ import ExplainLog from './pages/ExplainLog.vue'
 import Calibrate from './pages/Calibrate.vue'
 import ModEditor from './pages/ModEditor.vue'
 import Decks from './pages/Decks.vue'
+import CustomCards from './pages/CustomCards.vue'
+import Replay from './pages/Replay.vue'
 import WhatsNew from './pages/WhatsNew.vue'
 
 const router = createRouter({
@@ -32,6 +34,8 @@ const router = createRouter({
     { path: '/explain', component: ExplainLog, meta: { key: 'explain' } },
     { path: '/calibrate', component: Calibrate, meta: { key: 'calibrate' } },
     { path: '/decks', component: Decks, meta: { key: 'decks' } },
+    { path: '/cards', component: CustomCards, meta: { key: 'cards' } },
+    { path: '/replay/:id?', component: Replay, meta: { key: 'replay' } },
     { path: '/whatsnew', component: WhatsNew, meta: { key: 'whatsnew' } },
     { path: '/mods', component: ModEditor, meta: { key: 'mods' } },
   ],
