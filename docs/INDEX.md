@@ -8,6 +8,7 @@
 
 | 文档 | 语言 | 内容 |
 | --- | --- | --- |
+| [RELEASE_0.1.6.md](RELEASE_0.1.6.md) | 中文、English | 0.1.6 发布说明（2026-11-21），可作 GitHub Release 正文。含自定义卡牌、失败回放，以及本机 v0.113.1 整局适配的范围和未验证项。Windows 下载名是 `DeckBench-0.1.6-win64.zip` |
 | [RELEASE_0.1.5.md](RELEASE_0.1.5.md) | 中文、English | 0.1.5 发布说明（2026-11-11），可作 GitHub Release 正文。包括只读导入、种子预览、DLL→YAML、mentor-full、组牌和遭遇、对打、进度和取消、单卡贡献、战斗 workers、本版更新、简体中文 / English 切换、`.deckbench.zip`、空历史页的示例数据，以及最近的修复。Windows 下载是 `DeckBench-0.1.5-win64.zip` |
 | [MOD_AUTHORS.md](MOD_AUTHORS.md) | English | mod 作者入门。示例 `examples/spark/`（Arc、Lantern）。内部 Python 引擎，不需要游戏安装 |
 | [MOD_AUTHORS.zh-CN.md](MOD_AUTHORS.zh-CN.md) | 简体中文 | 同一份入门的简体中文 |
@@ -33,7 +34,7 @@
 
 | 文档 | 语言 | 内容 |
 | --- | --- | --- |
-| [CHANGELOG.md](../CHANGELOG.md) | 中文 + English | 更新日志。0.1.5（2026-11-11）一节是界面「本版更新」（`#/whatsnew`，`GET /api/changelog`）读的那一节，含示例数据和最近的修复 |
+| [CHANGELOG.md](../CHANGELOG.md) | 中文 + English | 更新日志。界面「本版更新」（`#/whatsnew`，`GET /api/changelog`）读最前面的一节，现在是 0.1.6（2026-11-21） |
 | [README.md](../README.md) | 中文为主，段落附 English | 安装和使用 |
 | [README.en.md](../README.en.md) | English | 同一份说明的英文 |
 | [README.ja.md](../README.ja.md) | 日本語 | 同一份说明的日文 |

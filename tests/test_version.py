@@ -1,6 +1,6 @@
 """Project version and the optional GitHub release check.
 
-The version number is ``sts2sim.__version__`` (0.1.5). These tests do not
+The version number is ``sts2sim.__version__`` (0.1.6). These tests do not
 bump it, and they do not call GitHub: the network is a fake ``fetch``.
 """
 import json
@@ -28,11 +28,11 @@ def test_project_version_is_the_existing_number():
     init = os.path.join(ROOT, "sts2sim", "__init__.py")
     with open(init, encoding="utf-8") as handle:
         text = handle.read()
-    assert '__version__ = "0.1.5"' in text
-    assert read_project_version(ROOT) == "0.1.5"
+    assert '__version__ = "0.1.6"' in text
+    assert read_project_version(ROOT) == "0.1.6"
     with open(os.path.join(ROOT, "gui", "web", "package.json"), encoding="utf-8") as handle:
         pkg = json.load(handle)
-    assert pkg["version"] == "0.1.5"
+    assert pkg["version"] == "0.1.6"
 
 
 def test_semver_order():
@@ -101,8 +101,8 @@ def test_check_latest_compares_without_calling_the_network():
     pre = check_latest(current="0.1.5-rc.1", fetch=_release("v0.1.5"))
     assert pre["status"] == "update_available"
 
-    current = check_latest(fetch=_release("v0.1.5"))
-    assert current["current"] == "0.1.5" and current["status"] == "up_to_date"
+    current = check_latest(fetch=_release("v0.1.6"))
+    assert current["current"] == "0.1.6" and current["status"] == "up_to_date"
 
 
 def test_check_latest_rejects_a_non_github_link():
@@ -173,10 +173,10 @@ def test_version_endpoint_matches_the_project_and_does_not_call_github(monkeypat
     with TestClient(app) as client:
         res = client.get("/api/version")
         assert res.status_code == 200
-        assert res.json() == {"name": "DeckBench", "version": "0.1.5"}
+        assert res.json() == {"name": "DeckBench", "version": "0.1.6"}
         health = client.get("/api/health")
         assert health.status_code == 200
-        assert health.json()["version"] == "0.1.5"
+        assert health.json()["version"] == "0.1.6"
 
 
 def test_update_endpoint_uses_the_mocked_release(monkeypatch):
@@ -199,7 +199,7 @@ def test_update_endpoint_uses_the_mocked_release(monkeypatch):
     assert res.status_code == 200
     body = res.json()
     assert body["status"] == "update_available"
-    assert body["current"] == "0.1.5" and body["latest"] == "9.9.9"
+    assert body["current"] == "0.1.6" and body["latest"] == "9.9.9"
     assert body["html_url"].startswith("https://github.com/Nopsil/deckbench/")
 
 
@@ -236,7 +236,7 @@ def test_read_version_script_prints_the_project_version():
     import sys
     script = os.path.join(ROOT, "gui", "packaging", "read_version.py")
     got = subprocess.run([sys.executable, script], cwd=ROOT, capture_output=True, text=True, check=True)
-    assert got.stdout.strip() == "0.1.5"
+    assert got.stdout.strip() == "0.1.6"
 
 
 def test_mcp_check_update_is_optional_and_uses_the_same_result(monkeypatch):
@@ -245,8 +245,8 @@ def test_mcp_check_update_is_optional_and_uses_the_same_result(monkeypatch):
     def fetch(url, timeout):
         calls.append(url)
         return 200, {}, json.dumps({
-            "tag_name": "v0.1.5",
-            "html_url": "https://github.com/Nopsil/deckbench/releases/tag/v0.1.5",
+            "tag_name": "v0.1.6",
+            "html_url": "https://github.com/Nopsil/deckbench/releases/tag/v0.1.6",
         }).encode()
 
     monkeypatch.setattr("sts2sim.version.default_fetch", fetch)
@@ -259,5 +259,5 @@ def test_mcp_check_update_is_optional_and_uses_the_same_result(monkeypatch):
         mcp_server.build_import()
         assert calls == []
     doc = json.loads(mcp_server.check_update())
-    assert doc["status"] == "up_to_date" and doc["latest"] == "0.1.5"
+    assert doc["status"] == "up_to_date" and doc["latest"] == "0.1.6"
     assert calls == [RELEASES_LATEST]

@@ -52,9 +52,9 @@ def _hrefs(node, out):
 
 
 def test_latest_section_is_unreleased_card_editor_and_replay():
-    parsed = load_changelog("0.1.5", CHANGELOG)
-    assert parsed["version"] == "0.1.5"
-    assert parsed["heading"] == "未发布 / Unreleased"
+    parsed = load_changelog("0.1.6", CHANGELOG)
+    assert parsed["version"] == "0.1.6"
+    assert parsed["heading"] == "0.1.6（2026-11-21） / 0.1.6 (2026-11-21)"
     blocks = []
     _walk(parsed["blocks"], blocks)
     text = json.dumps(parsed, ensure_ascii=False)
@@ -155,8 +155,8 @@ def test_api_changelog_is_json_without_a_stack():
     assert "json" in res.headers["content-type"]
     assert "text/html" not in res.headers["content-type"]
     body = res.json()
-    assert body["version"] == "0.1.5"
-    assert body["heading"] == "未发布 / Unreleased"
+    assert body["version"] == "0.1.6"
+    assert body["heading"] == "0.1.6（2026-11-21） / 0.1.6 (2026-11-21)"
     assert "自定义卡牌" in json.dumps(body, ensure_ascii=False)
     raw = res.text.lower()
     assert "<script" not in raw

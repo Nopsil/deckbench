@@ -121,6 +121,10 @@ Off by default. When you turn it on, each card play, target choice, potion use, 
 - Legacy fight experiments: `python -m sts2sim experiments/quick.yaml --explain`, or `explain: true` in the experiment YAML, writes `explain.jsonl` next to `raw.jsonl`.
 - Read one fight: `python tools/explain_fight.py runs.explain.jsonl --fight 0`.
 
+## 0.1.6
+
+Released 2026-11-21. The notes, suitable as a GitHub Release body, are in [docs/RELEASE_0.1.6.md](docs/RELEASE_0.1.6.md). This version adds the custom-card editor, loss replay, and full-run adaptation to your local game install. It is not a cleared real-game run, and it is not support for every piece of game content. The limits are in those notes.
+
 ## Try 0.1.5 features
 
 From the repo root. The release notes (suitable as a GitHub Release body) are in [docs/RELEASE_0.1.5.md](docs/RELEASE_0.1.5.md).
