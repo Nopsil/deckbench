@@ -3,7 +3,7 @@ import math
 import random as _pyrandom
 
 from .cs import *  # noqa
-from .cs import _lop, _len, _val, _sm, _Event, CsRegex, _int, _div, _mod, _nz, _isinst, _as, _is_type_or_eq, _eq, _str, _setattr_ret, _setitem_ret, _outcall, _init_obj, _generic, _Anon, _bases, _dispatch, _throw, _tmatch, _EmptyColl, _cast_uint, _cast_ulong, _cast_int, _cast_ushort, _cast_short, _cast_byte, _cast_sbyte, _inv, _params  # noqa
+from .cs import _lop, _len, _val, _sm, _Event, CsRegex, _int, _div, _mod, _nz, _isinst, _as, _is_type_or_eq, _eq, _with, _str, _setattr_ret, _setitem_ret, _outcall, _init_obj, _generic, _Anon, _bases, _dispatch, _throw, _tmatch, _EmptyColl, _cast_uint, _cast_ulong, _cast_int, _cast_ushort, _cast_short, _cast_byte, _cast_sbyte, _inv, _params  # noqa
 from .cs import G, CsObject, CsException, CsEnum, cs_enum, _int  # noqa
 from .linq import *  # noqa
 from .linq import Seq, HashSet, Dictionary, KeyValuePair, _iter, _Linq, _CInt, _LazyEnum  # noqa

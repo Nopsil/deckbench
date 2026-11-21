@@ -862,7 +862,7 @@
  "prev.confidence.failed": "This act's map was not generated",
  "prev.err.need_seed": "Enter a seed first.",
  "prev.err.bad_asc": "Ascension must be from 0 to 10.",
- "prev.err.bad_char": "Seed preview only supports the five base characters, not {char}.",
+ "prev.err.bad_char": "Seed preview does not include {char} among the playable characters from this install.",
  "prev.err.bad_neow": "Opening choice must be first, all, none, or an index.",
  "prev.err.no_engine": "Local game logic is not generated yet, so the map cannot be built. Let DeckBench generate data from your install first. {err}",
  "prev.err.failed": "Preview failed: {err}",

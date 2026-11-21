@@ -136,6 +136,7 @@ class _DropSignal(Exception):
 KNOWN_MODELS = set()
 GLOBAL_TYPES = set()
 DROP_IDS = {"VfxCmd", "SfxCmd", "SaveManager", "Color", "Colors", "Vector2", "Tween", "GD",
+            "SentryService", "SentrySdk",
             "Godot", "PreloadManager", "AudioManager", "TalkCmd", "ThinkCmd", "NGame", "Log", "Callable", "SceneHelper",
             "HoverTipFactory", "ImageHelper", "LocString", "Logger", "ScreenShake", "Shake", "ShakeStrength",
             "ShakeDuration", "FastModeType", "NodePath", "StringName", "Engine", "DisplayServer", "Input"}
@@ -399,11 +400,34 @@ class Parser:
             return f"({left} is not None)"
         ty = self._type()
         tr = self._type_ref(ty)
+        checks = []
+        tmp = None
+        if self.at("{"):
+            # 属性模式：x is T { Prop: pattern } name
+            self.next()
+            tmp = self.ctx.tmp("_is")
+            self.ctx.declare(tmp)
+            while not self.at("}"):
+                prop = self.next().v
+                self.expect(":")
+                checks.append(self._pattern(f"{tmp}.{pyname(prop)}"))
+                self.accept(",")
+            self.expect("}")
         res = f"_isinst({left}, {tr})"
         if self.peek().k == "id" and self.peek().v not in ("when", "or", "and", "select", "where", "orderby", "group", "into", "let", "join", "on", "equals", "by", "ascending", "descending"):
             nm = self.next().v
             self.ctx.declare(nm)
-            res = f"_isinst(({pyname(nm)} := {left}), {tr})"
+            if tmp is None:
+                res = f"_isinst(({pyname(nm)} := {left}), {tr})"
+            else:
+                res = f"_isinst(({tmp} := {left}), {tr})"
+                if checks:
+                    res = "(" + " and ".join([res] + checks) + ")"
+                res = f"((({pyname(nm)} := {tmp}) is not None) if ({res}) else False)"
+        elif tmp is not None:
+            res = f"_isinst(({tmp} := {left}), {tr})"
+            if checks:
+                res = "(" + " and ".join([res] + checks) + ")"
         if neg:
             res = f"(not {res})"
         return res
@@ -437,6 +461,10 @@ class Parser:
         if t.k == "id" and t.v == "await":
             self.next()
             return self.unary()
+        if t.k == "id" and t.v == "ref":
+            # (ref x) 是托管引用。Python 里没有这层，按 x 本身解析。
+            self.next()
+            return self.unary()
         return self.postfix(self.primary())
 
     def _try_cast(self):
@@ -459,8 +487,8 @@ class Parser:
         elif nt.k in ("id", "num", "str", "istr") and nt.v not in ("is", "as", "and", "or", "switch", "when") \
                 and re.match(r"^[A-Z]", last or "x") and not self.ctx.is_local(last):
             ok = True
-        elif nt.v == "(" and re.match(r"^[A-Z][a-z]", last or "x") and not self.ctx.is_local(last) \
-                and last not in self.ctx.cls_members:
+        elif nt.v == "(" and re.match(r"^[A-Z][a-z]", last or "x") and not self.ctx.is_local(last):
+            # (T)(expr) 在 C# 里是强转。(Node)(object)x 里的 Node 也可能是基类成员名，不能因此放弃强转。
             ok = True
         elif nt.v == "(" and (last in getattr(self.ctx, "mgparams", ()) or re.fullmatch(r"T([A-Z]\w*)?", last or "")) \
                 and not self.ctx.is_local(last):
@@ -516,11 +544,11 @@ class Parser:
         self.expect("=>")
         return self._lambda_body(params)
 
-    def _lambda_body(self, params):
+    def _lambda_body(self, params, star=False):
         self.ctx.push()
         for p in params:
             self.ctx.declare(p)
-        ps = ", ".join(pyname(p) for p in params)
+        ps = "*_a" if star and not params else ", ".join(pyname(p) for p in params)
         if self.at("{"):
             name = self.ctx.tmp("_fn")
             saved = self.ctx.pre
@@ -653,6 +681,9 @@ class Parser:
             return self._query()
         if v == "delegate":
             params = []
+            # delegate { } 没有参数列表，可以绑到任意 Action<T>，调用时参数要能接住。
+            # delegate() { } 才是零个参数。
+            star = not self.at("(")
             if self.at("("):
                 self.next()
                 while not self.at(")"):
@@ -665,7 +696,7 @@ class Parser:
                         params.append(self.next().v)
                     self.accept(",")
                 self.expect(")")
-            return self._lambda_body(params)
+            return self._lambda_body(params, star=star)
         if v == "new":
             return self._new()
         if v == "typeof":
@@ -752,6 +783,12 @@ class Parser:
                 self.expect("by")
                 k = self.expr(0)
                 cur = f"{cur}.GroupBy(lambda {v}: {k}, lambda {v}: {e})"
+                if self.accept("into"):
+                    # group ... into g 把后面的 where/orderby/select 改到分组上
+                    gname = self.next().v
+                    self.ctx.declare(gname)
+                    v = pyname(gname)
+                    continue
                 break
             else:
                 raise Unsupported("查询语法")
@@ -1043,6 +1080,9 @@ class Parser:
                 nm = self.next().v
                 if nm in DROP_METHODS and self.at("("):
                     raise _DropSignal()
+                if nm == "_002Ector":
+                    # Godot 源生成器的构造调用，只给视觉节点填字段
+                    raise _DropSignal()
                 if nm == "ToString" and self.at("("):
                     self.call_args()
                     left = f"_str({left})"
@@ -1104,6 +1144,19 @@ class Parser:
             if t.k == "id" and t.v == "switch":
                 self.next()
                 left = self._switch_expr(left)
+                continue
+            if t.k == "id" and t.v == "with" and self.at("{", 1):
+                # 记录 with 表达式：复制后改列出的字段（ilspycmd 有时把 ] 和 with 粘在一起）
+                self.next()
+                self.expect("{")
+                parts = []
+                while not self.at("}"):
+                    nm = self.next().v
+                    self.expect("=")
+                    parts.append(f"{pyname(nm)}={self.expr(0)}")
+                    self.accept(",")
+                self.expect("}")
+                left = f"_with({left}, {', '.join(parts)})"
                 continue
             break
         return left

@@ -20,7 +20,6 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, ".."))
 
-CHARS = ["Ironclad", "Silent", "Defect", "Necrobinder", "Regent"]
 TYPE_ZH = {"Monster": "怪", "Elite": "精", "Unknown": "？", "Shop": "商", "RestSite": "火", "Treasure": "宝",
            "Boss": "王", "Ancient": "古", "Unassigned": "·"}
 TYPE_EN = {"Monster": "M", "Elite": "E", "Unknown": "?", "Shop": "$", "RestSite": "R", "Treasure": "T",
@@ -270,7 +269,7 @@ def render(res, lang="zh"):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("seed")
-    ap.add_argument("--char", default="Ironclad", choices=CHARS)
+    ap.add_argument("--char", default="Ironclad", help="本机安装里的可玩角色")
     ap.add_argument("--asc", type=int, default=0)
     ap.add_argument("--neow", default="all", help="all / 序号 / none")
     ap.add_argument("--json", help="另存 JSON")

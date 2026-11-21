@@ -161,7 +161,8 @@ function ascFromQuery(v) {
 }
 
 const seed = ref(qstr(route.query.seed))
-const charId = ref(BASE.includes(qstr(route.query.char)) ? qstr(route.query.char) : 'Ironclad')
+const qChar = qstr(route.query.char)
+const charId = ref(/^[A-Za-z][A-Za-z0-9_]*$/.test(qChar) ? qChar : 'Ironclad')
 const asc = ref(ascFromQuery(route.query.asc))
 const neow = ref(neowFromQuery(route.query.neow) || 'first')
 const appliedNeow = ref('')
@@ -169,8 +170,11 @@ const loading = ref(false)
 const error = ref('')
 const res = ref(null)
 const chars = computed(() => {
-  const fromCat = (store.catalog && store.catalog.characters || []).filter((c) => BASE.includes(c.id))
-  const list = fromCat.length ? fromCat : BASE.map((id) => ({ id, name: id }))
+  const cat = (store.catalog && store.catalog.characters) || []
+  const base = (store.catalog && store.catalog.base_characters) || []
+  const ids = base.length ? base.map((c) => c.id) : BASE
+  const fromCat = cat.filter((c) => ids.includes(c.id))
+  const list = fromCat.length ? fromCat : ids.map((id) => ({ id, name: (base.find((c) => c.id === id) || {}).name || id }))
   return list.map((c) => ({ label: c.name, value: c.id }))
 })
 function namedCards(ids) {

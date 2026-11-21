@@ -2,9 +2,14 @@
 
 ## 未发布 / Unreleased
 
-版本号仍是 `0.1.5`，没有打标签，也没有发布。这一节是卡牌编辑器和失败回放，还在 `main` 之外。
+版本号仍是 `0.1.5`，没有打标签，也没有发布。卡牌编辑器和失败回放已经在 main。下面是对本机当前游戏安装的适配，还没有合并。
 
-*The version is still `0.1.5`. There is no tag and no release. This section is the card editor and the loss replay, and it is not on `main` yet.*
+*The version is still `0.1.5`. There is no tag and no release. The card editor and the loss replay are already on main. The section below adapts DeckBench to the current local game install, and it is not merged.*
+
+### 当前游戏安装
+
+- **整局模拟从本机 `sts2.dll` 生成，角色名单跟着这份安装走。** 缓存仍按 DLL 的 SHA-256 分目录，并记下 `release_info`。转译器修订号是 `translator_rev` 3；旧缓存没有这个字段，或数字不同，就拒绝加载，要用同一台机器上的安装重新 `python -m sts2sim.gamedata setup`。可玩角色读生成代码里的 `ModelDb.AllCharacters`，`IsPlayable` 为假的不收。没有这份属性时，才退回安装里仍能按类名找到的 Ironclad、Silent、Defect、Necrobinder、Regent。种子预览、批量跑和 MCP 开局用的是这张名单，不把安装里没有的角色写死进去。图形界面的种子预览在目录提供 `base_characters` 时用它，否则仍是原来的五个。见 [docs/GAME_SUPPORT.md](docs/GAME_SUPPORT.md)。
+  *A full run is generated from the local `sts2.dll`. The cache directory is still the DLL's SHA-256, and the manifest still stores `release_info`. Translator revision `translator_rev` is 3. A cache without that field, or with a different number, is refused; regenerate with `python -m sts2sim.gamedata setup` from the install on that machine. Playable characters are `ModelDb.AllCharacters` in the generated code. A model with `IsPlayable` false is left out. If that property is absent, the fallback is whichever of Ironclad, Silent, Defect, Necrobinder and Regent that install still defines by class name. Seed preview, batch and MCP new-run use that list. They do not hard-code a character the install does not have. The seed-preview page uses `base_characters` when the catalog sends it, and otherwise keeps the previous five. See [docs/GAME_SUPPORT.md](docs/GAME_SUPPORT.md).*
 
 ### 自定义卡牌
 

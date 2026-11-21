@@ -26,6 +26,8 @@ TOOLS = os.path.join(ROOT, "tools")
 GAME_FOLDER = "Slay the Spire 2"        # Steam 安装目录名（仅用于在本机查找安装）
 DLL = "sts2.dll"
 FORMAT = 2
+# 转译器有行为变化时加 1。旧缓存没有这个字段，或数字不同，就拒绝加载，让 setup 按当前安装重新生成。
+TRANSLATOR_REV = 3
 
 # 转译范围（与 tools/gen_game.sh 相同）
 RELS = ("Commands Hooks Entities Combat MonsterMoves Factories Odds Rewards Map Random ValueProps Localization Models "
@@ -159,7 +161,7 @@ def verify():
     if sha256(dll) != m.get("dll_sha256"):
         raise GameDataError("游戏已更新或文件不匹配，拒绝加载旧缓存 / game files changed; refusing to load stale cache.\n"
                             "重新生成 / regenerate:  python -m sts2sim.gamedata setup")
-    if m.get("format") != FORMAT:
+    if m.get("format") != FORMAT or m.get("translator_rev") != TRANSLATOR_REV:
         raise GameDataError("缓存格式过旧 / cache format outdated. Run: python -m sts2sim.gamedata setup")
     return d
 
@@ -352,7 +354,8 @@ def setup(game_dir=None, keep_src=False):
         shutil.rmtree(src, ignore_errors=True)
         if not os.environ.get("DECKBENCH_TEMP"):
             shutil.rmtree(troot, ignore_errors=True)   # 我们自己的目录（ilspycmd 还会留下 NuGetScratch），用完整个删掉
-    manifest = {"format": FORMAT, "game_dir": game_dir or os.path.dirname(dll), "dll_path": dll, "dll_sha256": digest,
+    manifest = {"format": FORMAT, "translator_rev": TRANSLATOR_REV,
+                "game_dir": game_dir or os.path.dirname(dll), "dll_path": dll, "dll_sha256": digest,
                 "release_info": rel, "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
                 "note": "Generated locally from your own install. Do not redistribute. / 由你本机安装生成，请勿分发。"}
     json.dump(manifest, open(os.path.join(tmp_out, "manifest.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)

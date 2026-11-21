@@ -16,6 +16,10 @@ def test_orderby_tuple_key_uses_compareto_on_ties():
     assert [t[1].e for t in out] == ["ZAP", "BODYGUARD", "DEFEND", "STRIKE"]
 
 
+def test_order_sorts_the_sequence_itself():
+    assert list(Seq(["b", "a", "c"]).Order(None)) == ["a", "b", "c"]
+
+
 def test_orderby_none_first_and_stable():
     out = Seq([3, None, 1, 1]).OrderBy(lambda x: x)
     assert list(out) == [None, 1, 1, 3]

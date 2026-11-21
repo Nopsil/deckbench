@@ -862,7 +862,7 @@
  "prev.confidence.failed": "这一幕的地图没有生成",
  "prev.err.need_seed": "请先填种子。",
  "prev.err.bad_asc": "进阶要在 0 到 10 之间。",
- "prev.err.bad_char": "种子预览只支持原版五名角色，不支持 {char}。",
+ "prev.err.bad_char": "种子预览里没有 {char}。名单是本机安装里的可玩角色。",
  "prev.err.bad_neow": "开局选项要填 first、all、none 或序号。",
  "prev.err.no_engine": "还没有本机的游戏逻辑，预览无法生成地图。先让 DeckBench 从你的游戏安装生成一次数据。{err}",
  "prev.err.failed": "预览失败：{err}",

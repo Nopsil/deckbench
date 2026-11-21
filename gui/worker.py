@@ -365,7 +365,7 @@ def cmd_cards(a):
     from claude_v35.cards_v35 import VARIANTS
     CL.load()
     from sts2sim.rt.boot import game as G
-    from sts2sim.engine.run import CHARACTERS
+    from sts2sim.engine.run import BASE_CHARACTERS, CHARACTERS
     starters = {}
     for ch, cls in CHARACTERS.items():
         try:
@@ -407,7 +407,8 @@ def cmd_cards(a):
     vdesc.setdefault("v35_orig", "")
     vdesc["v35_orig"] = ""     # 说明在 gui/locales 的 variant.v35_orig（随界面语言）
     vlist = [{"id": k, "desc": vdesc.get(k) or "", "detail": repr(v)[:300]} for k, v in VARIANTS.items()]
-    print(json.dumps({"cards": out, "variants": vlist, "starters": starters, "characters": list(CHARACTERS)},
+    print(json.dumps({"cards": out, "variants": vlist, "starters": starters, "characters": list(CHARACTERS),
+                      "base_characters": list(BASE_CHARACTERS)},
                      ensure_ascii=False))
 
 

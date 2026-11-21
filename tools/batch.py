@@ -244,7 +244,8 @@ def _check_mods(dirs, char, variant):
     if bad:
         sys.stderr.write("mod 有问题 / mod problems:\n" + "\n".join(f"  - {w + ': ' if w else ''}{zh}\n    {en}" for w, zh, en in bad) + "\n")
         raise SystemExit(2)
-    if char not in chars and char not in ("Ironclad", "Silent", "Defect", "Necrobinder", "Regent"):
+    from sts2sim.engine.run import BASE_CHARACTERS
+    if char not in chars and char not in BASE_CHARACTERS:
         sys.stderr.write(f"mod 里没有角色「{char}」/ no character '{char}' in the mod(s); 有 / available: {', '.join(chars)}\n")
         raise SystemExit(2)
 
