@@ -361,9 +361,20 @@ class HeuristicAgent(Agent):
             else:
                 tgts = [target] if target is not None else en[:1]
             for t in tgts:
+                dmg_t = dmg
                 d = dmg * hits
                 if tt == G.TargetType.AllEnemies and t is not target:
-                    d = self._preview(card, t)[0] * hits
+                    dmg_t = self._preview(card, t)[0]
+                    d = dmg_t * hits
+                slip = ctx["slip"].get(id(t), 0)
+                if slip and hits > 0 and dmg_t > 0:
+                    # Slippery：每段命中最多扣 1 点生命，并剥一层。大数字的单段攻击杀不死它。
+                    raw = dmg_t * hits
+                    hp = min(hits, float(slip)) * min(dmg_t, 1.0) + max(0.0, hits - float(slip)) * dmg_t
+                    if t.Block >= raw:
+                        d = min(float(t.Block), raw)
+                    else:
+                        d = min(float(t.Block), raw) + hp
                 eff = t.CurrentHp + t.Block
                 mprio = W["c_minion"] if (ctx.get("minion") and id(t) in ctx["minion"]) else 1.0
                 if d >= eff:
@@ -371,9 +382,8 @@ class HeuristicAgent(Agent):
                 else:
                     s += max(0.0, d - t.Block) * k + min(d, t.Block) * 0.4 * k
                 s += 0.4 * hits * k   # 每段命中（触发命中效果）
-                slip = ctx["slip"].get(id(t), 0)
                 if slip:
-                    s += min(hits, slip) * 2.5   # Slippery：每段命中剥一层“伤害封顶为 1”
+                    s += min(hits, slip) * 2.5   # 剥层本身有价值，伤害已按封顶算过
         if blk > 0:
             need = ctx["need"]
             s += min(blk, need) * W["c_blk"] + max(0.0, blk - need) * W["c_blk_over"]
@@ -405,6 +415,9 @@ class HeuristicAgent(Agent):
         if tn in ("Status", "Curse"):
             s = 0.3
         s += self.card_value(card) * 0.05
+        from .fool_ai import defer_aimed_shot, is_fool, reject_whiff
+        if is_fool(player) and (reject_whiff(card, player) or defer_aimed_shot(card, player, cs)):
+            return -1.0
         return s / (cost + 0.5)
 
     def combat_action(self, cs, player, acts):
@@ -435,6 +448,14 @@ class HeuristicAgent(Agent):
                     continue
                 if s > best_s:
                     best, best_s = a, s
+            from .fool_ai import aim_before_shot, is_fool, prefer_aimed_shot
+            if is_fool(player):
+                aimed = prefer_aimed_shot(best, acts, player, cs)
+                if aimed is not None:
+                    best = aimed
+                setup = aim_before_shot(best, acts, player)
+                if setup is not None:
+                    best = setup
             if log:
                 try:
                     turn = int(cs.RoundNumber)

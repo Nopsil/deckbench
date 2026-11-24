@@ -200,6 +200,10 @@ class StrongAgent(SearchAgent):
             r = self._pcache[key] = card_power(card)
         return r
 
+    def _is_fool(self):
+        from .fool_ai import is_fool
+        return is_fool(getattr(self, "player", None))
+
     def card_value(self, card, deck=None):
         b = basic_value(card) if _name(card.Rarity) == "Basic" else None
         if b is not None:
@@ -321,8 +325,12 @@ class StrongAgent(SearchAgent):
             b += 0.4
         if "multihit" in bp["traits"]:
             hits = max(1.0, dvar(card, "Repeat"), float(_src_hits(card)), dvar(card, "Hits"))
+            if self._is_fool():
+                hits = max(hits, dvar(card, "HitCount"))
             if hits >= 2:
                 b += 0.5
+            if self._is_fool() and hits >= 3:
+                b += 0.7
         return b
 
     def marginal(self, card, deck, act=None):
