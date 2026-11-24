@@ -11,6 +11,7 @@ from ..rt.boot import game as G
 from ..rt.prelude import Dummy
 from . import combat as C
 from .characters import map_from_models
+from .event_flow import same_chosen_page
 from .manager import SimRunManager, RunOver
 
 
@@ -254,7 +255,12 @@ class RunDriver:
             if not opts:
                 break
             idx = self.agent.event_option(ev, opts, self)
+            before_ids = [id(o) for o in opts]
             sync.ChooseLocalOption(idx)
+            ev = sync.GetLocalEvent()
+            if ev is not None and not ev.IsFinished and self.state.CurrentRoom is room:
+                if same_chosen_page(before_ids, ev.CurrentOptions):
+                    break
             guard += 1
             if guard > 30:
                 break

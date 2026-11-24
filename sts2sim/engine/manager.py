@@ -6,6 +6,7 @@
 """
 from ..rt.boot import game as G
 from ..rt.prelude import Dummy, _Event
+from .merchant_memory import MerchantMemory
 
 
 def ascension_manager(level, game_mode=None):
@@ -38,6 +39,84 @@ class NetService:
         return Dummy("NetService." + n)
 
 
+class EventCombatSync:
+    """单机事件战。
+
+    生成代码里的 EventCombatSynchronizer 在联机目录，没被转译，原来是个空对象。
+    选项调用 ReadyToEnterCombat 时什么都不发生，战斗选项看起来选了，实际没进房。
+    """
+
+    def __init__(self, player_collection, run_state):
+        self._run = run_state
+        self._states = [None] * len(list(G._iter(player_collection.Players)))
+        self._canonical_event = None
+        self.MutableEncounterForLayout = None
+        self.CombatStateForLayout = None
+
+    def InitializeForEvent(self, local_event):
+        self._canonical_event = local_event.CanonicalInstance
+        if local_event.LayoutType != G.EventLayoutType.Combat:
+            return
+        canonical = local_event.CanonicalEncounter
+        if canonical is None:
+            raise G.InvalidOperationException(f"Canonical encounter is not set for event {local_event.Id}")
+        encounter = canonical.ToMutable()
+        encounter.GenerateMonstersWithSlots(self._run)
+        combat = self._combat_state(encounter)
+        for player in G._iter(self._run.Players):
+            combat.AddPlayer(player)
+        for pair in G._iter(combat.Encounter.MonstersWithSlots):
+            monster, slot = (pair.Item1, pair.Item2) if hasattr(pair, "Item1") else pair
+            combat.AddCreature(combat.CreateCreature(monster, G.CombatSide.Enemy, slot))
+        self.MutableEncounterForLayout = encounter
+        self.CombatStateForLayout = combat
+
+    def ReadyToEnterCombat(self, canonical_encounter, player, extra_rewards, should_resume_after_combat):
+        slot = int(self._run.GetPlayerSlotIndex(player))
+        if self._states[slot] is not None:
+            raise G.InvalidOperationException("player is already ready to enter event combat")
+        self._states[slot] = (canonical_encounter, extra_rewards, bool(should_resume_after_combat))
+        if all(state is not None for state in self._states):
+            self._enter()
+
+    def _enter(self):
+        if self._canonical_event is None:
+            raise G.InvalidOperationException("GenerateInternalCombatState must be called before EnterCombat")
+        canonical, _, resume = self._states[0]
+        for state in self._states:
+            if bool(state[2]) != bool(resume) or state[0] is not canonical:
+                raise G.InvalidOperationException("event combat votes disagree")
+        if self.CombatStateForLayout is not None:
+            combat = self.CombatStateForLayout
+        else:
+            combat = self._combat_state(canonical.ToMutable())
+        room = G.CombatRoom(combat)
+        room.ShouldCreateCombat = self._canonical_event.LayoutType != G.EventLayoutType.Combat
+        room.ShouldResumeParentEventAfterCombat = resume
+        room.ParentEventId = self._canonical_event.Id
+        for _, rewards, _ in self._states:
+            for reward in G._iter(rewards):
+                room.AddExtraReward(reward.Player, reward)
+        G.RunManager.Instance.EnterRoomWithoutExitingCurrentRoom(
+            room, self._canonical_event.LayoutType != G.EventLayoutType.Combat)
+
+    def ResetState(self):
+        if self.CombatStateForLayout is not None:
+            for creature in list(G._iter(self.CombatStateForLayout.Creatures)):
+                self.CombatStateForLayout.RemoveCreature(creature)
+        self._canonical_event = None
+        self.MutableEncounterForLayout = None
+        self.CombatStateForLayout = None
+        self._states = [None] * len(self._states)
+
+    def _combat_state(self, encounter):
+        run = self._run
+        return G.CombatState(encounter, run, run.Modifiers, run.BadgeModels, run.RunModels, run.Dominion)
+
+
+G.EventCombatSynchronizer = EventCombatSync
+
+
 class MerchantSync:
     """单机商店库存。
 
@@ -46,7 +125,7 @@ class MerchantSync:
     """
 
     def __init__(self):
-        self._inv = {}
+        self._memory = MerchantMemory()
 
     def OnMerchantEntered(self, inventories=None):
         if inventories is not None:
@@ -55,16 +134,23 @@ class MerchantSync:
         blitz = getattr(st, "GameMode", None) == getattr(G.GameMode, "Blitz", None)
         create = G.MerchantInventory.CreateForBlitzMerchant if blitz else G.MerchantInventory.CreateForNormalMerchant
         for player in G._iter(st.Players):
-            self._inv[id(player)] = create(player)
+            self.SetMerchantInventory(player, create(player))
+
+    def SetMerchantInventory(self, player, inventory):
+        """假商人等事件会换掉这一层的库存。之后购买和 GetInventoryFor 都看这一份。"""
+        self._memory.set(player, inventory)
+
+    def GetInventoryFor(self, player):
+        return self._memory.get(player)
 
     def GetLocalInventory(self):
         st = G.RunManager.Instance.State
         me = G.LocalContext.GetMe(st)
-        return self._inv[id(me)]
+        return self.GetInventoryFor(me)
 
     def OnMerchantExited(self):
         # 真游戏还会把没买的商品写进地图历史。整局结果用的是已经入手的牌和遗物，这里只清掉这一店的库存。
-        self._inv.clear()
+        self._memory.clear()
 
 
 class SyncQueue:

@@ -1334,6 +1334,69 @@ class Parser:
         if decl:
             self.ctx.dropped_locals.add(decl)
 
+    def _catch_clause(self):
+        """catch 已经读掉。绑定异常名，并按 C# 的类型顺序过滤，避免第一个 except Exception 吃掉后面的分支。"""
+        ctype, cname, when = None, None, None
+        if self.at("("):
+            self.next()
+            if not self.at(")"):
+                ctype = self.try_type()
+                if ctype is None:
+                    while not self.at(")") and self.peek().k != "eof":
+                        self.next()
+                elif self.peek().k == "id" and (self.at(")", 1) or self.at("when", 1)):
+                    cname = self.next().v
+                    self.ctx.declare(cname)
+                if not self.at(")"):
+                    while not self.at(")") and self.peek().k != "eof":
+                        self.next()
+            self.expect(")")
+        if self.at("when"):
+            self.next()
+            self.expect("(")
+            when = self.expr(0)
+            self.expect(")")
+        body = self.body_or_stmt()
+        return ctype, (pyname(cname) if cname else None), when, body
+
+    def _catch_type_name(self, ctype):
+        if not ctype:
+            return None
+        base = ctype.split(".")[-1].split("<")[0].replace("[]", "").rstrip("?")
+        if base in ("Exception", "SystemException"):
+            return None
+        return base
+
+    def _emit_catches(self, catches):
+        typed = []
+        for ctype, cname, when, body in catches:
+            tname = self._catch_type_name(ctype)
+            cond = []
+            if tname:
+                cond.append(f"_isinst(_caught, {tname})")
+            if when:
+                w = when
+                if cname:
+                    w = re.sub(rf"\b{re.escape(cname)}\b", "_caught", w)
+                cond.append(f"({w})")
+            typed.append((cond, cname, body))
+        simple = len(typed) == 1 and not typed[0][0]
+        if simple:
+            _, cname, body = typed[0]
+            head = f"except Exception as {cname}:" if cname else "except Exception:"
+            return [head] + body
+        lines = ["except Exception as _caught:"]
+        for i, (cond, cname, body) in enumerate(typed):
+            kw = "if" if i == 0 else "elif"
+            guard = " and ".join(cond) if cond else "True"
+            lines.append(f"    {kw} {guard}:")
+            if cname:
+                lines.append(f"        {cname} = _caught")
+            lines += [("    " + ln) if ln.strip() else ln for ln in body]
+        if typed[-1][0]:
+            lines += ["    else:", "        raise"]
+        return lines
+
     def _skip_parens(self):
         self.expect("(")
         depth = 1
@@ -1471,20 +1534,20 @@ class Parser:
                 self.next()
                 body = self.body_or_stmt()
                 lines = ["try:"] + body
-                n0 = len(lines)
+                catches = []
                 while self.at("catch"):
                     self.next()
-                    if self.at("("):
-                        self._skip_parens()
-                    if self.at("when"):
-                        self.next()
-                        self._skip_parens()
-                    lines += ["except Exception:"] + self.body_or_stmt()
+                    catches.append(self._catch_clause())
+                finally_body = None
                 if self.at("finally"):
                     self.next()
-                    lines += ["finally:"] + self.body_or_stmt()
-                if len(lines) == n0:
-                    lines += ["finally:", "    pass"]
+                    finally_body = self.body_or_stmt()
+                if not catches:
+                    lines += ["finally:"] + (finally_body or ["    pass"])
+                    return lines
+                lines += self._emit_catches(catches)
+                if finally_body is not None:
+                    lines += ["finally:"] + finally_body
                 return lines
             if v == "switch":
                 return self._switch_stmt()
