@@ -37,15 +37,15 @@ def test_fanji_order_and_formula():
             out["fanji"] = int(player.Creature.GetPower(_g=(CL.FanjiPower,)).Amount)
             raise RuntimeError("stop")
 
-    # v0.111（XxHash64 种子 + MegaRandom）下种子与旧版不可比：C1 第一场 [0] 8HP 5 层被攻击 1 段；C3 第一场 [2] 9HP 2 层被攻击 1 段
-    # 每段：宪法 +2、免责声明 +1（先挂层）→ 反伤 1+⌊层/2⌋ → 减 1 层
+    # C1 第一场仍是小史莱姆，被打 1 段：宪法 +2、免责声明 +1 → 反伤 1+⌊层/2⌋。
+    # 这份 v0.113.1 上 C3 第一场是 SHRINKER_BEETLE_WEAK，第一回合不攻击，所以没有反伤，只核对层数。
     R.play_run("Claude", 0, "C1", agent=A())
     assert out["before"][0] == (8, 5) and out["after"][0] == (3, 7)
     assert out["fanji"] == 1      # 两次获得 → 2 层，回合开始 -1
     out.clear()
     R.play_run("Claude", 0, "C3", agent=A())
-    assert out["before"][2] == (9, 2) and out["after"][2] == (6, 4)
-    assert out["fanji"] == 1      # 两次获得 → 2 层，回合开始 -1
+    assert out["before"][0] == (40, 5) and out["after"][0] == (40, 5)
+    assert out["fanji"] == 1
 
 
 def test_v351_starter_values():

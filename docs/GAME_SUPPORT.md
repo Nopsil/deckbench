@@ -1,8 +1,8 @@
 # 本机游戏版本 / Local game version
 
-DeckBench 不附带游戏文件。整局模拟用的是你本机 `python -m sts2sim.gamedata setup` 从自己的 `sts2.dll` 生成的缓存。下面是 **2026-11-21** 用一份真实安装生成并跑过的结果。换一份安装，角色和内容以那份 DLL 生成出来的 `ModelDb` 为准，不要把这一节的数字当成所有版本的清单。
+DeckBench 不附带游戏文件。整局模拟用的是你本机 `python -m sts2sim.gamedata setup` 从自己的 `sts2.dll` 生成的缓存。下面是 **2026-11-24** 用同一份 Mac v0.113.1 安装重新生成并实际执行过的结果。换一份安装，角色和内容以那份 DLL 生成出来的 `ModelDb` 为准。这些数字不是所有版本的清单，模拟器跑通也不等于和真机客户端逐项对齐。
 
-*DeckBench ships no game files. A full run uses the cache `python -m sts2sim.gamedata setup` builds from your own `sts2.dll`. The rows below are from one real install, generated and executed on 2026-11-21. Another install follows whatever `ModelDb` that DLL generates. These counts are not a catalog for every version.*
+*DeckBench ships no game files. A full run uses the cache `python -m sts2sim.gamedata setup` builds from your own `sts2.dll`. The rows below were generated from the same Mac v0.113.1 install and executed on 2026-11-24. Another install follows whatever `ModelDb` that DLL generates. A simulator run finishing is not client-by-client parity.*
 
 ## 跑过的安装 / The install that was executed
 
@@ -12,7 +12,7 @@ DeckBench 不附带游戏文件。整局模拟用的是你本机 `python -m sts2
 | `release_info.json` | commit `d09d48e5`（产品版本里的完整提交是 `d09d48e516cfd24314c1781f662787904f894aa8`），date `2026-11-14T02:31:11+00:00`，branch `v0.113.1` |
 | 实际反编译并跑过的 DLL | Mac osx-arm64 `sts2.dll`，10,647,040 字节，SHA-256 `a671e9efb86a7b80405133105665867b053c787670d475b4347cf5ccc15cb5fb` |
 | 同一 Steam build 的 Windows DLL | SHA-256 `62ecbe91093e1fa862de4329aac865209dcb297804caf0f0520d92d8c0b4a9c3`。二进制没有放到这台机器上，**没有**用它生成或开局 |
-| 转译 | ilspycmd 9.1.0.7988，`translator_rev` 3。2622 个类型里 6 个类型有转译失败的成员，见下文 |
+| 转译 | ilspycmd 9.1.0.7988，`translator_rev` 4。`catch (Type name)` 会绑定这个名字；更窄的 `catch` 不再把后面的分支一起吞掉。2622 个类型里 6 个类型仍有转译失败的成员，见下文 |
 
 这不是 2026-11-14 那份 v0.113.0 / commit `16ac0fe3` / build 26625880，也不是仓库里曾经写过的 v0.111 验证。v0.111 的 DLL 这次没有重跑。
 
@@ -45,22 +45,38 @@ Fool 的 C# 类型是 `MegaCrit.Sts2.Core.Models.Characters.Fool`。本地化键
 | 能力 | 322 | — | — | — |
 | 远古 | 8（NEOW、OROBAS、PAEL、TEZCATARA、NONUPEIPE、TANX、VAKUU、DARV） | — | — | — |
 
-只有本地化、程序集里没有对应类型的牌和遗物，模拟器不会生成，也不标成已支持。事件房走生成代码。进阶 0 的几局里实际进入过的事件 id 包括 `NEOW`、`ROOM_FULL_OF_CHEESE`、`JUNGLE_MAZE_ADVENTURE`、`SELF_HELP_BOOK`、`WOOD_CARVINGS`、`WHISPERING_HOLLOW`。战斗 id 包括 `SHRINKER_BEETLE_WEAK`、`SLIMES_WEAK`、`BYGONE_EFFIGY_ELITE` 等。没有把 62 个事件逐个打一遍。
+只有本地化、程序集里没有对应类型的牌和遗物，模拟器不会生成，也不标成已支持。
 
-*Cards and relics that exist only as localization strings, with no type in this assembly, are not simulated and are not marked supported. A handful of event and encounter ids were entered during ascension-0 runs. The other events were not each played.*
+*Cards and relics that exist only as localization strings, with no type in this assembly, are not simulated and are not marked supported.*
 
-## 转译失败、仍不能当支持 / Members that did not translate
+## 这次实际执行过的 / Executed this pass
 
-这 6 个类型有成员变成 `cs_broken`。调用到它们会抛错，不能算支持：
+强制进入 `AllEvents` 的 62 个事件（规范模型，不是可变克隆）。每个选项在一局新的愚者、进阶 0 上点过。事件战在修复前不会进房；下面的战斗数字是修复之后单独复测的。
 
-- `PlayerChoiceResult.FromNetData`：多人联机选牌结果的反序列化。单机开局用的其它 `From*` 能生成。
-- `EnergyIconHelper.GetPool`：能量图标，不是战斗数值。
-- `LocManager` 的格式化加载，以及三个 JSON 序列化上下文的 `GetTypeInfo`：本地化文本另从你的 `.pck` 或 `DECKBENCH_GAME_LOC_*` 读，不靠这几个失败成员。
+| 范围 | 结果 |
+| --- | --- |
+| 62 个事件进房 | 61 个直接进房。`FAKE_MERCHANT` 修复前抛 `AttributeError`（没有 `SetMerchantInventory`），修复后进房并摆出 6 件有库存的遗物 |
+| 选项 | 130 个初始选项都调用了对应函数且没有抛错。`THE_FUTURE_OF_POTIONS` 在 0 瓶药水时是 0 个选项；另测了先拿到 2 瓶愚者药水再进房，出现 2 个选项，选第一个后药水从 2 变成 1，事件结束 |
+| 事件战 | `BATTLEWORN_DUMMY` 三个设置都打完对应遭遇（V1/V2/V3，各 4 回合，胜）并结束事件。`DENSE_VEGETATION` 的战斗、`PUNCH_OFF` 的战斗、`THE_LANTERN_KEY` 的战斗都会进入战斗房。起始牌组打后面三场会阵亡，这是这副牌打输了，不是进房失败 |
+| 愚者牌 | 牌池 90 张都在 `SLIMES_WEAK` 里尝试打出。89 张打出且不抛错。`ENRAPTURE` 是多人专用、目标是友方，单机没有目标，所以不能打出 |
+| 愚者遗物 / 药水 | 遗物池 8 个（含起始 `SONG_BOW`）各进了一场战斗并结束一回合，不抛错。`Fool4Epoch` 的 3 瓶药水都能获得并在战斗里使用 |
+| 瞄准 | 进战斗时 `AIM_POWER` 是 6。`FOOLISH_SHOT` 基础伤害 15，打在没有格挡的敌人身上掉 21 点生命 |
+| 整局 | 愚者进阶 0 种子 `FOOLSEED0001`、`FOOLSEED0002`，进阶 1 种子 `ASCSEED00001`，进阶 10 种子 `FOOLSEED0001`，`error` 都是空的。四局都没赢。这只说明这些种子能跑完，不说明机制和客户端一致 |
 
-## 明确没做或没测 / Not done, or not tested
+*All 62 events were force-entered on a fresh Fool ascension-0 run, and each initial option was invoked. Event combats did not start before the adapter fix; the combat rows above are from a retest after that fix. 89 of 90 Fool cards were played in `SLIMES_WEAK` without raising. `ENRAPTURE` is multiplayer-only and targets an ally, so a solo fight has no legal target. The 8 Fool relics and 3 Fool potions were triggered without raising. Starting Aim is 6, and `FOOLISH_SHOT` (15 base) removed 21 life from an unblocked enemy. Four Fool runs finished with an empty `error` and no victory.*
 
-- Windows 那份 DLL 没有跑。
-- 旧版 YAML 战斗模拟器仍要当前的 spire-codex（`eng_`/`zhs_` 的 monsters、encounters、relics、potions、powers）。这次没有用旧缓存里的 codex。setup 会在缓存里写出 `monster_ai.json`（这份安装 119 条）和 `encounter_monsters.json`（90 条），那是给旧战斗模拟器用的解析结果，**没有**拿它跑旧战斗测试，也不随仓库分发。
-- 商店没买的商品不会写入地图历史。买下来的牌、遗物和药水走游戏自己的购买函数。
-- mentor 的神经网络仍只覆盖原来那 5 个角色。Fool 的局外决策会按现有逻辑回退，不把 Fool 说成 mentor 已支持。
-- 没有逐张牌、逐个遗物、逐瓶药水对过真游戏。进阶 10 的测试只证明这些种子能跑完且不报错，不证明每个新机制都和客户端一致。
+## 已知限制或不支持 / Known limits
+
+- `FAKE_MERCHANT` 是自定义界面。库存能建出来。买东西和扔腐化药水要 `NFakeMerchant` 节点，模拟器没有这个界面，所以不会买、也不会因此进 `FAKE_MERCHANT_EVENT_ENCOUNTER`。
+- `PunchOff.PunchEachOther` 仍是空函数。原来的循环只播动画，同步执行会卡死。
+- 6 个类型仍有 `cs_broken` 成员，调用会抛错：`PlayerChoiceResult.FromNetData`（多人选牌反序列化）、`EnergyIconHelper.GetPool`（能量图标）、`LocManager` 的格式化加载，以及三个 JSON 序列化上下文的 `GetTypeInfo`。单机战斗不靠这几个成员。
+- 商店没买的商品仍然不写入地图历史。
+- mentor 的神经网络仍只覆盖原来那 5 个角色。Fool 的局外决策会回退，不把 Fool 说成 mentor 已支持。
+- Windows 那份 DLL（SHA-256 `62ecbe91093e1fa862de4329aac865209dcb297804caf0f0520d92d8c0b4a9c3`）没有在这台机器上生成或开局。
+
+## 仍未覆盖 / Not covered
+
+- 没有把 90 张愚者牌、8 个遗物、3 瓶药水的数值和客户端逐条对过。上面只证明这些调用不抛错，以及瞄准这一条用生命差对过。
+- 130 个选项里，只有上面点名的事件战和药水交易对过状态变化。其余选项只确认调用没有抛错。
+- 深渊浴场的「继续浸泡」被连续选了 8 次都没有抛错，没有把「离开」那条分支单独当战斗来测。
+- 旧版 YAML 战斗模拟器这次没有跑。setup 仍会写出 `monster_ai.json`（119 条）和 `encounter_monsters.json`（90 条），不随仓库分发。

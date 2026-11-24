@@ -27,7 +27,7 @@ GAME_FOLDER = "Slay the Spire 2"        # Steam 安装目录名（仅用于在�
 DLL = "sts2.dll"
 FORMAT = 2
 # 转译器有行为变化时加 1。旧缓存没有这个字段，或数字不同，就拒绝加载，让 setup 按当前安装重新生成。
-TRANSLATOR_REV = 3
+TRANSLATOR_REV = 4
 
 # 转译范围（与 tools/gen_game.sh 相同）
 RELS = ("Commands Hooks Entities Combat MonsterMoves Factories Odds Rewards Map Random ValueProps Localization Models "
