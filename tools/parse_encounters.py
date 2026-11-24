@@ -34,6 +34,165 @@ def _slot_of(expr, var, lists):
     return var.get(v)
 
 
+def _paren_groups(body, needle):
+    """needle 结尾停在要读的左括号上。返回每一处括号里的文本。"""
+    out = []
+    start = 0
+    while True:
+        j = body.find(needle, start)
+        if j < 0:
+            break
+        i = j + len(needle) - 1
+        if i >= len(body) or body[i] != "(":
+            start = j + 1
+            continue
+        depth = 0
+        for k in range(i, len(body)):
+            if body[k] == "(":
+                depth += 1
+            elif body[k] == ")":
+                depth -= 1
+                if depth == 0:
+                    out.append(body[i + 1:k])
+                    start = k + 1
+                    break
+        else:
+            break
+    return out
+
+
+def _assign_map(body, lists):
+    assigns = {}
+    for match in re.finditer(r'(\w+)\s*=\s*(\w+)\.ToList\(\)', body):
+        opts = lists.get(match.group(2))
+        if isinstance(opts, list):
+            assigns[match.group(1)] = list(opts)
+    for match in re.finditer(r'(\w+)\s*=\s*(?:\([^)]*\)\s*)?ModelDb\.Monster<(\w+)>', body):
+        assigns[match.group(1)] = [snake(match.group(2))]
+    for match in re.finditer(r'(\w+)\s*=\s*(?:\(\w+\))?base\.Rng\.NextItem\((\w+)\)', body):
+        opts = lists.get(match.group(2))
+        if isinstance(opts, list):
+            assigns[match.group(1)] = list(opts)
+        elif isinstance(assigns.get(match.group(2)), list):
+            assigns[match.group(1)] = list(assigns[match.group(2)])
+    return assigns
+
+
+def _resolve_name(name, lists, assigns):
+    if isinstance(lists.get(name), list):
+        return list(lists[name])
+    if isinstance(assigns.get(name), list):
+        return list(assigns[name])
+    return None
+
+
+def _expr_slot(expr, lists, assigns):
+    expr = expr.strip()
+    if "NextItem" in expr:
+        match = re.search(r'NextItem\((\w+)\)', expr)
+        return _resolve_name(match.group(1), lists, assigns) if match else None
+    match = re.search(r'ModelDb\.Monster<(\w+)>', expr)
+    if match:
+        return [snake(match.group(1))]
+    match = re.match(r'(\w+)\.ToMutable\(\)', expr)
+    if match:
+        return assigns.get(match.group(1))
+    if re.fullmatch(r'\w+', expr):
+        return assigns.get(expr)
+    return None
+
+
+def _tuple_slots(body, lists):
+    assigns = _assign_map(body, lists)
+    slots = []
+    for inner in _paren_groups(body, ".Add("):
+        if not inner.startswith("("):
+            continue
+        inner = inner[1:].removesuffix(")")
+        first = split_args(inner)[0] if inner.strip() else ""
+        slot = _expr_slot(first, lists, assigns)
+        if not slot:
+            return None
+        slots.append(slot)
+    return slots
+
+
+def _slot_count(src):
+    match = re.search(r'string\[(\d+)\]', src)
+    return int(match.group(1)) if match else 0
+
+
+def _brace_block(text, open_at):
+    depth = 0
+    for k in range(open_at, len(text)):
+        if text[k] == "{":
+            depth += 1
+        elif text[k] == "}":
+            depth -= 1
+            if depth == 0:
+                return text[open_at + 1:k], k + 1
+    return None, None
+
+
+def _case_comps(case, lists):
+    tokens = []
+    for match in re.finditer(r'ModelDb\.Monster<(\w+)>|NextItem\((\w+)\)', case):
+        if match.group(1):
+            tokens.append([snake(match.group(1))])
+            continue
+        opts = lists.get(match.group(2))
+        if not isinstance(opts, list):
+            return None
+        tokens.append(list(opts))
+    if not tokens:
+        return None
+    comps = [[]]
+    for opts in tokens:
+        comps = [row + [opt] for row in comps for opt in opts]
+    return comps
+
+
+def _switch_alternatives(body, lists):
+    match = re.search(r'\bswitch\s*\(', body)
+    if not match:
+        return None
+    brace = body.find("{", match.end())
+    if brace < 0:
+        return None
+    block, end = _brace_block(body, brace)
+    if block is None:
+        return None
+    tail = [snake(name) for name in re.findall(r'ModelDb\.Monster<(\w+)>', body[end:])]
+    alts = []
+    for case in re.split(r'\bcase\s+[\w.]+\s*:', block)[1:]:
+        case = case.split("break;", 1)[0]
+        comps = _case_comps(case, lists)
+        if not comps:
+            continue
+        # 每个 case 先等权，case 里面的组合再平分。这样「三选一，再在组里抽」不会被组合数量淹没。
+        share = 1 / len(comps)
+        for comp in comps:
+            alts.append([share, comp + tail])
+    return alts or None
+
+
+def _fallback(src, body, lists):
+    """v0.113.1 里几种旧正则盖不住的 GenerateMonsters。"""
+    slots = _tuple_slots(body, lists)
+    if slots:
+        if re.search(r'foreach\s*\([^)]*\bSlots\b', body) and len(slots) == 1:
+            count = _slot_count(src)
+            if count:
+                slots = [list(slots[0]) for _ in range(count)]
+        random_comp = "Rng" in body or any(len(slot) != 1 for slot in slots)
+        return {"slots": slots, "pool": None, "random": random_comp or "Rng" in body,
+                "source": "代码(随机组成)" if random_comp else "代码"}
+    alts = _switch_alternatives(body, lists)
+    if alts:
+        return {"slots": [], "pool": None, "random": True, "source": "代码(随机组成)", "alternatives": alts}
+    return None
+
+
 def parse(path):
     src = open(path, encoding="utf-8").read()
     b = body_of(src, "GenerateMonsters()")
@@ -77,7 +236,12 @@ def parse(path):
         tag = "代码(随机组成)"
     else:
         tag = "代码"
-    return {"slots": slots, "pool": pool, "random": rnd, "source": tag}
+    result = {"slots": slots, "pool": pool, "random": rnd, "source": tag}
+    if tag == "缺失":
+        alt = _fallback(src, b, lists)
+        if alt:
+            return alt
+    return result
 
 
 # 解析器处理不了、按 C# 手工转写的组成（alternatives = 候选的完整组成及权重）
@@ -85,13 +249,19 @@ def parse(path):
 MANUAL = {}
 
 
-def main(d):
+def parse_dir(directory):
     out = {}
-    for f in sorted(os.listdir(d)):
-        if f.endswith(".cs"):
-            r = parse(os.path.join(d, f))
-            if r is not None:
-                out[snake(f[:-3])] = r
+    for name in sorted(os.listdir(directory)):
+        if not name.endswith(".cs"):
+            continue
+        parsed = parse(os.path.join(directory, name))
+        if parsed is not None:
+            out[snake(name[:-3])] = parsed
+    return out
+
+
+def main(d):
+    out = parse_dir(d)
     for k, v in MANUAL.items():
         out[k] = {"slots": [], "pool": None, "random": True, "source": "代码(手工转写)", **v}
     json.dump(out, open(os.path.join(os.environ.get("DECKBENCH_OUT") or os.path.join(ROOT, "data"), "encounter_monsters.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)

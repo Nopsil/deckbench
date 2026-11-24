@@ -332,3 +332,34 @@ class NoxiousFumes(Power):
         if ev.side == "player":
             for e in C.alive_enemies():
                 C.apply_power(e, "POISON", self.amount, source=("power", self), multi=True, src_name=self.src)
+
+
+@register_power
+class Aim(Power):
+    """瞄准：带 arrow 标记的攻击加上当前层数，这一击之后清掉。
+
+    旧模拟器没有箭袋，不检查身上还有没有箭。多段攻击只在第一段加上层数，随后层数清掉。
+    """
+    id = "AIM"
+    name = "瞄准"
+    kind = "buff"
+    ai_value = 1.5
+
+    def on_damage_add(self, C, ev):
+        if ev.src is not self.owner or ev.kind != "attack" or self.amount <= 0:
+            return
+        card = ev.card
+        tags = getattr(getattr(card, "d", None), "tags", ())
+        if "arrow" not in tags or self.data.get("spent"):
+            return
+        ev.amount += self.amount
+        self.data["spent"] = self.amount
+
+    def on_attacked(self, C, ev):
+        spent = self.data.get("spent")
+        if ev.attacker is not self.owner or not spent:
+            return
+        self.amount -= spent
+        self.data["spent"] = 0
+        if self.amount <= 0:
+            self.owner.powers.pop(self.id, None)

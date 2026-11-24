@@ -11,15 +11,19 @@ from collections import Counter
 
 from . import gamedata as _gd
 
-DATA = _gd.codex_dir()   # 不随仓库分发
 _IDX = {}
 
 
 def codex_index(kind, lang="zhs"):
-    key = (kind, lang)
+    root = _gd.codex_dir()
+    key = (root, kind, lang)
     if key not in _IDX:
-        path = os.path.join(DATA, f"{lang}_{kind}.json")
-        _IDX[key] = {x["id"]: x for x in json.load(open(path, encoding="utf-8"))} if os.path.exists(path) else {}
+        path = os.path.join(root, f"{lang}_{kind}.json")
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as handle:
+                _IDX[key] = {row["id"]: row for row in json.load(handle)}
+        else:
+            _IDX[key] = {}
     return _IDX[key]
 
 
