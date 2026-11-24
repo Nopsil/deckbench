@@ -49,8 +49,9 @@ cd gui\web; npm install; npm run build; cd ..\..
    在安装目录里找 `sts2.dll`。**找不到就打印说明并退出（退出码 2）**。
 2. **本机反编译**：用 ilspycmd 把你自己的 `sts2.dll` 反编译到临时目录（用完即删）。
 3. **转译**：`tools/cs2py_files.py`（+ `tools/cs_patches.py` 的结构化补丁）把游戏逻辑转成 Python `game.py`；
-   `tools/parse_monster_ai.py`、`tools/parse_encounters.py` 解析怪物出招状态机和遭遇组成（供旧版战斗模拟器用）。
-4. **写入本机缓存并绑定安装**：`%LOCALAPPDATA%\deckbench\<哈希>\`（Linux/macOS：`~/.cache/deckbench/`，可用 `DECKBENCH_CACHE` 改），
+   `tools/parse_monster_ai.py`、`tools/parse_encounters.py` 解析怪物出招状态机和遭遇组成（供旧版战斗模拟器用）。没有自己状态机的子类会沿基类抄一份。
+4. **旧版战斗目录**：找得到 eng/zhs 时（`DECKBENCH_GAME_LOC_ENG` / `DECKBENCH_GAME_LOC_ZHS`，或安装里的 `.pck`），把怪物、遭遇、牌、遗物、药水、能力和角色写成缓存里的 `legacy-codex/`，并写 `codex_stamp.json`（DLL 的 SHA-256、`release_info` 的版本和 commit）。没有本地化就跳过这一步，整局模拟仍然生成。
+5. **写入本机缓存并绑定安装**：`%LOCALAPPDATA%\deckbench\<哈希>\`（Linux/macOS：`~/.cache/deckbench/`，可用 `DECKBENCH_CACHE` 改），
    `manifest.json` 记录安装路径和 `sts2.dll` 的 SHA-256。每次加载（`import sts2sim.gen.game`）都会重新校验：
    安装不见了或文件变了（例如游戏更新）就**拒绝加载**，提示重新生成。缓存里有 `DO_NOT_REDISTRIBUTE.txt`——**请勿分发缓存内容**。
 
@@ -64,7 +65,7 @@ python -m sts2sim.gamedata setup [--game-dir PATH] [--keep-src]   # 生成；--k
 python -m sts2sim.gamedata status                                 # 查看当前缓存绑定的安装、哈希、版本
 ```
 
-环境变量 / environment variables：`DECKBENCH_GAME_DIR`（游戏目录）、`DECKBENCH_CACHE`（缓存根目录）、`DECKBENCH_TEMP`（反编译临时目录，默认是缓存根目录下的 `tmp\`，不用系统 TEMP / decompile scratch dir, defaults to `<cache>/tmp`, not the system TEMP）。
+环境变量 / environment variables：`DECKBENCH_GAME_DIR`（游戏目录）、`DECKBENCH_CACHE`（缓存根目录）、`DECKBENCH_TEMP`（反编译临时目录，默认是缓存根目录下的 `tmp\`，不用系统 TEMP / decompile scratch dir, defaults to `<cache>/tmp`, not the system TEMP）、`DECKBENCH_GAME_LOC_ENG` / `DECKBENCH_GAME_LOC_ZHS`（已解出的本地化表目录；不设就从 `.pck` 读）。
 
 ## 命令行整局批量运行 / Full-run batches from the command line
 
@@ -228,11 +229,10 @@ spire-mentor 已经实现了这些牌，但 `state_from_dict` 查牌 id 时只�
 
 单场战斗大批量测试：卡牌用 YAML + Python 钩子写（见 [MODDING.md](MODDING.md)），实验配置在 `experiments/*.yaml`。
 
-运行（`python -m sts2sim <实验.yaml>`）需要两样不随仓库分发的本机数据：
-  - spire-codex 格式的怪物/遭遇/卡牌 JSON（`eng_*.json`、`zhs_*.json`）：用第三方工具 spire-codex 从你自己的安装导出，
-    放到 `data/spire-codex/` 或用 `DECKBENCH_CODEX_DIR` 指定；
-  - 原版对照组 `mods/vanilla/`（原版卡牌的 YAML 写法，自行整理；已 gitignore）。
-  缺少时会报错退出；整局模拟和 GUI 的整局功能不受影响。界面里卡牌名称在没有这份数据时显示为 ID。
+运行（`python -m sts2sim <实验.yaml>`）需要不随仓库分发的本机数据：
+  - 怪物/遭遇/牌/遗物/药水/能力/角色的 `eng_*.json`、`zhs_*.json`。`python -m sts2sim.gamedata setup` 在有中英本地化时写到缓存的 `legacy-codex/`，并用 `codex_stamp.json` 绑到这份 `sts2.dll`。已经校验过的缓存不会改去读没盖戳的 `data/spire-codex/`。`DECKBENCH_CODEX_DIR` 仍可指向别的目录；那个目录若带戳且哈希不对，会拒绝加载。单独重导：`python -m sts2sim.legacycodex --src <反编译的 Core> --loc-eng <目录> --loc-zhs <目录> --out <目录> --dll sts2.dll`。
+  - 原版对照组 `mods/vanilla/`（原版卡牌的 YAML 写法，自行整理；已 gitignore）。愚者起始牌里能直译的伤害/格挡可以从 `legacy-codex` 的卡牌记录打，不需要这份 vanilla 目录。
+  缺少怪物数据时会报错退出；整局模拟和 GUI 的整局功能不受影响。界面里卡牌名称在没有这份数据时显示为 ID。
 
 
 ```bash
@@ -257,17 +257,20 @@ spire-mentor 已经实现了这些牌，但 `state_from_dict` 查牌 id 时只�
 
 ### 敌人数据从哪来 / Where enemy behaviour comes from
 
-- 出招逻辑：`tools/parse_monster_ai.py` 从**本机反编译**的 `Models/Monsters/*.cs` 解析出招状态机（MoveState、RandomBranchState 的权重 / 不可重复 / 最多连续 N 次 / 冷却、ConditionalBranchState 的条件、开场招），首次生成时写进本机缓存的 `monster_ai.json`。
-- 遭遇组成：`tools/parse_encounters.py` 解析 `Models/Encounters/*.cs` 的 `GenerateMonsters()`，写进缓存的 `encounter_monsters.json`；解析不了的少数遭遇退回近似组成。
-- 招式数值、名字：来自你本机导出的 spire-codex 格式 JSON（见上）；它漏掉的招式数值由代码推出。
+- 出招逻辑：`tools/parse_monster_ai.py` 从**本机反编译**的 `Models/Monsters/*.cs` 解析出招状态机（MoveState、RandomBranchState 的权重 / 不可重复 / 最多连续 N 次 / 冷却、ConditionalBranchState 的条件、开场招），首次生成时写进本机缓存的 `monster_ai.json`。子类没有自己的 `GenerateMoveStateMachine` 时沿基类抄一份，键用子类 id。属性名可以以 `m` 结尾；只有 `5m` 这种小数后缀会被剪掉。`GetValueIfAscension` 后面的 `IsDread() ? N : 0` 不加进数值。
+- 遭遇组成：`tools/parse_encounters.py` 解析 `Models/Encounters/*.cs` 的 `GenerateMonsters()`，写进缓存的 `encounter_monsters.json`。除了原来的数组写法，也认 `list.Add((ModelDb.Monster<...>().ToMutable(), ...))`、`foreach` 槽位，和 `switch` 分支（每个 case 先等权，case 里面的组合再平分）。解析不了的退回近似组成。
+- 招式数值、名字：来自上面那份 `legacy-codex`（或你用 `DECKBENCH_CODEX_DIR` 指的目录）。它漏掉的招式数值由代码推出。血量同样取非进阶、非 Dread 的数。
 - AI 读取意图：`C.predict_intent_damage(enemy)` = 意图伤害 × 段数，含力量/虚弱/易伤，击晕或沉睡时为 0。
 - 覆盖率：每份报告第 6 节 + `coverage_*.csv`；`tools/import_codex.py` 可把还没实现的遗物/药水/能力导出成本机 YAML 桩（`data/stubs/`，已 gitignore，不要提交）。
 
 ### 已知限制（旧版）
 
-- 单场战斗、满血开局；不模拟地图/选卡/商店/事件，成型卡组是手写的约 15 张 + 自动升级。
+- 单场战斗、满血开局；不模拟地图/选卡/商店/事件，成型卡组是手写的约 15 张 + 自动升级。从 `legacy-codex` 打的起始牌组只用直译出来的伤害和格挡。
 - 召唤不生成新敌人；少数敌人能力只记层数；随机数和游戏不同，同种子出招不会逐招一致（分布和约束一致）。
+- 数值是非进阶、非 Dread。箭袋不模拟。`AIM` 只加在带 `arrow` 标记的攻击上，打完这一击就清掉；多段只加第一段。
 - 启发式 AI 是贪心的，不会为下回合规划；需要先铺引擎的组合可以换束搜索 AI（`--agent beam`）。
+
+这一份 Mac v0.113.1 上实际导出和打过的范围写在 [GAME_SUPPORT.md](GAME_SUPPORT.md)。
 
 ## 导入对局记录、预览种子 / Import a run, preview a seed
 
@@ -321,7 +324,8 @@ tests/               单元测试
 - 不需要游戏：`tests/test_gamedata.py`（找安装、缓存绑定/拒绝加载、仓库里没有生成代码）、`tests/test_saveimport.py`（虚构的对局 JSON）、`tests/test_seedpreview.py` 里不启动引擎的部分。
 - 种子预览的真生成：有本机缓存时 `tests/test_seedpreview.py` 会跑 `preview()`；没有就只检查「缺少引擎」的报错。JSON 结构和 `--cache` 用虚构结果测，不启动游戏。
 - 需要本机生成的缓存（没有时自动 skip）：`test_engine.py`、`test_ai_upgrade.py`、`test_claude_v35.py`、`test_status_damage.py`。
-- 需要旧版模拟器的本机数据（spire-codex JSON + `mods/vanilla/`，没有时不收集）：`test_claude.py`、`test_intents.py`、`test_shensu.py`。
+- 不需要游戏、用合成夹具覆盖旧版目录导出、戳的哈希、Dread 数值、新的遭遇写法和一场愚者形状的牌组战斗：`tests/test_legacy_codex.py`。
+- 需要旧版模拟器的本机数据（盖过戳的 `legacy-codex` 或 `DECKBENCH_CODEX_DIR`，外加 `mods/vanilla/`，没有时不收集）：`test_claude.py`、`test_intents.py`、`test_shensu.py`。
 - 图形界面端到端：`gui/tests_e2e.py`（Playwright，先 `python -m gui.app --serve --port 8765`）。
 - 持续集成在 Ubuntu 和 Windows 上用 Python 3.11 与 3.12 跑上面这套 pytest，并把 pytest-cov 的摘要写进作业；lint 是 `ruff==0.17.4` 的 `ruff check .`。作业怎么拆、摘要表长什么样，见 [CI.md](CI.md)。补测试那一次的模块覆盖率见 [COVERAGE.md](COVERAGE.md)。校准的匹配规则见 [CALIBRATION.md](CALIBRATION.md)。
   *Continuous integration runs this pytest suite on Ubuntu and Windows with Python 3.11 and 3.12, writes a pytest-cov summary on the job, and lints with `ruff==0.17.4` (`ruff check .`). The jobs are described in [CI.md](CI.md). The per-module snapshot from the coverage pass is [COVERAGE.md](COVERAGE.md). Calibration matching is [CALIBRATION.md](CALIBRATION.md).*

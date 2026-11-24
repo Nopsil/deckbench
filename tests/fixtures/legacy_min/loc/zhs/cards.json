@@ -1,0 +1,10 @@
+{
+ "JAB.title": "戳击",
+ "JAB.description": "造成 6 点伤害。",
+ "WARD.title": "护持",
+ "WARD.description": "获得 4 点格挡。",
+ "SHOT.title": "射击",
+ "SHOT.description": "用箭造成 9 点伤害。",
+ "HEX.title": "咒",
+ "HEX.description": "给予 2 层虚弱。"
+}

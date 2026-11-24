@@ -207,10 +207,48 @@ def data_path(name):
     return p if os.path.exists(p) else None
 
 
+def _verified_cache():
+    try:
+        return verify()
+    except GameDataError:
+        return None
+
+
 def codex_dir():
-    """旧版 YAML 战斗模拟器需要的 spire-codex 格式 JSON（eng_/zhs_ monsters、encounters、cards…）。
-    不随仓库分发：由你用第三方工具 spire-codex 从自己的安装导出，放到 DECKBENCH_CODEX_DIR 或 data/spire-codex/（已 gitignore）。"""
-    return os.environ.get("DECKBENCH_CODEX_DIR") or os.path.join(ROOT, "data", "spire-codex")
+    """旧版 YAML 战斗模拟器的怪物/遭遇/卡牌 JSON。
+
+    ``DECKBENCH_CODEX_DIR`` 优先（测试夹具或你自己的目录）。
+    否则，已经 ``setup`` 过的缓存用其中的 ``legacy-codex/``，不回退到没盖戳的
+    ``data/spire-codex/``，避免新的 ``monster_ai.json`` 配上旧导出。
+    还没有缓存时，才用 ``data/spire-codex/``。
+    """
+    explicit = os.environ.get("DECKBENCH_CODEX_DIR")
+    if explicit:
+        return explicit
+    cache = _verified_cache()
+    if cache:
+        return os.path.join(cache, "legacy-codex")
+    return os.path.join(ROOT, "data", "spire-codex")
+
+
+def _stamp_problem(directory):
+    from .legacycodex import FORMAT, KIND, read_stamp
+    stamp = read_stamp(directory)
+    if stamp is None:
+        return None
+    if stamp.get("format") != FORMAT or stamp.get("kind") != KIND:
+        return ("旧版战斗目录的版本戳对不上当前程序 / legacy codex stamp does not match this build: "
+                + os.path.join(directory, "codex_stamp.json"))
+    cache = _verified_cache()
+    if not cache:
+        return None
+    with open(os.path.join(cache, "manifest.json"), encoding="utf-8") as handle:
+        manifest = json.load(handle)
+    if stamp.get("dll_sha256") != manifest.get("dll_sha256"):
+        return ("旧版战斗目录是另一份 sts2.dll 导出的，已拒绝和当前缓存混用 / "
+                "legacy codex was exported from a different sts2.dll; refusing to mix it with this cache.\n"
+                + directory)
+    return None
 
 
 def require_codex():
@@ -218,7 +256,12 @@ def require_codex():
     if not os.path.exists(os.path.join(d, "eng_monsters.json")):
         raise GameDataError(
             f"旧版 YAML 战斗模拟器需要本机导出的怪物/遭遇数据，未找到 / legacy combat simulator data not found: {d}\n"
-            "见 README「旧版战斗模拟器」/ see README 'Legacy combat simulator'. 整局模拟不受影响 / full-run engine is unaffected.")
+            "有中英本地化时，python -m sts2sim.gamedata setup 会把 legacy-codex 写进缓存并盖上 dll 哈希。\n"
+            "When eng/zhs localization is available, python -m sts2sim.gamedata setup writes a hash-stamped legacy-codex into the cache.\n"
+            "整局模拟不受影响 / full-run engine is unaffected.")
+    problem = _stamp_problem(d)
+    if problem:
+        raise GameDataError(problem)
     return d
 
 
@@ -312,12 +355,12 @@ def setup(game_dir=None, keep_src=False):
         else:
             print("警告：没找到 .NET 9 运行时，反编译质量可能下降 / warning: .NET 9 runtime not found", flush=True)
         argv += ["-r", bin_dir, dll]
-        print("[1/3] 本机反编译 / decompiling locally ...", flush=True)
+        print("[1/4] 本机反编译 / decompiling locally ...", flush=True)
         _run(argv, stdout=subprocess.DEVNULL, env=dict(os.environ, TEMP=troot, TMP=troot, TMPDIR=troot))
         core = os.path.join(src, "MegaCrit", "Sts2", "Core")
         if not os.path.isdir(core):
             raise GameDataError("反编译结果里没有预期的命名空间 / unexpected decompiler output layout")
-        print("[2/3] 转译 / transpiling ...", flush=True)
+        print("[2/4] 转译 / transpiling ...", flush=True)
         # 进程内调用（打包后的 exe 里 sys.executable 不是 python）
         if TOOLS not in sys.path:
             sys.path.insert(0, TOOLS)
@@ -331,7 +374,7 @@ def setup(game_dir=None, keep_src=False):
         import undefined_names  # noqa
         with open(os.path.join(tmp_out, "undefined.txt"), "w", encoding="utf-8") as f:
             f.write("\n".join(undefined_names.compute(os.path.join(tmp_out, "game.py"))) + "\n")
-        print("[3/3] 解析怪物 / 遭遇 / parsing monsters & encounters ...", flush=True)
+        print("[3/4] 解析怪物 / 遭遇 / parsing monsters & encounters ...", flush=True)
         old = os.environ.get("DECKBENCH_OUT")
         os.environ["DECKBENCH_OUT"] = tmp_out
         try:
@@ -348,6 +391,15 @@ def setup(game_dir=None, keep_src=False):
                 os.environ.pop("DECKBENCH_OUT", None)
             else:
                 os.environ["DECKBENCH_OUT"] = old
+        print("[4/4] 旧版战斗目录 / legacy codex ...", flush=True)
+        from .legacycodex import export_tree, load_loc_pair
+        eng_loc, zhs_loc = load_loc_pair()
+        if eng_loc and zhs_loc:
+            stamp = export_tree(core, eng_loc, zhs_loc, os.path.join(tmp_out, "legacy-codex"), digest, rel)
+            print("    ", stamp.get("counts"), "playable:", ",".join(stamp.get("playable_characters") or []), flush=True)
+        else:
+            print("    跳过：没有 eng/zhs 本地化（DECKBENCH_GAME_LOC_ENG / _ZHS，或安装里的 .pck）/ "
+                  "skipped: no eng/zhs localization", flush=True)
         if keep_src:
             shutil.copytree(src, os.path.join(tmp_out, "src"))
     finally:

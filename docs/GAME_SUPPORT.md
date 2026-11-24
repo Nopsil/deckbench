@@ -57,10 +57,62 @@ Fool 的 C# 类型是 `MegaCrit.Sts2.Core.Models.Characters.Fool`。本地化键
 - `EnergyIconHelper.GetPool`：能量图标，不是战斗数值。
 - `LocManager` 的格式化加载，以及三个 JSON 序列化上下文的 `GetTypeInfo`：本地化文本另从你的 `.pck` 或 `DECKBENCH_GAME_LOC_*` 读，不靠这几个失败成员。
 
+## 旧版 YAML 战斗模拟器 / Legacy YAML combat simulator
+
+同一份 Mac `sts2.dll` 和从 `.pck` 解出的 eng / zhs 表，用 `python -m sts2sim.gamedata setup` 里的导出（也可以 `python -m sts2sim.legacycodex`）写进缓存的 `legacy-codex/`。`codex_stamp.json` 记着 format 1、`dll_sha256`、版本 `v0.113.1`、commit `d09d48e5`。已经校验过的缓存不会再去读没盖戳的 `data/spire-codex/`。要故意用别的目录，设置 `DECKBENCH_CODEX_DIR`；那份目录若带戳且哈希和当前 DLL 不同，加载会拒绝。这些 JSON 不进仓库。
+
+*The same Mac `sts2.dll` and the eng / zhs tables from the `.pck` were exported by the step inside `python -m sts2sim.gamedata setup` (or `python -m sts2sim.legacycodex`) into `legacy-codex/` in the cache. `codex_stamp.json` records format 1, the DLL SHA-256, version `v0.113.1` and commit `d09d48e5`. A verified cache does not read an unstamped `data/spire-codex/`. `DECKBENCH_CODEX_DIR` points somewhere else on purpose; a stamp whose hash is not this DLL is refused. The JSON is not in the repository.*
+
+| 种类 | 这次写出的目录 | 说明 |
+| --- | ---: | --- |
+| 怪物 | 122 | 跳过 `Deprecated*` / `Mock*`。没有自己状态机的子类沿基类抄出招和血量 |
+| 遭遇 | 90 | 跳过 `DeprecatedEncounter`。80 个挂在幕上，10 个没有幕（事件战，不进普通/精英/首领池） |
+| 牌 | 716 | 跳过 `DeprecatedCard`。整局引擎的 `AllCards` 是 717 |
+| 遗物 | 316 | 和 `ModelDb` 的 316 一致 |
+| 药水 | 67 | `Models/Potions` 里 68 个类型去掉 `DeprecatedPotion`。`Mocks` 目录没进。整局引擎数过 69 |
+| 能力 | 308 | 只来自 `Models/Powers`。整局引擎的能力数是 322 |
+| 角色 | 9，其中可玩 6 | `IsPlayable => false` 的不标成可玩。可玩的是 Ironclad、Silent、Regent、Necrobinder、Defect、Fool |
+
+`monster_ai.json` 123 条（含 4 条从基类继承），没有未解析语句。`encounter_monsters.json` 90 条：82 条组成固定，7 条随机，1 条是空的 `DEPRECATED_ENCOUNTER`。先前解析成「缺失」的 `SLIMES_WEAK`、`OVICOPTER_NORMAL`、`DENSE_VEGETATION_EVENT_ENCOUNTER`、`SLITHERING_STRANGLER_NORMAL` 现在有组成。第 1 幕池把 Overgrowth 和 Underdocks 都算进 Act 1（弱怪 8、普通 22、精英 6、首领 6）。第 2 幕普通/精英/首领是 10 / 3 / 3，第 3 幕是 9 / 3 / 3。
+
+直译进旧战斗效果的牌是 148 张（只有 OnPlay 里的伤害和格挡）。愚者 90 张里 26 张是这种。其余只进双语索引。
+
+愚者这条是目录里读出来的，不是写死的：生命 77，能量 3（角色没覆盖 `MaxEnergy`，用的是默认 3），金币 99，起始牌 `STRIKE_FOOL`×5（6，升级 9）、`DEFEND_FOOL`×4（5，升级 8）、`FOOLISH_SHOT`（15，升级 20，标记 `arrow`），起始遗物 `SONG_BOW` 在战斗开始施加 6 层 `AIM`。单独打一发：有弓时愚蠢射击打 21 然后瞄准清掉；没有弓是 15；打击仍是 6，瞄准还在。旧模拟器没有箭袋，这张牌不检查还有没有箭。
+
+种子 7、最多 12 回合，同一场打两遍，结果相同。都是赢：
+
+| 遭遇 | 回合 | 剩余生命 |
+| --- | ---: | ---: |
+| `NIBBITS_WEAK` | 3 | 69 |
+| `NIBBITS_NORMAL` | 7 | 63 |
+| `SLIMES_WEAK` | 3 | 74 |
+| `OVICOPTER_NORMAL` | 7 | 56 |
+| `DENSE_VEGETATION_EVENT_ENCOUNTER` | 6 | 58 |
+| `SLITHERING_STRANGLER_NORMAL` | 5 | 56 |
+| `BYGONE_EFFIGY_ELITE` | 7 | 15 |
+| `SHRINKER_BEETLE_WEAK` | 2 | 77 |
+| `CULTISTS_NORMAL` | 7 | 58 |
+| `THE_KIN_BOSS` | 3 | 42 |
+
+`NIBBITS_NORMAL` 前四回合两边分别是 SLICE/HISS/BUTT/SLICE 和 HISS/BUTT/SLICE/HISS。`CULTISTS_NORMAL` 先 INCANTATION，再四次 DARK_STRIKE。这是旧模拟器的出招，不是客户端逐招回放。
+
+*Fool's row is what the export read: 77 HP, energy 3 because `MaxEnergy` is not overridden, 99 gold, the starter deck and `SONG_BOW` applying 6 Aim. With the bow, Foolish Shot hit for 21 and Aim cleared; without it the hit was 15; Strike stayed 6 and Aim stayed. There is no quiver, so the card does not check for an arrow. Ten encounters at seed 7 were each won twice with the same result. Nibbit and cultist intent lines matched the sequences already used by the legacy tests. That is this simulator's move picker, not a client replay.*
+
+仍不支持，或只是近似：
+
+- 血量和招式用的是非进阶、非 Dread 的数。`IsDread() ? N : 0` 不加进去。
+- 箭袋、多段箭的瞄准（只加在第一段上然后清掉）、召唤新敌人，都不模拟。
+- 568 张牌、绝大多数遗物、全部药水，以及不是「进战斗施加一层能力」这种形状的遗物，只有索引。
+- `SLIMES_WEAK` 的两只小史莱姆按每个位置独立抽，真代码是不放回。随机组成用的是模拟器自己的随机数。
+- 没有挂在幕上的事件战不进 `encounter_pool`，只能按遭遇 id 打。
+- 本地化没有自己的名字时，沿基类找，再不行就显示 id。
+- Windows 那份 DLL 没有用来导出或打这些战斗。
+
+*Still unsupported or approximate: numbers are non-ascension and non-Dread; no quiver; Aim on a multi-hit arrow card applies to the first hit and then clears; summons do not spawn; 568 cards, nearly all relics and every potion are index-only; the two small slimes in `SLIMES_WEAK` are drawn independently; event encounters with no act stay out of `encounter_pool`; a missing name walks the base class and otherwise stays the id. The Windows DLL was not used for this export or these fights.*
+
 ## 明确没做或没测 / Not done, or not tested
 
 - Windows 那份 DLL 没有跑。
-- 旧版 YAML 战斗模拟器仍要当前的 spire-codex（`eng_`/`zhs_` 的 monsters、encounters、relics、potions、powers）。这次没有用旧缓存里的 codex。setup 会在缓存里写出 `monster_ai.json`（这份安装 119 条）和 `encounter_monsters.json`（90 条），那是给旧战斗模拟器用的解析结果，**没有**拿它跑旧战斗测试，也不随仓库分发。
 - 商店没买的商品不会写入地图历史。买下来的牌、遗物和药水走游戏自己的购买函数。
 - mentor 的神经网络仍只覆盖原来那 5 个角色。Fool 的局外决策会按现有逻辑回退，不把 Fool 说成 mentor 已支持。
 - 没有逐张牌、逐个遗物、逐瓶药水对过真游戏。进阶 10 的测试只证明这些种子能跑完且不报错，不证明每个新机制都和客户端一致。

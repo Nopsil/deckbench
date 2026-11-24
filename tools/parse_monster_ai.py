@@ -5,6 +5,7 @@
 
 只做语法层面的解析（正则 + 语句切分），解析不了的写进 "unparsed"，由 enemies.py 退回 spire-codex 的 attack_pattern。
 """
+import copy
 import json
 import os
 import re
@@ -89,9 +90,17 @@ def classify_args(args):
     return {"repeat": rep, "max_times": mx, "cooldown": cd, "weight": w}
 
 
+# v0.113.1 在普通进阶差值后面又加了 Dread：`+ (AscensionHelper.IsDread() ? N : 0)`。
+# 旧战斗模拟器打的是非进阶、非 Dread。取 GetValueIfAscension 的第二个数，不把末尾的 0 当成血量或伤害。
+_DREAD_SUFFIX = r'(?:\s*\+\s*\(AscensionHelper\.IsDread\(\)\s*\?\s*-?\d+\s*:\s*0\))?'
+
+
 def consts_of(src):
     consts = {}
-    for cm in re.finditer(r'(?:private|public|protected)[^;{}=]*?\b(\w+)\s*=>\s*AscensionHelper\.GetValueIfAscension\([^,]+,\s*(-?\d+)m?,\s*(-?\d+)m?\)\s*;', src):
+    for cm in re.finditer(
+            r'(?:private|public|protected)[^;{}=]*?\b(\w+)\s*=>\s*'
+            r'AscensionHelper\.GetValueIfAscension\([^,]+,\s*(-?\d+)m?,\s*(-?\d+)m?\)'
+            + _DREAD_SUFFIX + r'\s*;', src):
         consts[cm.group(1)] = int(cm.group(3))
     for cm in re.finditer(r'(?:private|public|protected)[^;{}=]*?\b(\w+)\s*=>\s*(-?\d+)m?\s*;', src):
         consts.setdefault(cm.group(1), int(cm.group(2)))
@@ -101,10 +110,13 @@ def consts_of(src):
 
 
 def _val(x, consts):
-    x = x.strip().rstrip("m")
+    x = x.strip()
     if x.startswith("()"):
         x = x.split("=>", 1)[1].strip()
-    if re.fullmatch(r'-?\d+', x):
+    # 小数后缀是 5m。名字本身可以以 m 结尾（Slam、Aim），不能把那个 m 剪掉。
+    if re.fullmatch(r"-?\d+m", x):
+        x = x[:-1]
+    if re.fullmatch(r"-?\d+", x):
         return int(x)
     return consts.get(x)
 
@@ -290,7 +302,9 @@ def parse_file(path):
         st["escapes"] = "CreatureCmd.Escape" in fb
     # 构造/字段默认值里的数字常量（状态牌数量常写成属性）
     consts = {}
-    for cm in re.finditer(r'(?:private|public|protected)[^;{=]*?\b(\w+)\s*=>\s*(?:AscensionHelper\.GetValueIfAscension\([^,]+,\s*-?\d+,\s*(-?\d+)\)|(-?\d+))\s*;', src):
+    for cm in re.finditer(
+            r'(?:private|public|protected)[^;{=]*?\b(\w+)\s*=>\s*(?:AscensionHelper\.GetValueIfAscension\([^,]+,\s*-?\d+,\s*(-?\d+)\)'
+            + _DREAD_SUFFIX + r'|(-?\d+))\s*;', src):
         consts[cm.group(1)] = int(cm.group(2) or cm.group(3))
     for cm in re.finditer(r'const int (\w+)\s*=\s*(-?\d+)', src):
         consts[cm.group(1)] = int(cm.group(2))
@@ -304,17 +318,62 @@ def parse_file(path):
             "status_cards": status, "consts": consts, "unparsed": unparsed}
 
 
-def main(src_dir):
+def _class_base(src, cls):
+    m = re.search(r'class\s+' + re.escape(cls) + r'\s*:\s*(\w+)', src)
+    return m.group(1) if m else None
+
+
+def inherit(src_dir, out):
+    """子类没有自己的状态机时，沿基类抄一份。键用子类 id，避免和前缀匹配串类。"""
+    bases = {}
+    for name in os.listdir(src_dir):
+        if not name.endswith(".cs"):
+            continue
+        cls = name[:-3]
+        path = os.path.join(src_dir, name)
+        if not os.path.isfile(path):
+            continue
+        with open(path, encoding="utf-8") as handle:
+            parent = _class_base(handle.read(), cls)
+        if parent:
+            bases[snake(cls)] = snake(parent)
+
+    def resolve(cid, seen):
+        if cid in out:
+            return out[cid]
+        parent = bases.get(cid)
+        if not parent or parent in seen or parent == "MONSTER_MODEL":
+            return None
+        found = resolve(parent, seen | {cid})
+        if found is None:
+            return None
+        copied = copy.deepcopy(found)
+        copied["inherited_from"] = parent
+        out[cid] = copied
+        return copied
+
+    for cid in list(bases):
+        resolve(cid, set())
+    return out
+
+
+def parse_dir(src_dir):
     out = {}
-    for f in sorted(os.listdir(src_dir)):
-        if not f.endswith(".cs"):
+    for name in sorted(os.listdir(src_dir)):
+        if not name.endswith(".cs"):
             continue
-        r = parse_file(os.path.join(src_dir, f))
-        if r is None:
+        parsed = parse_file(os.path.join(src_dir, name))
+        if parsed is None:
             continue
-        out[snake(f[:-3])] = r
+        out[snake(name[:-3])] = parsed
+    return inherit(src_dir, out)
+
+
+def main(src_dir):
+    out = parse_dir(src_dir)
     path = os.path.join(os.environ.get("DECKBENCH_OUT") or os.path.join(ROOT, "data"), "monster_ai.json")
-    json.dump(out, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(out, handle, ensure_ascii=False, indent=1)
     bad = {k: v["unparsed"] for k, v in out.items() if v["unparsed"]}
     noinit = [k for k, v in out.items() if not v["initial"] and not v["initial_expr"]]
     print(f"解析 {len(out)} 个怪物；有未解析语句 {len(bad)} 个；无初始状态 {len(noinit)} 个")

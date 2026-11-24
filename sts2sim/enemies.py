@@ -115,20 +115,30 @@ _DB = {}
 
 
 def load_db():
-    if _DB:
+    global DATA_DIR
+    root = _gd.codex_dir()
+    if _DB.get("_root") != root:
+        _DB.clear()
+    if _DB.get("monsters"):
         return _DB
+    DATA_DIR = root
     try:
         _gd.require_codex()
     except _gd.GameDataError as e:
         raise SystemExit(str(e))
-    eng = json.load(open(os.path.join(DATA_DIR, "eng_monsters.json"), encoding="utf-8"))
-    zh = {x["id"]: x["name"] for x in json.load(open(os.path.join(DATA_DIR, "zhs_monsters.json"), encoding="utf-8"))}
-    _DB["monsters"] = {x["id"]: MonsterDef(x, zh.get(x["id"])) for x in eng}
-    enc = json.load(open(os.path.join(DATA_DIR, "eng_encounters.json"), encoding="utf-8"))
-    zhe = {x["id"]: x["name"] for x in json.load(open(os.path.join(DATA_DIR, "zhs_encounters.json"), encoding="utf-8"))}
+    with open(os.path.join(root, "eng_monsters.json"), encoding="utf-8") as handle:
+        eng = json.load(handle)
+    with open(os.path.join(root, "zhs_monsters.json"), encoding="utf-8") as handle:
+        zh = {row["id"]: row["name"] for row in json.load(handle)}
+    _DB["monsters"] = {row["id"]: MonsterDef(row, zh.get(row["id"])) for row in eng}
+    with open(os.path.join(root, "eng_encounters.json"), encoding="utf-8") as handle:
+        enc = json.load(handle)
+    with open(os.path.join(root, "zhs_encounters.json"), encoding="utf-8") as handle:
+        zhe = {row["id"]: row["name"] for row in json.load(handle)}
     for e in enc:
         e["zh_name"] = zhe.get(e["id"], e["name"])
     _DB["encounters"] = enc
+    _DB["_root"] = root
     comp_path = _gd.data_path("encounter_monsters.json")   # 本机首次运行时从你的安装生成
     _DB["compositions"] = json.load(open(comp_path, encoding="utf-8")) if comp_path else {}
     ai_path = _gd.data_path("monster_ai.json")
@@ -671,7 +681,7 @@ class PainfulStabs(Power):
             C.add_card("WOUND", to="discard")
 
 
-IMPLEMENTED = {"SOAR", "FLUTTER", "PAINFUL_STABS", "STRENGTH", "DEXTERITY", "VULNERABLE", "WEAK", "FRAIL", "ARTIFACT", "INTANGIBLE", "PLATING", "THORNS",
+IMPLEMENTED = {"SOAR", "FLUTTER", "PAINFUL_STABS", "AIM", "STRENGTH", "DEXTERITY", "VULNERABLE", "WEAK", "FRAIL", "ARTIFACT", "INTANGIBLE", "PLATING", "THORNS",
                "RITUAL", "TERRITORIAL", "HIGH_VOLTAGE", "VIGOR", "POISON", "CURL_UP", "SKITTISH", "ENRAGE",
                "HARDENED_SHELL", "RAMPART", "ASLEEP", "SLUMBER", "MINION", "SLIPPERY", "HARD_TO_KILL", "PLOW",
                "SHRIEK", "IMBALANCED", "ILLUSION", "REATTACH"}
